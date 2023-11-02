@@ -1,0 +1,16 @@
+name: osml-jupyterlab-ext-dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - conda-forge::gdal=3.7.0
+  - conda-forge::proj=9.2.1
+  - jupyterlab=4
+  - nodejs=18
+  - copier=7
+  - jinja2-time
+  - git
+  - pip
+  - pip:
+      - osml-imagery-toolkit>=1.1.2

@@ -57,7 +57,10 @@
     },
     "dependencies": {
         "@jupyterlab/application": "^4.0.0",
-        "@jupyterlab/settingregistry": "^4.0.0"
+        "@jupyterlab/launcher": "^4.0.7",
+        "@jupyterlab/settingregistry": "^4.0.0",
+        "@types/leaflet": "^1.9.7",
+        "leaflet": "^1.9.4"
     },
     "devDependencies": {
         "@jupyterlab/builder": "^4.0.0",
