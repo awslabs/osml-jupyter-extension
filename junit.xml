@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="3.826">
+  <testsuite name="osml-jupyter-extension" errors="0" failures="0" skipped="0" timestamp="2023-11-08T19:19:54" time="3.129" tests="1">
+    <testcase classname="osml-jupyter-extension should be tested" name="osml-jupyter-extension should be tested" time="0.003">
+    </testcase>
+  </testsuite>
+</testsuites>

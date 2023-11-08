@@ -158,7 +158,6 @@ export const JupyterImageLayer = GridLayer.extend({
         // TODO: Error handling? What happens if the tile can't be retrieved from the kernel.
         console.log('Received tile from comm!!!');
         //console.log(msg);
-        // @ts-ignore
         image.src = 'data:image/png;base64, ' + msg.content.data.img;
         // This is necessary to let the layer know the tile has been fully loaded
         done(undefined, tile);
@@ -181,6 +180,6 @@ export function jupyterImageLayer(
   imageName: string,
   options: IJupyterImageLayerOptions
 ) {
-  // @ts-ignore
+  // @ts-ignore: Leaflet custom extends() approach does not play well with typescript
   return new JupyterImageLayer(sessionContext, imageName, options);
 }

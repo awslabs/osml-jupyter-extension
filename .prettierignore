@@ -3,4 +3,7 @@ node_modules
 **/lib
 **/package.json
 !/package.json
+package-lock.json
 osml_jupyter_extension
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
