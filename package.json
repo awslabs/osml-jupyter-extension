@@ -180,6 +180,7 @@
             {
                 "files": "package.json",
                 "options": {
+                    "printWidth": 120,
                     "tabWidth": 4
                 }
             }
