@@ -27,6 +27,12 @@ pip uninstall osml_jupyter_extension
 
 ### Development install
 
+Setup development environment in conda. 
+```bash
+conda env create -f environment.yml
+conda activate osml-jupyterlab-ext-dev
+```
+
 Note: You will need NodeJS to build the extension package.
 
 The `jlpm` command is JupyterLab's pinned version of
@@ -40,6 +46,10 @@ The `jlpm` command is JupyterLab's pinned version of
 pip install -e "."
 # Link your development version of the extension with JupyterLab
 jupyter labextension develop . --overwrite
+
+
+jlpm install
+
 # Rebuild extension Typescript source after making changes
 jlpm build
 ```
