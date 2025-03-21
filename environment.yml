@@ -3,9 +3,9 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.10
-  - conda-forge::gdal=3.7.0
-  - conda-forge::proj=9.2.1
+  - python=3.11
+  - conda-forge::gdal=3.8.3
+  - conda-forge::proj=9.3.1
   - jupyterlab=4
   - nodejs=18
   - copier=7
@@ -13,4 +13,4 @@ dependencies:
   - git
   - pip
   - pip:
-      - osml-imagery-toolkit>=1.1.2
+      - osml-imagery-toolkit>=1.4.2

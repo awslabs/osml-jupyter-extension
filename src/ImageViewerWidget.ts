@@ -1,5 +1,4 @@
 import {
-  InputDialog,
   ISessionContext,
   SessionContext,
   SessionContextDialogs
@@ -23,7 +22,6 @@ import {
 } from 'leaflet';
 
 import { jupyterImageLayer } from './JupyterImageLayer';
-import { addLayerControl } from './AddLayerControl';
 import { jupyterOverlayLayer } from './JupyterOverlayLayer';
 
 /**
@@ -139,6 +137,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   private mapControl?: Map;
   private layersControl?: Control.Layers;
   private comm?: Kernel.IComm;
+  private imageName?: string;
 
   /**
    * Public constructor for the ImageViewerWidget.
@@ -148,8 +147,12 @@ export class ImageViewerWidget extends MainAreaWidget {
    * by custom messages sent by layers added to the map.
    *
    * @param manager Jupyter service manager dependency
+   * @param selectedFileName Path of the selected file on the local file system
    */
-  public constructor(manager: ServiceManager.IManager) {
+  public constructor(
+    manager: ServiceManager.IManager,
+    selectedFileName: string | null
+  ) {
     const content = new Widget();
     super({ content });
     this.id = 'osml-jupyter-extension:image-viewer';
@@ -227,12 +230,9 @@ export class ImageViewerWidget extends MainAreaWidget {
           // Once the session is initialized we can ask the user to select an image for display.
           // This widget is not a general full-earth geographic display so a single image must be
           // selected as the base layer.
-          const input = await InputDialog.getText({
-            title: 'Image Filename',
-            okLabel: 'Load'
-          });
-          if (input.button.accept && input.value) {
-            this.openImage(input.value);
+
+          if (selectedFileName) {
+            this.openImage(selectedFileName);
           }
         }
       })
@@ -248,9 +248,13 @@ export class ImageViewerWidget extends MainAreaWidget {
    *
    * @param imageName the full path of the image on the Jupyter notebook instance.
    */
-  private openImage(imageName: string) {
+  public openImage(imageName: string | null) {
     console.log('DEBUG: ImageViewerWidget.openImage("' + imageName + '")');
+    if (!imageName) {
+      return;
+    }
 
+    this.imageName = imageName;
     const minZoom = 2;
     const maxZoom = 12;
     const maxNativeZoom = 6;
@@ -290,48 +294,32 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.layersControl = control.layers(baseLayers, overlayLayers);
     this.mapControl.addControl(this.layersControl);
 
-    const addLayerCallback = async () => {
-      if (!this.layersControl) {
-        console.warn('Layers Control Missing! Nothing to do!');
-        return;
-      }
-      if (!this.mapControl) {
-        console.warn('Map Missing! Nothing to do!');
-        return;
-      }
+    return;
+  }
 
-      const input = await InputDialog.getText({
-        title: 'GeoJSON Location',
-        okLabel: 'Load'
-      });
-      if (input.button.accept && input.value) {
-        console.log('Add Layer: ' + input.value + ' for image ' + imageName);
-        const overlayLayer = jupyterOverlayLayer(
-          this.comm,
-          imageName,
-          input.value,
-          {
-            tileSize: 512,
-            minNativeZoom: minNativeZoom,
-            maxNativeZoom: maxNativeZoom
-          }
-        );
-        this.mapControl.addLayer(overlayLayer);
-        this.layersControl.addOverlay(overlayLayer, input.value);
+  public addLayer(layerDataPath: string | null) {
+    console.log(`TODO: Add Layer for ${layerDataPath}`);
+    if (!layerDataPath || !this.imageName) {
+      return;
+    }
+
+    const maxNativeZoom = 6;
+    const minNativeZoom = 6;
+    const overlayLayer = jupyterOverlayLayer(
+      this.comm,
+      this.imageName,
+      layerDataPath,
+      {
+        tileSize: 512,
+        minNativeZoom: minNativeZoom,
+        maxNativeZoom: maxNativeZoom
       }
-    };
-
-    // @ts-ignore: hack fix type of options for layer control
-    const callback = () => {
-      console.log('AddLayerControl Clicked!');
-      addLayerCallback().then(() => {
-        console.log('AddLayerCallback Done!');
-      });
-    };
-
-    this.mapControl.addControl(
-      addLayerControl(callback, { position: 'topright' })
     );
+    if (this.mapControl && this.layersControl) {
+      this.mapControl.addLayer(overlayLayer);
+      this.layersControl.addOverlay(overlayLayer, layerDataPath);
+    }
+    return;
   }
 
   /**
