@@ -37,16 +37,32 @@ gdal.UseExceptions()
 from aws.osml.gdal import load_gdal_dataset, GDALImageFormats, GDALCompressionOptions, RangeAdjustmentType
 from aws.osml.image_processing import GDALTileFactory
 from aws.osml.features import STRFeature2DSpatialIndex, ImagedFeaturePropertyAccessor
+from math import ceil, log
 
 import base64
 import geojson
 import shapely
 import os
 
+def get_standard_overviews(width: int, height: int, preview_size: int):
+    min_side = min(width, height)
+    num_overviews = ceil(log(min_side / preview_size) / log(2))
+    if num_overviews > 0:
+        result = []
+        for i in range(1, num_overviews + 1):
+            result.append(2**i)
+        return result
+    return []
+
 image_tile_factory_cache = {}
 def get_image_tile_factory(dataset):
     if dataset not in image_tile_factory_cache.keys():
         ds, sensor_model = load_gdal_dataset(dataset)
+        band = ds.GetRasterBand(1)
+        overview_count = band.GetOverviewCount()
+        if overview_count == 0:
+            overviews = get_standard_overviews(ds.RasterXSize, ds.RasterYSize, 1024)
+            ds.BuildOverviews("CUBIC", overviews)
         viz_tile_factory = GDALTileFactory(ds,
                                            sensor_model,
                                            GDALImageFormats.PNG,
@@ -88,11 +104,18 @@ def create_recv(comm):
             zoom = msg['content']['data']['zoom']
             row = msg['content']['data']['row']
             col = msg['content']['data']['col']
+            max_native_zoom = 12
+            scale = 2**(max_native_zoom - zoom)
+            scaled_tile_size = 512*scale
             tile_factory = get_image_tile_factory(dataset)
             if tile_factory is not None:
                 comm.send({
                     'type': "IMAGE_TILE_RESPONSE",
-                    'img': base64.b64encode(tile_factory.create_encoded_tile([int(col)*512, int(row)*512, 512, 512])).decode('utf-8')
+                    'img': base64.b64encode(tile_factory.create_encoded_tile([
+                    int(col)*scaled_tile_size, 
+                    int(row)*scaled_tile_size, 
+                    scaled_tile_size, 
+                    scaled_tile_size], [512, 512])).decode('utf-8')
                 })
         elif type == 'OVERLAY_TILE_REQUEST':
             image_name = msg['content']['data']['imageName']
@@ -257,8 +280,8 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.imageName = imageName;
     const minZoom = 2;
     const maxZoom = 12;
-    const maxNativeZoom = 6;
-    const minNativeZoom = 6;
+    const maxNativeZoom = 12;
+    const minNativeZoom = 0;
     const customCRS = extend({}, CRS.Simple, {
       transformation: new Transformation(
         1 / 2 ** maxNativeZoom,
@@ -303,8 +326,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    const maxNativeZoom = 6;
-    const minNativeZoom = 6;
+    const maxNativeZoom = 12;
+    const minNativeZoom = 12;
     const overlayLayer = jupyterOverlayLayer(
       this.comm,
       this.imageName,
