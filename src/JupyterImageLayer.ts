@@ -46,7 +46,9 @@ export const JupyterImageLayer = GridLayer.extend({
     image.setAttribute('height', this.options.tileSize);
     tile.appendChild(image);
 
-    console.log('Fetching tile for coords: ' + coords);
+    console.log(
+      `Fetching tile: ${this.imageName} (x,y,z) = (${coords.x},${coords.y},${coords.z})`
+    );
 
     const commFuture = this.comm.send({
       type: 'IMAGE_TILE_REQUEST',
