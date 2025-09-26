@@ -1,5 +1,48 @@
 # osml_jupyter_extension
 
+#### TEMP QUICK START GUIDE!!!
+Note that this project is currently a quick and dirty proof of concept that does
+not conform to any of the build conventions other OversightML projects use. It 
+started from a jupyterlab extension template and was built to provide a proof of
+concept. 
+
+See the Development Install section below for ways to run this on a local developer
+machine/jupyter instance for rapid dev iterations.
+
+To build and install a binary into a SageMaker AI managed Jupyter environment follow
+these instructions:
+1. Build the code and package it as a wheel. The result ends up in the ./dist directory.
+```bash
+pip install build twine hatch
+python3 -m build
+```
+2. Copy the .whl to your Jupyter instance.
+3. Start a terminal on the Jupyter instance and then install the package:
+```bash
+python3 -m pip install osml_jupyter_extension-0.1.0-py3-none-any.whl
+```
+4. Verify that the installation succeeded. You should see a row that says osml-jupyter-extension enabled OK.
+```bash
+jupyter labextension list
+```
+5. Refresh/Reload your Jupyter browser window. This is necessary to download the new UI with the frontend extensions.
+
+This extension assumes you have a conda based Jupyter kernel available with 
+osml-imagery-toolkit available and installed. To do that:
+1. Upload/create a Conda environment file to your Jupyter instance that has GDAL, Proj, and the osml-imagery-toolkit.
+2. Start a terminal on the Jupyter instance and then create the conda environment:
+```bash
+conda env create -f osml-kernel-environment.yml
+```
+3. Register the new Conda environment as a Jupyter Kernel
+```bash
+conda activate osml-kernel
+python3 -m ipykernel install --user --name=osml-kernel
+```
+4. Refresh/Reload your Jupyter browser window. This is necessary to make sure the new kernel is listed in the web UI.
+
+
+
 [![Github Actions Status](https://github.com/aws-solutions-library-samples/osml-jupyter-extension/workflows/Build/badge.svg)](https://github.com/aws-solutions-library-samples/osml-jupyter-extension/actions/workflows/build.yml)
 A JupyterLab extension to work with satellite imagery using OversightML.
 
@@ -28,6 +71,8 @@ pip uninstall osml_jupyter_extension
 ### Development install
 
 Setup development environment in conda. 
+Make sure the gdal and proj dependencies in this environment match the dependencies in your 
+osml-kernel environment
 ```bash
 conda env create -f environment.yml
 conda activate osml-jupyterlab-ext-dev
@@ -41,7 +86,7 @@ The `jlpm` command is JupyterLab's pinned version of
 
 ```bash
 # Clone the repo to your local environment
-# Change directory to the osml_jupyter_extension directory
+
 # Install package in development mode
 pip install -e "."
 # Link your development version of the extension with JupyterLab

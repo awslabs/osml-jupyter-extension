@@ -1,0 +1,31 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
+# To build the environment run:
+# conda env create -f osml-kernel-environment.yml
+#
+# To install in jupyter run:
+# conda activate osml-kernel
+# python3 -m ipykernel install --user --name=osml-kernel
+#
+# After that refresh the jupyter tab in the browser to see the new environment
+
+name: osml-kernel
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.9
+  - conda-forge::numpy=2.2.4
+  - conda-forge::gdal=3.8.5
+  - conda-forge::proj=9.4.1
+  - ipykernel
+  - python-graphviz
+  - geopandas
+  - git
+  - pip
+  - pip:
+      - boto3
+      - tqdm
+      - ipyleaflet
+      - osml-imagery-toolkit>=1.4.2
+      - h3
