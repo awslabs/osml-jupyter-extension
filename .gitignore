@@ -1,3 +1,5 @@
+dev-jupyter-workspace/
+
 *.bundle.*
 lib/
 node_modules/
