@@ -12,18 +12,17 @@ import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
 import { MainAreaWidget } from '@jupyterlab/apputils';
-import {
-  Control,
-  Map,
-  CRS,
-  Transformation,
-  control,
-  map,
-  extend
-} from 'leaflet';
+import { Deck, OrthographicView } from '@deck.gl/core';
 
-import { jupyterImageLayer } from './JupyterImageLayer';
-import { jupyterOverlayLayer } from './JupyterOverlayLayer';
+import { ImagePyramidLayerManager } from './ImagePyramidLayerManager';
+import { 
+  createMockTileDataFunction, 
+  createRealTileDataFunction, 
+  createTileDataWrapper,
+  ITile, 
+  TileDataFunction 
+} from './ImagePyramidTileDataFunctions';
+import { DeckJupyterOverlayLayerManager } from './DeckJupyterOverlayLayer';
 import { KERNEL_SETUP_CODE } from './kernelSetupCode';
 
 /**
@@ -34,11 +33,14 @@ export class ImageViewerWidget extends MainAreaWidget {
   private sessionContextDialogs: SessionContextDialogs;
   private translator: ITranslator;
   private mapDiv: HTMLDivElement;
-  private mapControl?: Map;
-  private layersControl?: Control.Layers;
+  private deckInstance?: Deck;
+  private imageLayerManager?: ImagePyramidLayerManager;
+  private overlayLayerManagers: Map<string, DeckJupyterOverlayLayerManager> = new Map();
   private comm?: Kernel.IComm;
   private imageName?: string;
   private manager?: ServiceManager.IManager;
+  private viewportUpdateTimeout?: NodeJS.Timeout;
+  private lastViewportUpdate: number = 0;
 
   /**
    * Static Factory Method for the ImageViewerWidget.
@@ -82,13 +84,13 @@ export class ImageViewerWidget extends MainAreaWidget {
       translator: this.translator
     });
 
-    // Create a new div that will contain the Leaflet managed content. This div will be the full window in the
+    // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
     this.mapDiv = document.createElement('div');
     this.mapDiv.id = 'map-' + Date.now();
+    this.mapDiv.style.width = '100%';
+    this.mapDiv.style.height = '100%';
     this.content.node.appendChild(this.mapDiv);
-    this.mapControl = undefined;
-    this.layersControl = undefined;
   }
 
   private async initialize(selectedFileName: string | null) {
@@ -161,7 +163,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   public statusSignal: Signal<any, any> = new Signal<any, any>(this);
 
   /**
-   * Creates a new Leaflet map containing a base layer for this tiled image.
+   * Creates a new Deck.gl visualization containing a base layer for this tiled image.
    *
    * @param imageName the full path of the image on the Jupyter notebook instance.
    */
@@ -214,71 +216,144 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
 
     this.imageName = imageName;
-    const minZoom = 0;
-    const maxZoom = 16;
-    const maxNativeZoom = 12;
-    const minNativeZoom = 0;
-    const customCRS = extend({}, CRS.Simple, {
-      transformation: new Transformation(
-        1 / 2 ** maxNativeZoom,
-        0,
-        1 / 2 ** maxNativeZoom,
-        0
-      )
-    });
-    this.mapControl = map(this.mapDiv.id, {
-      crs: customCRS,
-      minZoom: minZoom,
-      maxZoom: maxZoom,
-      zoom: maxNativeZoom,
-      center: [512, 512],
-      attributionControl: false
-    });
+    const minZoom = -10;
+    const maxZoom = 10;
+    const maxNativeZoom = 0;
+    const minNativeZoom = -10;
 
     if (!this.imageSessionContext || !this.comm) {
       return;
     }
 
-    const imageLayer = jupyterImageLayer(this.comm, imageName, {
-      tileSize: 512,
-      minNativeZoom: minNativeZoom,
-      maxNativeZoom: maxNativeZoom
-    });
-    this.mapControl.addLayer(imageLayer);
+    // Create tile data function - can easily swap between mock and real data
+    // For mock data:
+    //const tileDataFunction = createMockTileDataFunction(512);
+    // For real data (uncomment to use):
+    const tileDataFunction = createRealTileDataFunction(this.comm, imageName, 10000);
+    
+    // Create the image layer manager with update callback
+    this.imageLayerManager = new ImagePyramidLayerManager(
+      this.comm,
+      imageName,
+      {
+        tileSize: 512,
+        minZoom: minZoom,
+        maxZoom: maxZoom,
+        enableDebugLogging: true, // Enable debug logging for development
+        getTileData: createTileDataWrapper(tileDataFunction, () => this.updateDeckLayers())
+      },
+      () => this.updateDeckLayers() // Update callback to refresh layers when tiles load
+    );
 
-    const baseLayers: any = {};
-    baseLayers[imageName] = imageLayer;
+    // Create a canvas element for Deck.gl
+    const canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    this.mapDiv.appendChild(canvas);
 
-    const overlayLayers = {};
-    this.layersControl = control.layers(baseLayers, overlayLayers);
-    this.mapControl.addControl(this.layersControl);
+    // Create Deck.gl instance with OrthographicView
+    // Position the view to show the image starting from coordinate (0,0) at full resolution
+    this.deckInstance = new Deck({
+      canvas: canvas,
+      width: '100%',
+      height: '100%',
+      initialViewState: {
+        target: [0, 0, 0], 
+        zoom: 0,   // Start at full resolution (zoom level 0)
+        minZoom: minZoom,
+        maxZoom: maxZoom
+      } as any,
+      views: [
+        new OrthographicView({
+          id: 'ortho',
+          controller: true,
+          flipY: true, // Assign 0,0 to the upper left corner to match image coordinate systems
+        })
+      ],
+      layers: [this.imageLayerManager.getLayer()],
+      onViewStateChange: ({ viewState }) => {
+        // Handle view state changes if needed
+        console.log('View state changed:', viewState);
+        // Use throttled update to prevent excessive layer updates during rapid viewport changes
+        this.throttledViewportUpdate();
+      }
+    }) as any; // Type assertion to work around Deck.gl typing issues
 
+    this.statusSignal.emit(`${imageName} loaded successfully`);
     return;
   }
 
   public addLayer(layerDataPath: string | null) {
-    if (!layerDataPath || !this.imageName) {
+    if (!layerDataPath || !this.imageName || !this.deckInstance) {
       return;
     }
 
     this.statusSignal.emit(`Adding overlays from ${layerDataPath}`);
-    const maxNativeZoom = 12;
-    const minNativeZoom = 12;
-    const overlayLayer = jupyterOverlayLayer(
+    
+    // Create overlay layer manager
+    const overlayLayerManager = new DeckJupyterOverlayLayerManager(
       this.comm,
       this.imageName,
       layerDataPath,
       {
         tileSize: 512,
-        minNativeZoom: minNativeZoom,
-        maxNativeZoom: maxNativeZoom
+        opacity: 0.8
       }
     );
-    if (this.mapControl && this.layersControl) {
-      this.mapControl.addLayer(overlayLayer);
-      this.layersControl.addOverlay(overlayLayer, layerDataPath);
-    }
+
+    // Store the overlay layer manager
+    this.overlayLayerManagers.set(layerDataPath, overlayLayerManager);
+
+    // Update Deck.gl layers
+    this.updateDeckLayers();
+    
+    this.statusSignal.emit(`Added overlay layer: ${layerDataPath}`);
     return;
+  }
+
+
+  /**
+   * Throttled viewport update to prevent excessive layer updates during rapid viewport changes.
+   * This ensures smooth interaction while still updating tiles when the viewport stabilizes.
+   */
+  private throttledViewportUpdate(): void {
+    const now = Date.now();
+    const timeSinceLastUpdate = now - this.lastViewportUpdate;
+    
+    // Clear any existing timeout
+    if (this.viewportUpdateTimeout) {
+      clearTimeout(this.viewportUpdateTimeout);
+    }
+    
+    // If enough time has passed since the last update, update immediately
+    if (timeSinceLastUpdate >= 100) { // 100ms throttle
+      this.lastViewportUpdate = now;
+      this.updateDeckLayers();
+    } else {
+      // Otherwise, schedule an update for later
+      this.viewportUpdateTimeout = setTimeout(() => {
+        this.lastViewportUpdate = Date.now();
+        this.updateDeckLayers();
+      }, 100 - timeSinceLastUpdate);
+    }
+  }
+
+  /**
+   * Updates the Deck.gl instance with current layers.
+   */
+  private updateDeckLayers(): void {
+    if (!this.deckInstance || !this.imageLayerManager) {
+      return;
+    }
+
+    const layers: any[] = [this.imageLayerManager.getLayer()];
+    
+    // Add all overlay layers
+    for (const overlayManager of this.overlayLayerManagers.values()) {
+      layers.push(overlayManager.getLayer());
+    }
+
+    this.deckInstance.setProps({ layers });
   }
 
   /**
@@ -305,10 +380,33 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Implementation expand the super's dispose function to ensure class specific resources are cleaned up.
    */
   dispose(): void {
+    // Clean up viewport update timeout
+    if (this.viewportUpdateTimeout) {
+      clearTimeout(this.viewportUpdateTimeout);
+      this.viewportUpdateTimeout = undefined;
+    }
+
+    // Clean up Deck.gl instance
+    if (this.deckInstance) {
+      this.deckInstance.finalize();
+      this.deckInstance = undefined;
+    }
+
+    // Clear layer managers
+    if (this.imageLayerManager) {
+      this.imageLayerManager.clearCache();
+      this.imageLayerManager = undefined;
+    }
+
+    for (const overlayManager of this.overlayLayerManagers.values()) {
+      overlayManager.clearCache();
+    }
+    this.overlayLayerManagers.clear();
+
+    // Clean up DOM
     if (this.mapDiv) {
       this.mapDiv.innerHTML = '';
     }
-    this.mapControl = undefined;
 
     console.log('Shutting down session and comm as part of dispose()');
     try {

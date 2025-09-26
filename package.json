@@ -58,12 +58,14 @@
     "dependencies": {
         "@cloudscape-design/components": "^3.0.544",
         "@cloudscape-design/global-styles": "^1.0.23",
+        "@deck.gl/core": "^9.1.14",
+        "@deck.gl/extensions": "^9.1.14",
+        "@deck.gl/layers": "^9.1.14",
         "@jupyterlab/application": "^4.0.0",
         "@jupyterlab/launcher": "^4.0.7",
         "@jupyterlab/settingregistry": "^4.0.0",
         "@jupyterlab/ui-components": "^4.0.0",
-        "@types/leaflet": "^1.9.7",
-        "leaflet": "^1.9.4",
+        "deck.gl": "^9.1.14",
         "webpack": "^5.90.3"
     },
     "devDependencies": {
