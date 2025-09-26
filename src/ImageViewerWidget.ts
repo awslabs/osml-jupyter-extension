@@ -10,6 +10,7 @@ import { Kernel, KernelMessage, ServiceManager } from '@jupyterlab/services';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
+import { Signal } from '@lumino/signaling';
 import { MainAreaWidget } from '@jupyterlab/apputils';
 import {
   Control,
@@ -99,7 +100,18 @@ def create_recv(comm):
         # print(msg['content']['data'])
         type = msg['content']['data']['type']
         
-        if type == 'IMAGE_TILE_REQUEST':
+        if type == 'IMAGE_LOAD_REQUEST':
+            dataset = msg['content']['data']['dataset']
+            tile_factory = get_image_tile_factory(dataset)
+            status = "FAILED"
+            if tile_factory is not None:
+                status = "SUCCESS"
+            comm.send({
+                'type': "IMAGE_LOAD_RESPONSE",
+                'dataset': dataset,
+                'status': status
+            })
+        elif type == 'IMAGE_TILE_REQUEST':
             dataset = msg['content']['data']['dataset']
             zoom = msg['content']['data']['zoom']
             row = msg['content']['data']['row']
@@ -161,9 +173,10 @@ export class ImageViewerWidget extends MainAreaWidget {
   private layersControl?: Control.Layers;
   private comm?: Kernel.IComm;
   private imageName?: string;
+  private manager?: ServiceManager.IManager;
 
   /**
-   * Public constructor for the ImageViewerWidget.
+   * Static Factory Method for the ImageViewerWidget.
    *
    * On creation this widget injects code into a Python Kernel that establishes the server side of a "comm" channel
    * and sets up tile readers / vector indexes based on the osml-imagery-toolkit. These resources will be accessed
@@ -172,17 +185,37 @@ export class ImageViewerWidget extends MainAreaWidget {
    * @param manager Jupyter service manager dependency
    * @param selectedFileName Path of the selected file on the local file system
    */
-  public constructor(
+  public static async createForImage(
     manager: ServiceManager.IManager,
     selectedFileName: string | null
-  ) {
+  ): Promise<ImageViewerWidget> {
+    const widget = new ImageViewerWidget(manager);
+    await widget.initialize(selectedFileName);
+    return widget;
+  }
+
+  public constructor(manager: ServiceManager.IManager) {
     const content = new Widget();
     super({ content });
     this.id = 'osml-jupyter-extension:image-viewer';
     this.title.label = 'OSML Image View';
     this.title.closable = true;
 
+    this.manager = manager;
+
     this.translator = nullTranslator;
+
+    // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
+    this.imageSessionContext = new SessionContext({
+      sessionManager: this.manager.sessions,
+      specsManager: this.manager.kernelspecs,
+      name: 'OversightML Image Viewer',
+      kernelPreference: { name: 'ipython' }
+    });
+
+    this.sessionContextDialogs = new SessionContextDialogs({
+      translator: this.translator
+    });
 
     // Create a new div that will contain the Leaflet managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -191,18 +224,12 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.content.node.appendChild(this.mapDiv);
     this.mapControl = undefined;
     this.layersControl = undefined;
+  }
 
-    // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
-    this.imageSessionContext = new SessionContext({
-      sessionManager: manager.sessions,
-      specsManager: manager.kernelspecs,
-      name: 'OversightML Image Viewer',
-      kernelPreference: { name: 'ipython' }
-    });
-
-    this.sessionContextDialogs = new SessionContextDialogs({
-      translator: this.translator
-    });
+  private async initialize(selectedFileName: string | null) {
+    if (!this.imageSessionContext) {
+      return;
+    }
 
     this.imageSessionContext
       .initialize()
@@ -255,7 +282,7 @@ export class ImageViewerWidget extends MainAreaWidget {
           // selected as the base layer.
 
           if (selectedFileName) {
-            this.openImage(selectedFileName);
+            await this.openImage(selectedFileName);
           }
         }
       })
@@ -266,20 +293,64 @@ export class ImageViewerWidget extends MainAreaWidget {
       });
   }
 
+  public statusSignal: Signal<any, any> = new Signal<any, any>(this);
+
   /**
    * Creates a new Leaflet map containing a base layer for this tiled image.
    *
    * @param imageName the full path of the image on the Jupyter notebook instance.
    */
-  public openImage(imageName: string | null) {
+  public async openImage(imageName: string | null) {
     console.log('DEBUG: ImageViewerWidget.openImage("' + imageName + '")');
     if (!imageName) {
       return;
     }
 
+    if (!this.comm) {
+      this.statusSignal.emit(
+        `Unable to load ${imageName} because plugin setup failed.`
+      );
+      return;
+    }
+
+    try {
+      this.statusSignal.emit(`Loading ${imageName} ...`);
+      const loadStatus = await new Promise<string>((resolve, reject) => {
+        const commFuture = this.comm!.send({
+          type: 'IMAGE_LOAD_REQUEST',
+          dataset: imageName
+        });
+
+        // Set a timeout to reject the promise if we don't get a response
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Timeout waiting for image load response'));
+        }, 30000); // 30 second timeout
+
+        commFuture.onIOPub = (msg: any): void => {
+          const msgType = msg.header.msg_type;
+          if (msgType === 'comm_msg') {
+            console.log('Received image load response from comm!!!');
+            clearTimeout(timeoutId);
+            resolve(msg.content.data.status);
+          }
+        };
+
+        // Handle comm future done with error
+        commFuture.done.catch(error => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
+      });
+
+      this.statusSignal.emit(`Loading ${imageName} ... ${loadStatus}`);
+    } catch (error: any) {
+      console.error('Error loading image:', error);
+      this.statusSignal.emit(`Error loading ${imageName}: ${error.message}`);
+    }
+
     this.imageName = imageName;
-    const minZoom = 2;
-    const maxZoom = 12;
+    const minZoom = 0;
+    const maxZoom = 16;
     const maxNativeZoom = 12;
     const minNativeZoom = 0;
     const customCRS = extend({}, CRS.Simple, {
@@ -321,11 +392,11 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   public addLayer(layerDataPath: string | null) {
-    console.log(`TODO: Add Layer for ${layerDataPath}`);
     if (!layerDataPath || !this.imageName) {
       return;
     }
 
+    this.statusSignal.emit(`Adding overlays from ${layerDataPath}`);
     const maxNativeZoom = 12;
     const minNativeZoom = 12;
     const overlayLayer = jupyterOverlayLayer(
