@@ -1,6 +1,14 @@
-import { GridLayerOptions } from 'leaflet';
-
 /**
- * Interface is a placeholder incase we need to extend the GridLayerOptions.
+ * Interface for Jupyter image layer options.
+ * This is kept for backward compatibility but should be replaced with IDeckImageLayerOptions.
+ * @deprecated Use IDeckImageLayerOptions instead
  */
-export interface IJupyterImageLayerOptions extends GridLayerOptions {}
+export interface IJupyterImageLayerOptions {
+  tileSize?: number;
+  minNativeZoom?: number;
+  maxNativeZoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  opacity?: number;
+  visible?: boolean;
+}

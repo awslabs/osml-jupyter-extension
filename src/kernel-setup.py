@@ -82,8 +82,9 @@ def create_recv(comm):
             zoom = msg['content']['data']['zoom']
             row = msg['content']['data']['row']
             col = msg['content']['data']['col']
-            max_native_zoom = 12
-            scale = 2**(max_native_zoom - zoom)
+            #max_native_zoom = 12
+            #scale = 2**(max_native_zoom - zoom)
+            scale = 2**(-1*zoom)
             scaled_tile_size = 512*scale
             tile_factory = get_image_tile_factory(dataset)
             if tile_factory is not None:
