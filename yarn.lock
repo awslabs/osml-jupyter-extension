@@ -1669,7 +1669,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deck.gl/aggregation-layers@npm:9.1.14":
+"@deck.gl/aggregation-layers@npm:9.1.14, @deck.gl/aggregation-layers@npm:^9.1.14":
   version: 9.1.14
   resolution: "@deck.gl/aggregation-layers@npm:9.1.14"
   dependencies:
@@ -9834,6 +9834,7 @@ __metadata:
   dependencies:
     "@cloudscape-design/components": ^3.0.544
     "@cloudscape-design/global-styles": ^1.0.23
+    "@deck.gl/aggregation-layers": ^9.1.14
     "@deck.gl/core": ^9.1.14
     "@deck.gl/extensions": ^9.1.14
     "@deck.gl/layers": ^9.1.14

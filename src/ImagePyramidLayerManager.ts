@@ -1,5 +1,5 @@
 import { Kernel } from '@jupyterlab/services';
-import { ImagePyramidLayer } from './ImagePyramidLayer';
+import { DeckTileImageLayer } from './DeckTileImageLayer';
 import { ITile, TileDataFunction } from './ImagePyramidTileDataFunctions';
 
 /**
@@ -16,11 +16,11 @@ export interface IImagePyramidLayerOptions {
 }
 
 /**
- * Manager class for ImagePyramidLayer instances.
+ * Manager class for DeckTileImageLayer instances.
  * Provides a simplified interface for creating and managing image pyramid layers.
  */
 export class ImagePyramidLayerManager {
-  private layer: ImagePyramidLayer | null = null;
+  private layer: DeckTileImageLayer | null = null;
   private updateCallback?: () => void;
 
   constructor(
@@ -47,13 +47,14 @@ export class ImagePyramidLayerManager {
   }
 
   /**
-   * Create and return the ImagePyramidLayer instance.
+   * Create and return the DeckTileImageLayer instance.
    */
-  public getLayer(): ImagePyramidLayer {
+  public getLayer(): DeckTileImageLayer {
     if (!this.layer) {
       
-      this.layer = new ImagePyramidLayer({
+      this.layer = new DeckTileImageLayer({
         id: `image-pyramid-${this.imageName}`,
+        data: [], // Required by TileLayer but not used since we provide getTileData
         comm: this.comm,
         imageName: this.imageName,
         tileSize: this.options.tileSize || 512,
@@ -62,8 +63,13 @@ export class ImagePyramidLayerManager {
         opacity: this.options.opacity || 1.0,
         visible: this.options.visible !== false,
         enableDebugLogging: this.options.enableDebugLogging || false,
-        getTileData: this.options.getTileData
-      });
+        getTileData: this.options.getTileData, // This will be handled by DeckTileImageLayer's conversion
+        // Additional TileLayer optimizations
+        maxCacheSize: 100,
+        maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
+        refinementStrategy: 'best-available',
+        debounceTime: 100
+      } as any); // Type assertion to bypass the getTileData type mismatch
       
       this.logDebug('Layer created', {
         layerId: this.layer.id,
