@@ -13,16 +13,21 @@ import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
 import { MainAreaWidget } from '@jupyterlab/apputils';
 import { Deck, OrthographicView } from '@deck.gl/core';
+import { TileLayer } from '@deck.gl/geo-layers';
+import { BitmapLayer } from '@deck.gl/layers';
 
-import { ImagePyramidLayerManager } from './ImagePyramidLayerManager';
 import { 
   createMockTileDataFunction, 
   createRealTileDataFunction, 
-  createTileDataWrapper,
   ITile, 
   TileDataFunction 
 } from './ImagePyramidTileDataFunctions';
-import { DeckJupyterOverlayLayerManager } from './DeckJupyterOverlayLayer';
+import { 
+  createMockFeatureDataFunction, 
+  createRealFeatureDataFunction, 
+  FeatureTileDataFunction 
+} from './FeatureTileDataFunctions';
+import { MultiResolutionFeatureLayer } from './MultiResolutionFeatureLayer';
 import { KERNEL_SETUP_CODE } from './kernelSetupCode';
 
 /**
@@ -34,13 +39,17 @@ export class ImageViewerWidget extends MainAreaWidget {
   private translator: ITranslator;
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
-  private imageLayerManager?: ImagePyramidLayerManager;
-  private overlayLayerManagers: Map<string, DeckJupyterOverlayLayerManager> = new Map();
+  private featureLayers: Map<string, MultiResolutionFeatureLayer> = new Map();
   private comm?: Kernel.IComm;
   private imageName?: string;
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
+  
+  // Configuration options
+  private useMockData: boolean = false; // Set to true for testing with mock tiles
+  private useMockFeatureData: boolean = false; // Set to true for testing with mock features
+  private enableDebugLogging: boolean = false;
 
   /**
    * Static Factory Method for the ImageViewerWidget.
@@ -163,6 +172,95 @@ export class ImageViewerWidget extends MainAreaWidget {
   public statusSignal: Signal<any, any> = new Signal<any, any>(this);
 
   /**
+   * Debug logging utility
+   */
+  private debugLog(message: string, data?: any): void {
+    if (this.enableDebugLogging) {
+      console.log(`[ImageViewerWidget] ${message}`, data || '');
+    }
+  }
+
+  /**
+   * Create a TileLayer for the image with swappable getTileData function
+   */
+  private createImageLayer(imageName: string, getTileData: TileDataFunction): TileLayer {
+    return new TileLayer({
+      id: `image-${imageName}`,
+      data: [], // Required by TileLayer but not used since we provide getTileData
+      tileSize: 512,
+      minZoom: -10,
+      maxZoom: 10,
+      maxCacheSize: 100,
+      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
+      refinementStrategy: 'best-available',
+      debounceTime: 100,
+      getTileData: (tileProps: any) => {
+        // Extract tile coordinates from TileLoadProps
+        const x = tileProps.x ?? tileProps.index?.x;
+        const y = tileProps.y ?? tileProps.index?.y;
+        const z = tileProps.z ?? tileProps.index?.z;
+        
+        // Convert TileLayer's tile format to our ITile format
+        const scale = Math.pow(2, -z);
+        const tileSize = 512;
+        const tile: ITile = { 
+          x, 
+          y, 
+          z, 
+          left: x * tileSize * scale, 
+          top: y * tileSize * scale, 
+          right: (x + 1) * tileSize * scale, 
+          bottom: (y + 1) * tileSize * scale 
+        };
+        
+        this.debugLog(`Loading tile ${x}-${y}-${z}`, tile);
+        return getTileData(tile);
+      },
+      renderSubLayers: (props: any) => {
+        const { tile, data } = props;
+        
+        if (!data) {
+          return null;
+        }
+
+        // Extract tile bounds from the tile's bbox
+        const { bbox } = tile;
+        let bounds: number[];
+        
+        if ('west' in bbox) {
+          // Geographic bounds format
+          bounds = [bbox.west, bbox.south, bbox.east, bbox.north];
+        } else {
+          // Image coordinate bounds format
+          bounds = [bbox.left, bbox.bottom, bbox.right, bbox.top];
+        }
+
+        this.debugLog(`Rendering tile ${tile.x}-${tile.y}-${tile.z}`, {
+          bounds,
+          hasData: !!data,
+          dataType: typeof data
+        });
+
+        return new BitmapLayer({
+          ...props,
+          id: `${props.id}-bitmap`,
+          image: data,
+          bounds,
+          data: null // Explicitly set data to null to avoid BitmapLayer confusion
+        });
+      },
+      onTileLoad: (tile: any) => {
+        this.debugLog(`Tile loaded: ${tile.x}-${tile.y}-${tile.z}`);
+      },
+      onTileError: (error: any, tile?: any) => {
+        const tileInfo = tile ? `${tile.x}-${tile.y}-${tile.z}` : 'unknown';
+        console.error(`Tile error for ${tileInfo}:`, error);
+        this.debugLog(`Tile error for ${tileInfo}`, error);
+      }
+    });
+  }
+
+  /**
    * Creates a new Deck.gl visualization containing a base layer for this tiled image.
    *
    * @param imageName the full path of the image on the Jupyter notebook instance.
@@ -173,7 +271,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    if (!this.comm) {
+    if (!this.comm && !this.useMockData) {
       this.statusSignal.emit(
         `Unable to load ${imageName} because plugin setup failed.`
       );
@@ -182,68 +280,52 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     try {
       this.statusSignal.emit(`Loading ${imageName} ...`);
-      const loadStatus = await new Promise<string>((resolve, reject) => {
-        const commFuture = this.comm!.send({
-          type: 'IMAGE_LOAD_REQUEST',
-          dataset: imageName
-        });
+      
+      // Only send load request if using real data
+      if (!this.useMockData) {
+        const loadStatus = await new Promise<string>((resolve, reject) => {
+          const commFuture = this.comm!.send({
+            type: 'IMAGE_LOAD_REQUEST',
+            dataset: imageName
+          });
 
-        // Set a timeout to reject the promise if we don't get a response
-        const timeoutId = setTimeout(() => {
-          reject(new Error('Timeout waiting for image load response'));
-        }, 30000); // 30 second timeout
+          // Set a timeout to reject the promise if we don't get a response
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Timeout waiting for image load response'));
+          }, 30000); // 30 second timeout
 
-        commFuture.onIOPub = (msg: any): void => {
-          const msgType = msg.header.msg_type;
-          if (msgType === 'comm_msg') {
-            console.log('Received image load response from comm!!!');
+          commFuture.onIOPub = (msg: any): void => {
+            const msgType = msg.header.msg_type;
+            if (msgType === 'comm_msg') {
+              console.log('Received image load response from comm!!!');
+              clearTimeout(timeoutId);
+              resolve(msg.content.data.status);
+            }
+          };
+
+          // Handle comm future done with error
+          commFuture.done.catch(error => {
             clearTimeout(timeoutId);
-            resolve(msg.content.data.status);
-          }
-        };
-
-        // Handle comm future done with error
-        commFuture.done.catch(error => {
-          clearTimeout(timeoutId);
-          reject(error);
+            reject(error);
+          });
         });
-      });
 
-      this.statusSignal.emit(`Loading ${imageName} ... ${loadStatus}`);
+        this.statusSignal.emit(`Loading ${imageName} ... ${loadStatus}`);
+      }
     } catch (error: any) {
       console.error('Error loading image:', error);
       this.statusSignal.emit(`Error loading ${imageName}: ${error.message}`);
     }
 
     this.imageName = imageName;
-    const minZoom = -10;
-    const maxZoom = 10;
-    const maxNativeZoom = 0;
-    const minNativeZoom = -10;
-
-    if (!this.imageSessionContext || !this.comm) {
-      return;
-    }
 
     // Create tile data function - can easily swap between mock and real data
-    // For mock data:
-    //const tileDataFunction = createMockTileDataFunction(512);
-    // For real data (uncomment to use):
-    const tileDataFunction = createRealTileDataFunction(this.comm, imageName, 10000);
+    const getTileData = this.useMockData 
+      ? createMockTileDataFunction(512)
+      : createRealTileDataFunction(this.comm!, imageName, 10000);
     
-    // Create the image layer manager with update callback
-    this.imageLayerManager = new ImagePyramidLayerManager(
-      this.comm,
-      imageName,
-      {
-        tileSize: 512,
-        minZoom: minZoom,
-        maxZoom: maxZoom,
-        enableDebugLogging: true, // Enable debug logging for development
-        getTileData: createTileDataWrapper(tileDataFunction, () => this.updateDeckLayers())
-      },
-      () => this.updateDeckLayers() // Update callback to refresh layers when tiles load
-    );
+    // Create the image layer directly using TileLayer
+    const imageLayer = this.createImageLayer(imageName, getTileData);
 
     // Create a canvas element for Deck.gl
     const canvas = document.createElement('canvas');
@@ -260,8 +342,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       initialViewState: {
         target: [0, 0, 0], 
         zoom: 0,   // Start at full resolution (zoom level 0)
-        minZoom: minZoom,
-        maxZoom: maxZoom
+        minZoom: -10,
+        maxZoom: 10
       } as any,
       views: [
         new OrthographicView({
@@ -270,10 +352,10 @@ export class ImageViewerWidget extends MainAreaWidget {
           flipY: true, // Assign 0,0 to the upper left corner to match image coordinate systems
         })
       ],
-      layers: [this.imageLayerManager.getLayer()],
+      layers: [imageLayer],
       onViewStateChange: ({ viewState }) => {
         // Handle view state changes if needed
-        console.log('View state changed:', viewState);
+        this.debugLog('View state changed:', viewState);
         // Use throttled update to prevent excessive layer updates during rapid viewport changes
         this.throttledViewportUpdate();
       }
@@ -283,6 +365,28 @@ export class ImageViewerWidget extends MainAreaWidget {
     return;
   }
 
+  /**
+   * Create a MultiResolutionFeatureLayer for overlay data
+   */
+  private createFeatureLayer(overlayName: string, getTileData: FeatureTileDataFunction): MultiResolutionFeatureLayer {
+    return new MultiResolutionFeatureLayer({
+      id: `features-${overlayName}`,
+      getTileData,
+      tileSize: 512,
+      minZoom: -10,
+      maxZoom: 10,
+      heatmapZoomThreshold: 0, // Use heatmap for zoom levels < 0
+      maxCacheSize: 100,
+      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
+      heatmapRadiusPixels: 25,
+      heatmapIntensity: 1,
+      featureFillColor: [255, 0, 0, 47], // Red with alpha
+      featureLineColor: [255, 0, 0, 255], // Solid red
+      featureLineWidth: 1,
+      enableDebugLogging: this.enableDebugLogging
+    });
+  }
+
   public addLayer(layerDataPath: string | null) {
     if (!layerDataPath || !this.imageName || !this.deckInstance) {
       return;
@@ -290,19 +394,19 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     this.statusSignal.emit(`Adding overlays from ${layerDataPath}`);
     
-    // Create overlay layer manager
-    const overlayLayerManager = new DeckJupyterOverlayLayerManager(
-      this.comm,
-      this.imageName,
-      layerDataPath,
-      {
-        tileSize: 512,
-        opacity: 0.8
-      }
-    );
+    // Create feature tile data function - can easily swap between mock and real data
+    const getFeatureTileData = this.useMockFeatureData
+      ? createMockFeatureDataFunction(0.1) // 10% corner square size
+      : createRealFeatureDataFunction(this.comm!, this.imageName, layerDataPath, 10000);
+    
+    this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
+    this.debugLog(`Layer path: ${layerDataPath}`);
+    
+    // Create the feature layer directly using MultiResolutionFeatureLayer
+    const featureLayer = this.createFeatureLayer(layerDataPath, getFeatureTileData);
 
-    // Store the overlay layer manager
-    this.overlayLayerManagers.set(layerDataPath, overlayLayerManager);
+    // Store the feature layer
+    this.featureLayers.set(layerDataPath, featureLayer);
 
     // Update Deck.gl layers
     this.updateDeckLayers();
@@ -311,6 +415,12 @@ export class ImageViewerWidget extends MainAreaWidget {
     return;
   }
 
+  /**
+   * Get all feature layers
+   */
+  private getFeatureLayers(): MultiResolutionFeatureLayer[] {
+    return Array.from(this.featureLayers.values());
+  }
 
   /**
    * Throttled viewport update to prevent excessive layer updates during rapid viewport changes.
@@ -342,18 +452,36 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Updates the Deck.gl instance with current layers.
    */
   private updateDeckLayers(): void {
-    if (!this.deckInstance || !this.imageLayerManager) {
+    if (!this.deckInstance || !this.imageName) {
       return;
     }
 
-    const layers: any[] = [this.imageLayerManager.getLayer()];
+    // Recreate the image layer (this is lightweight since TileLayer handles caching)
+    const getTileData = this.useMockData 
+      ? createMockTileDataFunction(512)
+      : createRealTileDataFunction(this.comm!, this.imageName, 10000);
     
-    // Add all overlay layers
-    for (const overlayManager of this.overlayLayerManagers.values()) {
-      layers.push(overlayManager.getLayer());
-    }
+    const imageLayer = this.createImageLayer(this.imageName, getTileData);
+    const featureLayers = this.getFeatureLayers();
+    
+    this.deckInstance.setProps({ 
+      layers: [imageLayer, ...featureLayers] 
+    });
+  }
 
-    this.deckInstance.setProps({ layers });
+  /**
+   * Set whether to use mock data for tiles (useful for testing)
+   */
+  public setUseMockData(useMock: boolean): void {
+    this.useMockData = useMock;
+    this.updateDeckLayers();
+  }
+
+  /**
+   * Enable/disable debug logging
+   */
+  public setDebugLogging(enabled: boolean): void {
+    this.enableDebugLogging = enabled;
   }
 
   /**
@@ -377,6 +505,57 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Set whether to use mock feature data (useful for testing)
+   */
+  public setUseMockFeatureData(useMock: boolean): void {
+    this.useMockFeatureData = useMock;
+    // Clear existing feature layers and recreate them with new data source
+    this.featureLayers.clear();
+    this.updateDeckLayers();
+  }
+
+  /**
+   * Add a test feature layer with mock data for testing purposes
+   */
+  public addTestFeatureLayer(): void {
+    if (!this.deckInstance) {
+      console.warn('Cannot add test feature layer: Deck instance not initialized');
+      return;
+    }
+
+    const testLayerName = 'test-features';
+    
+    // Enable mock feature data and debug logging for testing
+    this.useMockFeatureData = true;
+    this.enableDebugLogging = true;
+    
+    console.log('Adding test feature layer with mock data...');
+    this.statusSignal.emit('Adding test feature layer with mock squares...');
+    
+    // Add the test layer
+    this.addLayer(testLayerName);
+    
+    console.log('Test feature layer added. You should see squares at tile centers and corners.');
+    console.log('- Zoom >= 0: Individual square features');
+    console.log('- Zoom < 0: Heatmap aggregation');
+  }
+
+  /**
+   * Get debug information about the current state
+   */
+  public getDebugInfo(): any {
+    return {
+      useMockData: this.useMockData,
+      useMockFeatureData: this.useMockFeatureData,
+      enableDebugLogging: this.enableDebugLogging,
+      featureLayerCount: this.featureLayers.size,
+      featureLayerNames: Array.from(this.featureLayers.keys()),
+      imageName: this.imageName,
+      deckInstanceExists: !!this.deckInstance
+    };
+  }
+
+  /**
    * Implementation expand the super's dispose function to ensure class specific resources are cleaned up.
    */
   dispose(): void {
@@ -392,16 +571,11 @@ export class ImageViewerWidget extends MainAreaWidget {
       this.deckInstance = undefined;
     }
 
-    // Clear layer managers
-    if (this.imageLayerManager) {
-      this.imageLayerManager.clearCache();
-      this.imageLayerManager = undefined;
+    // Clear feature layers
+    for (const featureLayer of this.featureLayers.values()) {
+      featureLayer.clearCache();
     }
-
-    for (const overlayManager of this.overlayLayerManagers.values()) {
-      overlayManager.clearCache();
-    }
-    this.overlayLayerManagers.clear();
+    this.featureLayers.clear();
 
     // Clean up DOM
     if (this.mapDiv) {

@@ -3,9 +3,10 @@
 ## What Works
 - **Core Extension Structure**: JupyterLab extension is properly configured and builds successfully
 - **Context Menu Integration**: Right-click "OversightML: Open" and "OversightML: Add Layer" commands work
-- **Widget Management**: ImageViewerWidget creates and manages Leaflet maps correctly
+- **Simplified ImageViewerWidget**: Now uses Deck.gl TileLayer directly without wrapper classes
 - **Comm Channel Communication**: Frontend-backend messaging via Jupyter comm system is functional
 - **Tile Processing**: GDAL-based tile factory processes satellite imagery into web-compatible tiles
+- **Flexible Tile Data Loading**: Easy swapping between mock and real tile data implementations
 - **Layer System**: Base image layers and vector overlays can be added and managed
 - **Status Updates**: Real-time status feedback through JupyterLab status bar
 - **Resource Cleanup**: Proper disposal of sessions, comm channels, and map resources
@@ -41,12 +42,14 @@
 ## Recent Milestones
 - ✅ Basic extension structure and build system
 - ✅ Context menu integration with file browser
-- ✅ ImageViewerWidget with Leaflet map display
+- ✅ ImageViewerWidget with Deck.gl TileLayer (simplified from Leaflet)
 - ✅ Comm channel setup and messaging protocol
 - ✅ GDAL tile factory integration
-- ✅ Layer management system
+- ✅ Simplified layer management system (direct TileLayer usage)
 - ✅ Status bar integration
 - ✅ Resource cleanup and disposal
+- ✅ **Architecture Simplification**: Eliminated wrapper classes, reduced code by ~400 lines
+- ✅ **Preserved Flexibility**: Maintained mock/real tile data switching capability
 
 ## Next Major Milestones
 - 🔄 Enhanced error handling and user feedback
