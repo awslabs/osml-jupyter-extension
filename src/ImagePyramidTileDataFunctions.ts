@@ -19,18 +19,18 @@ export interface ITile {
 /**
  * Type definition for tile data functions - all tile data functions should conform to this signature
  */
-export type TileDataFunction = (tile: ITile) => Promise<string | null>;
+export type TileDataFunction = (tile: ITile) => Promise<ImageBitmap | null>;
 
 /**
  * Create mock tile data for testing/debugging purposes.
  * Generates a canvas-based tile with gray background, border, and coordinate text.
+ * Returns an ImageBitmap with byteLength property for Deck.gl compatibility.
  * 
  * @param tile Tile information
  * @param tileSize Tile size in pixels (default 512)
- * @param flipY Whether to apply flipY transformation for OrthographicView (default true)
  */
-export function createMockTileData(tile: ITile, tileSize: number = 512): Promise<string | null> {
-  return new Promise((resolve) => {
+export function createMockTileData(tile: ITile, tileSize: number = 512): Promise<ImageBitmap | null> {
+  return new Promise(async (resolve) => {
     const canvas = document.createElement('canvas');
     canvas.width = tileSize;
     canvas.height = tileSize;
@@ -63,12 +63,22 @@ export function createMockTileData(tile: ITile, tileSize: number = 512): Promise
     // Restore context
     ctx.restore();
     
-    resolve(canvas.toDataURL('image/png'));
+    try {
+      // Convert canvas to ImageBitmap which has better Deck.gl compatibility
+      const imageBitmap = await createImageBitmap(canvas);
+      // Add byteLength property for Deck.gl compatibility
+      (imageBitmap as any).byteLength = tileSize * tileSize * 4; // RGBA bytes
+      resolve(imageBitmap);
+    } catch (error) {
+      console.error('Error creating ImageBitmap:', error);
+      resolve(null);
+    }
   });
 }
 
 /**
  * Load real tile data from the Jupyter kernel via comm channel.
+ * Returns an ImageBitmap with byteLength property for Deck.gl compatibility.
  * 
  * @param tile Tile information
  * @param comm Jupyter comm channel
@@ -80,7 +90,7 @@ export function loadRealTileData(
   comm: Kernel.IComm, 
   imageName: string, 
   timeout: number = 10000
-): Promise<string | null> {
+): Promise<ImageBitmap | null> {
   return new Promise((resolve, reject) => {
     const commFuture = comm.send({
       type: 'IMAGE_TILE_REQUEST',
@@ -95,14 +105,42 @@ export function loadRealTileData(
       reject(new Error(`Timeout loading tile ${tile.x}-${tile.y}-${tile.z}`));
     }, timeout);
 
-    commFuture.onIOPub = (msg: any): void => {
+    commFuture.onIOPub = async (msg: any): Promise<void> => {
       const msgType = msg.header.msg_type;
       if (msgType === 'comm_msg') {
-        const base64Data = msg.content.data.img;
-        const dataUrl = `data:image/png;base64,${base64Data}`;
-        
-        clearTimeout(timeoutId);
-        resolve(dataUrl);
+        try {
+          const base64Data = msg.content.data.img;
+          const dataUrl = `data:image/png;base64,${base64Data}`;
+          
+          // Convert data URL to Image first
+          const img = new Image();
+          img.onload = async () => {
+            try {
+              // Convert to ImageBitmap which has better Deck.gl compatibility
+              const imageBitmap = await createImageBitmap(img);
+              // Add byteLength property for Deck.gl compatibility
+              // Estimate based on image dimensions (assuming RGBA)
+              (imageBitmap as any).byteLength = imageBitmap.width * imageBitmap.height * 4;
+              
+              clearTimeout(timeoutId);
+              resolve(imageBitmap);
+            } catch (error) {
+              console.error('Error creating ImageBitmap from tile data:', error);
+              clearTimeout(timeoutId);
+              resolve(null);
+            }
+          };
+          img.onerror = () => {
+            console.error(`Failed to load image for tile ${tile.x}-${tile.y}-${tile.z}`);
+            clearTimeout(timeoutId);
+            resolve(null);
+          };
+          img.src = dataUrl;
+        } catch (error) {
+          console.error('Error processing tile data:', error);
+          clearTimeout(timeoutId);
+          resolve(null);
+        }
       }
     };
 
@@ -118,10 +156,9 @@ export function loadRealTileData(
  * This function conforms to the TileDataFunction signature and can be used interchangeably.
  * 
  * @param tileSize Tile size in pixels (default 512)
- * @param flipY Whether to apply flipY transformation (default true)
  */
 export function createMockTileDataFunction(tileSize: number = 512): TileDataFunction {
-  return (tile: ITile): Promise<string | null> => {
+  return (tile: ITile): Promise<ImageBitmap | null> => {
     return createMockTileData(tile, tileSize);
   };
 }
@@ -139,7 +176,7 @@ export function createRealTileDataFunction(
   imageName: string, 
   timeout: number = 10000
 ): TileDataFunction {
-  return (tile: ITile): Promise<string | null> => {
+  return (tile: ITile): Promise<ImageBitmap | null> => {
     return loadRealTileData(tile, comm, imageName, timeout);
   };
 }
@@ -155,7 +192,7 @@ export function createTileDataWrapper(
   tileDataFunction: TileDataFunction,
   updateCallback?: () => void
 ): TileDataFunction {
-  return async (tile: ITile): Promise<string | null> => {
+  return async (tile: ITile): Promise<ImageBitmap | null> => {
     try {
       const result = await tileDataFunction(tile);
       // Trigger update callback after tile data is loaded
