@@ -11,7 +11,7 @@ import { Kernel, KernelMessage, ServiceManager } from '@jupyterlab/services';
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
-import { MainAreaWidget } from '@jupyterlab/apputils';
+import { MainAreaWidget, Toolbar } from '@jupyterlab/apputils';
 import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
@@ -21,7 +21,7 @@ import {
   createRealTileDataFunction, 
   ITile, 
   TileDataFunction 
-} from './ImagePyramidTileDataFunctions';
+} from './ImageTileDataFunctions';
 import { 
   createMockFeatureDataFunction, 
   createRealFeatureDataFunction, 
@@ -50,6 +50,10 @@ export class ImageViewerWidget extends MainAreaWidget {
   private useMockData: boolean = false; // Set to true for testing with mock tiles
   private useMockFeatureData: boolean = false; // Set to true for testing with mock features
   private enableDebugLogging: boolean = false;
+  
+  // Model selection state
+  private selectedModel: string = '';
+  private selectedModelEnabled: boolean = false;
 
   /**
    * Static Factory Method for the ImageViewerWidget.
@@ -72,7 +76,8 @@ export class ImageViewerWidget extends MainAreaWidget {
 
   public constructor(manager: ServiceManager.IManager) {
     const content = new Widget();
-    super({ content });
+    const toolbar = new Toolbar();
+    super({ content, toolbar });
     this.id = 'osml-jupyter-extension:image-viewer';
     this.title.label = 'OSML Image View';
     this.title.closable = true;
@@ -375,7 +380,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       tileSize: 512,
       minZoom: -10,
       maxZoom: 10,
-      heatmapZoomThreshold: 0, // Use heatmap for zoom levels < 0
+      heatmapZoomThreshold: -3, // Use heatmap for zoom levels <= -3
       maxCacheSize: 100,
       maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
       heatmapRadiusPixels: 25,
@@ -541,6 +546,39 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Set the selected model for tile processing
+   */
+  public setSelectedModel(modelName: string, modelEnabled?: boolean): void {
+    this.selectedModel = modelName;
+    if (modelEnabled !== undefined) {
+      this.selectedModelEnabled = modelEnabled;
+    }
+    console.log(`Selected model updated - Name: ${modelName}, Enabled: ${this.selectedModelEnabled}`);
+    
+    if (!this.selectedModelEnabled) {
+      this.statusSignal.emit('Model processing disabled');
+    } else if (modelName) {
+      this.statusSignal.emit(`Model selected: ${modelName}`);
+    } else {
+      this.statusSignal.emit('Model enabled but no name specified');
+    }
+  }
+
+  /**
+   * Get the currently selected model
+   */
+  public getSelectedModel(): string {
+    return this.selectedModel;
+  }
+
+  /**
+   * Get the currently selected model enabled state
+   */
+  public getSelectedModelEnabled(): boolean {
+    return this.selectedModelEnabled;
+  }
+
+  /**
    * Get debug information about the current state
    */
   public getDebugInfo(): any {
@@ -551,7 +589,9 @@ export class ImageViewerWidget extends MainAreaWidget {
       featureLayerCount: this.featureLayers.size,
       featureLayerNames: Array.from(this.featureLayers.keys()),
       imageName: this.imageName,
-      deckInstanceExists: !!this.deckInstance
+      deckInstanceExists: !!this.deckInstance,
+      selectedModel: this.selectedModel,
+      selectedModelEnabled: this.selectedModelEnabled
     };
   }
 

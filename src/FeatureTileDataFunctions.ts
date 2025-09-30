@@ -15,18 +15,27 @@ export interface IFeatureTile {
 }
 
 /**
+ * Wrapper for feature tile data that includes byteLength for Deck.gl compatibility
+ */
+export interface FeatureTileData {
+  features: Feature[];
+  byteLength: number;
+}
+
+/**
  * Type definition for feature tile data functions
  */
-export type FeatureTileDataFunction = (tile: IFeatureTile) => Promise<Feature[]>;
+export type FeatureTileDataFunction = (tile: IFeatureTile) => Promise<FeatureTileData>;
 
 /**
  * Create mock feature data for testing/debugging purposes.
  * Generates 5 square features per tile: 1 large at center, 4 smaller at corners.
+ * Returns FeatureTileData with byteLength for Deck.gl compatibility.
  * 
  * @param tile Tile information
  * @param squareSize Size of the squares relative to tile size (default 0.1 = 10% of tile)
  */
-export function createMockFeatureData(tile: IFeatureTile, squareSize: number = 0.1): Promise<Feature[]> {
+export function createMockFeatureData(tile: IFeatureTile, squareSize: number = 0.1): Promise<FeatureTileData> {
   return new Promise((resolve) => {
     const features: Feature[] = [];
     
@@ -90,7 +99,13 @@ export function createMockFeatureData(tile: IFeatureTile, squareSize: number = 0
     );
     features.push(bottomRightSquare);
     
-    resolve(features);
+    // Calculate approximate byte length for the features
+    const byteLength = calculateFeaturesByteLength(features);
+    
+    resolve({
+      features,
+      byteLength
+    });
   });
 }
 
@@ -136,6 +151,7 @@ function createSquareFeature(
 
 /**
  * Load real feature data from the Jupyter kernel via comm channel.
+ * Returns FeatureTileData with byteLength for Deck.gl compatibility.
  * 
  * @param tile Tile information
  * @param comm Jupyter comm channel
@@ -149,7 +165,7 @@ export function loadRealFeatureData(
   imageName: string,
   overlayName: string,
   timeout: number = 10000
-): Promise<Feature[]> {
+): Promise<FeatureTileData> {
   return new Promise((resolve, reject) => {
     const commFuture = comm.send({
       type: 'OVERLAY_TILE_REQUEST',
@@ -182,8 +198,14 @@ export function loadRealFeatureData(
           return feature;
         });
         
+        // Calculate approximate byte length for the features
+        const byteLength = calculateFeaturesByteLength(processedFeatures);
+        
         clearTimeout(timeoutId);
-        resolve(processedFeatures);
+        resolve({
+          features: processedFeatures,
+          byteLength
+        });
       }
     };
 
@@ -200,7 +222,7 @@ export function loadRealFeatureData(
  * @param squareSize Size of the corner squares relative to tile size (default 0.1)
  */
 export function createMockFeatureDataFunction(squareSize: number = 0.1): FeatureTileDataFunction {
-  return (tile: IFeatureTile): Promise<Feature[]> => {
+  return (tile: IFeatureTile): Promise<FeatureTileData> => {
     return createMockFeatureData(tile, squareSize);
   };
 }
@@ -219,7 +241,7 @@ export function createRealFeatureDataFunction(
   overlayName: string,
   timeout: number = 10000
 ): FeatureTileDataFunction {
-  return (tile: IFeatureTile): Promise<Feature[]> => {
+  return (tile: IFeatureTile): Promise<FeatureTileData> => {
     return loadRealFeatureData(tile, comm, imageName, overlayName, timeout);
   };
 }
@@ -290,4 +312,27 @@ function calculatePolygonCentroid(coordinates: number[][]): [number, number] {
   }
   
   return [x / numPoints, y / numPoints];
+}
+
+/**
+ * Calculate approximate byte length for an array of features.
+ * This provides a rough estimate for Deck.gl's memory management.
+ * 
+ * @param features Array of GeoJSON features
+ * @returns Estimated byte length
+ */
+function calculateFeaturesByteLength(features: Feature[]): number {
+  if (!features || features.length === 0) {
+    return 0;
+  }
+  
+  // Rough estimate: JSON.stringify length * 2 (for UTF-16 encoding)
+  // Plus some overhead for object structure
+  try {
+    const jsonString = JSON.stringify(features);
+    return jsonString.length * 2 + (features.length * 100); // 100 bytes overhead per feature
+  } catch (error) {
+    // Fallback: estimate based on feature count
+    return features.length * 1000; // 1KB per feature as rough estimate
+  }
 }
