@@ -35,14 +35,14 @@
 - **Started from Template**: Built upon JupyterLab extension cookiecutter template
 - **Proof-of-Concept Focus**: Prioritized functionality over production-ready patterns
 - **AWS Integration**: Chose Cloudscape Design System for UI consistency
-- **Leaflet Selection**: Selected over other mapping libraries for simplicity and features
+- **Deck.gl Selection**: Selected over other mapping libraries for performance and features
 - **Comm Channel Architecture**: Leveraged Jupyter's built-in communication system
 - **Factory Pattern Adoption**: Implemented caching for performance optimization
 
 ## Recent Milestones
 - ✅ Basic extension structure and build system
 - ✅ Context menu integration with file browser
-- ✅ ImageViewerWidget with Deck.gl TileLayer (simplified from Leaflet)
+- ✅ ImageViewerWidget with Deck.gl TileLayer
 - ✅ Comm channel setup and messaging protocol
 - ✅ GDAL tile factory integration
 - ✅ Simplified layer management system (direct TileLayer usage)
