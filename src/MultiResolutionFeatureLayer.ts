@@ -14,6 +14,7 @@ import { Feature } from 'geojson';
 import { 
   FeatureTileDataFunction, 
   IFeatureTile, 
+  FeatureTileData,
   extractHeatmapPoints 
 } from './FeatureTileDataFunctions';
 
@@ -33,7 +34,7 @@ export interface MultiResolutionFeatureLayerProps extends CompositeLayerProps {
   /** Maximum zoom level */
   maxZoom?: number;
   
-  /** Zoom level threshold below which to use heatmap (default: 0) */
+  /** Zoom level threshold below which to use heatmap (default: -3) */
   heatmapZoomThreshold?: number;
   
   /** Maximum number of tiles to cache */
@@ -65,7 +66,7 @@ const defaultProps: DefaultProps<MultiResolutionFeatureLayerProps> = {
   tileSize: 512,
   minZoom: -10,
   maxZoom: 10,
-  heatmapZoomThreshold: 0,
+  heatmapZoomThreshold: -3,
   maxCacheSize: 100,
   maxCacheByteSize: 50 * 1024 * 1024, // 50MB
   heatmapRadiusPixels: 25,
@@ -87,7 +88,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
 
   state!: {
     allFeatures: Feature[];
-    featureCache: Map<string, Feature[]>;
+    featureCache: Map<string, FeatureTileData>;
   };
 
   initializeState(): void {
@@ -171,25 +172,25 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
         
         // Check cache first
         if (this.state.featureCache.has(tileKey)) {
-          const cachedFeatures = this.state.featureCache.get(tileKey)!;
-          console.log(`[MultiResolutionFeatureLayer] Using cached features for tile ${tileKey}`, { count: cachedFeatures.length });
-          this.debugLog(`Using cached features for tile ${tileKey}`, { count: cachedFeatures.length });
-          return cachedFeatures;
+          const cachedTileData = this.state.featureCache.get(tileKey)!;
+          console.log(`[MultiResolutionFeatureLayer] Using cached features for tile ${tileKey}`, { count: cachedTileData.features.length });
+          this.debugLog(`Using cached features for tile ${tileKey}`, { count: cachedTileData.features.length });
+          return cachedTileData;
         }
         
         console.log(`[MultiResolutionFeatureLayer] Loading features for tile ${tileKey}`, tile);
         this.debugLog(`Loading features for tile ${tileKey}`, tile);
         
         try {
-          const features = await getTileData(tile);
+          const tileData = await getTileData(tile);
           
-          console.log(`[MultiResolutionFeatureLayer] Loaded ${features.length} features for tile ${tileKey}`);
+          console.log(`[MultiResolutionFeatureLayer] Loaded ${tileData.features.length} features for tile ${tileKey}`);
           
-          // Cache the features
-          this.state.featureCache.set(tileKey, features);
+          // Cache the tile data
+          this.state.featureCache.set(tileKey, tileData);
           
           // Add to all features collection (for heatmap)
-          this.state.allFeatures.push(...features);
+          this.state.allFeatures.push(...tileData.features);
           
           // Force layer re-render when new features are loaded
           // We need to trigger a state change to force renderLayers() to be called again
@@ -198,11 +199,11 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
             allFeatures: [...this.state.allFeatures] // Create new array to trigger change
           });
           
-          this.debugLog(`Loaded ${features.length} features for tile ${tileKey}`);
-          return features;
+          this.debugLog(`Loaded ${tileData.features.length} features for tile ${tileKey}`);
+          return tileData;
         } catch (error) {
           console.error(`[MultiResolutionFeatureLayer] Error loading features for tile ${tileKey}:`, error);
-          return [];
+          return { features: [], byteLength: 0 };
         }
       },
       
@@ -234,8 +235,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
 
     // Collect all features from cache
     const allFeatures: Feature[] = [];
-    for (const features of this.state.featureCache.values()) {
-      allFeatures.push(...features);
+    for (const tileData of this.state.featureCache.values()) {
+      allFeatures.push(...tileData.features);
     }
 
     console.log(`[MultiResolutionFeatureLayer] Creating GeoJsonLayer with ${allFeatures.length} features`);
@@ -291,8 +292,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
 
     // Collect all features and extract points for heatmap
     const allFeatures: Feature[] = [];
-    for (const features of this.state.featureCache.values()) {
-      allFeatures.push(...features);
+    for (const tileData of this.state.featureCache.values()) {
+      allFeatures.push(...tileData.features);
     }
 
     const heatmapPoints = extractHeatmapPoints(allFeatures);
@@ -339,7 +340,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
     const tileLayer = this.createFeatureTileLayer();
     
     // Choose rendering layer based on zoom level
-    const useHeatmap = currentZoom < heatmapZoomThreshold!;
+    const useHeatmap = currentZoom <= heatmapZoomThreshold!;
     
     this.debugLog(`Rendering at zoom ${currentZoom}, using ${useHeatmap ? 'heatmap' : 'features'}`);
     this.debugLog(`Feature cache size: ${this.state.featureCache.size}`);
@@ -375,8 +376,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
    */
   getAllFeatures(): Feature[] {
     const allFeatures: Feature[] = [];
-    for (const features of this.state.featureCache.values()) {
-      allFeatures.push(...features);
+    for (const tileData of this.state.featureCache.values()) {
+      allFeatures.push(...tileData.features);
     }
     return allFeatures;
   }
