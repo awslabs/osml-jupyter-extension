@@ -17,7 +17,7 @@ The OSML Jupyter Extension addresses a critical gap in satellite imagery analysi
 ### Core User Experience
 - **Right-click Integration**: Users can right-click on satellite image files in the Jupyter file browser and select "OversightML: Open" to launch the viewer
 - **Layer Addition**: Additional layers can be added via "OversightML: Add Layer" context menu option
-- **Interactive Viewing**: Pan, zoom, and explore imagery with Leaflet-based controls
+- **Interactive Viewing**: Pan, zoom, and explore imagery with deck.gl-based controls
 - **Status Feedback**: Real-time status updates in the JupyterLab status bar
 
 ### Key Workflows

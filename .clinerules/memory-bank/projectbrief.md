@@ -17,7 +17,7 @@ The OSML Jupyter Extension is a JupyterLab extension designed to work with satel
 - **Platform**: JupyterLab 4.0+ extension
 - **Languages**: TypeScript (frontend), Python (backend integration)
 - **Key Dependencies**: 
-  - Leaflet for mapping/imagery display, (prototype to be replaced)
+  - Deck.gl for mapping/imagery display
   - AWS Cloudscape Design System for UI components
   - OSML Imagery Toolkit for satellite image processing
   - GDAL/Proj for geospatial operations

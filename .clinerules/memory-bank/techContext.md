@@ -5,7 +5,7 @@
 ### Frontend Technologies
 - **TypeScript**: Primary language for extension development
 - **JupyterLab 4.0+**: Extension platform and framework
-- **Leaflet**: Interactive mapping library for satellite imagery display
+- **Deck.gl**: GPU-powered high powered data visualization framework
 - **AWS Cloudscape Design System**: UI component library for consistent AWS-style interface
 - **Lumino**: Widget framework underlying JupyterLab (signals, messaging, widgets)
 
@@ -52,7 +52,7 @@ dependencies:
   - geopandas
   - pip:
     - osml-imagery-toolkit>=1.4.2
-    - boto3, h3, ipyleaflet
+    - boto3
 ```
 
 ## Key Dependencies
@@ -60,7 +60,7 @@ dependencies:
 ### Critical Runtime Dependencies
 - **@jupyterlab/application**: Core JupyterLab application framework
 - **@cloudscape-design/components**: AWS UI component library
-- **leaflet**: Mapping and tile display functionality
+- **@deck.gl/core**: Mapping and tile display functionality
 - **osml-imagery-toolkit**: Satellite image processing backend
 
 ### Development Dependencies
@@ -74,6 +74,7 @@ dependencies:
 - Must follow JupyterLab extension patterns
 - Requires proper plugin registration and lifecycle management
 - Context menu integration with file browser
+- Toolbar integration for main widget actions
 - Status bar integration for user feedback
 
 ### Conda Environment Requirements

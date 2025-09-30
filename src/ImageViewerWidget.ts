@@ -16,19 +16,19 @@ import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
+import { KERNEL_SETUP_CODE } from './utils';
 import { 
-  createMockTileDataFunction, 
-  createRealTileDataFunction, 
   ITile, 
-  TileDataFunction 
-} from './ImageTileDataFunctions';
-import { 
-  createMockFeatureDataFunction, 
-  createRealFeatureDataFunction, 
+  TileDataFunction,
   FeatureTileDataFunction 
-} from './FeatureTileDataFunctions';
-import { MultiResolutionFeatureLayer } from './MultiResolutionFeatureLayer';
-import { KERNEL_SETUP_CODE } from './kernelSetupCode';
+} from './types';
+import { MultiResolutionFeatureLayer } from './layers';
+import { 
+  CommService, 
+  ImageTileService, 
+  FeatureTileService, 
+  KernelService 
+} from './services';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -45,6 +45,12 @@ export class ImageViewerWidget extends MainAreaWidget {
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
+  
+  // Service instances
+  private commService: CommService;
+  private imageTileService: ImageTileService;
+  private featureTileService: FeatureTileService;
+  private kernelService: KernelService;
   
   // Configuration options
   private useMockData: boolean = false; // Set to true for testing with mock tiles
@@ -85,6 +91,14 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.manager = manager;
 
     this.translator = nullTranslator;
+
+    // Initialize services (will be properly initialized after kernel setup)
+    this.commService = new CommService();
+    this.imageTileService = new ImageTileService(this.commService, {
+      enableDebugLogging: this.enableDebugLogging
+    });
+    this.featureTileService = new FeatureTileService(this.commService);
+    this.kernelService = new KernelService(this.manager);
 
     // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
     this.imageSessionContext = new SessionContext({
@@ -146,7 +160,22 @@ export class ImageViewerWidget extends MainAreaWidget {
               };
             }
 
-            // Create the client side of the comm channel.
+            // Initialize CommService with kernel connection
+            const kernel = this.imageSessionContext.session?.kernel;
+            if (kernel) {
+              this.commService = new CommService(kernel);
+              await this.commService.initialize('osml_comm_target');
+              
+              // Update services with new CommService
+              this.imageTileService = new ImageTileService(this.commService, {
+                enableDebugLogging: this.enableDebugLogging
+              });
+              this.featureTileService = new FeatureTileService(this.commService);
+              
+              console.log('CommService initialized successfully.');
+            }
+
+            // Create the client side of the comm channel (legacy support).
             console.log('Setting up new comm!');
             this.comm =
               this.imageSessionContext.session?.kernel?.createComm(
@@ -326,8 +355,8 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Create tile data function - can easily swap between mock and real data
     const getTileData = this.useMockData 
-      ? createMockTileDataFunction(512)
-      : createRealTileDataFunction(this.comm!, imageName, 10000);
+      ? this.imageTileService.createMockTileDataFunction()
+      : this.imageTileService.createRealTileDataFunction(imageName);
     
     // Create the image layer directly using TileLayer
     const imageLayer = this.createImageLayer(imageName, getTileData);
@@ -401,8 +430,8 @@ export class ImageViewerWidget extends MainAreaWidget {
     
     // Create feature tile data function - can easily swap between mock and real data
     const getFeatureTileData = this.useMockFeatureData
-      ? createMockFeatureDataFunction(0.1) // 10% corner square size
-      : createRealFeatureDataFunction(this.comm!, this.imageName, layerDataPath, 10000);
+      ? this.featureTileService.createMockFeatureDataFunction(0.1) // 10% corner square size
+      : this.featureTileService.createRealFeatureDataFunction(this.imageName, layerDataPath);
     
     this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
     this.debugLog(`Layer path: ${layerDataPath}`);
@@ -463,8 +492,8 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Recreate the image layer (this is lightweight since TileLayer handles caching)
     const getTileData = this.useMockData 
-      ? createMockTileDataFunction(512)
-      : createRealTileDataFunction(this.comm!, this.imageName, 10000);
+      ? this.imageTileService.createMockTileDataFunction()
+      : this.imageTileService.createRealTileDataFunction(this.imageName);
     
     const imageLayer = this.createImageLayer(this.imageName, getTileData);
     const featureLayers = this.getFeatureLayers();
@@ -616,6 +645,17 @@ export class ImageViewerWidget extends MainAreaWidget {
       featureLayer.clearCache();
     }
     this.featureLayers.clear();
+
+    // Clean up services
+    try {
+      this.imageTileService?.dispose();
+      this.featureTileService?.dispose();
+      this.kernelService?.dispose();
+      this.commService?.dispose();
+    } catch (e) {
+      console.warn('Exception caught cleaning up service resources');
+      console.debug(e);
+    }
 
     // Clean up DOM
     if (this.mapDiv) {

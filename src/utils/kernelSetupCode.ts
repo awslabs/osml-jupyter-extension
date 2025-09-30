@@ -9,7 +9,7 @@
  */
 
 // Import the Python code as a string
-import kernelSetupPython from './kernel-setup.py';
+import kernelSetupPython from '../kernel/kernel-setup.py';
 
 /**
  * The Python code that the extension installs in a newly launched kernel to provide access to raster and vector

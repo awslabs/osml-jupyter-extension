@@ -8,9 +8,9 @@ import { ILauncher } from '@jupyterlab/launcher';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
-import { LOGO_ICON } from './icons';
+import { LOGO_ICON } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
-import { ModelSelectionToolbarButton } from './ModelSelectionToolbarButton';
+import { ModelSelectionToolbarButton } from './components';
 import { Widget } from '@lumino/widgets';
 
 namespace CommandIDs {

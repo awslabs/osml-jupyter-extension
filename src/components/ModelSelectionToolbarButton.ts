@@ -1,7 +1,7 @@
 import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
 import { showDialog, Dialog } from '@jupyterlab/apputils';
-import { ImageViewerWidget } from './ImageViewerWidget';
+import { ImageViewerWidget } from '../ImageViewerWidget';
 import ModelSelectionDialog, { IModelSelectionResult } from './ModelSelectionDialog';
 
 /**

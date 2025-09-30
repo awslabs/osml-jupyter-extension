@@ -15,8 +15,8 @@ import {
   FeatureTileDataFunction, 
   IFeatureTile, 
   FeatureTileData,
-  extractHeatmapPoints 
-} from './FeatureTileDataFunctions';
+  HeatmapPoint
+} from '../types';
 
 /**
  * Properties for MultiResolutionFeatureLayer
@@ -296,7 +296,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       allFeatures.push(...tileData.features);
     }
 
-    const heatmapPoints = extractHeatmapPoints(allFeatures);
+    // Extract heatmap points from features
+    const heatmapPoints = this.extractHeatmapPoints(allFeatures);
     
     console.log(`[MultiResolutionFeatureLayer] Creating heatmap with ${heatmapPoints.length} points from ${allFeatures.length} features`);
     console.log(`[MultiResolutionFeatureLayer] Feature cache has ${this.state.featureCache.size} tiles`);
@@ -330,6 +331,73 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
         data: [this.state.featureCache.size, allFeatures.length] // Trigger update when cache or feature count changes
       }
     });
+  }
+
+  /**
+   * Extract point positions from features for heatmap rendering
+   */
+  private extractHeatmapPoints(features: Feature[]): HeatmapPoint[] {
+    const points: HeatmapPoint[] = [];
+    
+    features.forEach(feature => {
+      const weight = feature.properties?.weight || 1;
+      const geometry = feature.geometry || feature.properties?.imageGeometry;
+      
+      if (!geometry) {
+        return;
+      }
+      
+      switch (geometry.type) {
+        case 'Point':
+          points.push({
+            position: [geometry.coordinates[0], geometry.coordinates[1]],
+            weight: weight
+          });
+          break;
+          
+        case 'Polygon':
+          // Use centroid of polygon
+          const coords = geometry.coordinates[0]; // outer ring
+          if (coords.length > 0) {
+            const centroid = this.calculatePolygonCentroid(coords);
+            points.push({
+              position: centroid,
+              weight: weight
+            });
+          }
+          break;
+          
+        case 'LineString':
+          // Use midpoint of line
+          const lineCoords = geometry.coordinates;
+          if (lineCoords.length > 0) {
+            const midIndex = Math.floor(lineCoords.length / 2);
+            points.push({
+              position: [lineCoords[midIndex][0], lineCoords[midIndex][1]],
+              weight: weight
+            });
+          }
+          break;
+      }
+    });
+    
+    return points;
+  }
+
+  /**
+   * Calculate the centroid of a polygon
+   */
+  private calculatePolygonCentroid(coordinates: number[][]): [number, number] {
+    let x = 0;
+    let y = 0;
+    const numPoints = coordinates.length - 1; // Exclude the closing point
+    
+    for (let i = 0; i < numPoints; i++) {
+      x += coordinates[i][0];
+      y += coordinates[i][1];
+    }
+    
+    return [x / numPoints, y / numPoints];
   }
 
   renderLayers(): LayersList {
