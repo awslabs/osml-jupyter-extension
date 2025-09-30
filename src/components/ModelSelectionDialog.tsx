@@ -1,5 +1,6 @@
 import React, { FC, useState } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
+import { Widget } from '@lumino/widgets';
 import FormField from '@cloudscape-design/components/form-field';
 import Input from '@cloudscape-design/components/input';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -16,28 +17,17 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
   initialModelEnabled = false,
   onUpdate
 }) => {
-  // Use the initial values directly as the current state
-  // This ensures the component always reflects the current dialog state
-  const [modelName, setModelName] = useState(initialModelName);
-  const [modelEnabled, setModelEnabled] = useState(initialModelEnabled);
-
-  // Force reset state every time the component renders with new initial values
-  React.useEffect(() => {
-    setModelName(initialModelName);
-    setModelEnabled(initialModelEnabled);
-    // Also immediately update the parent with the initial values
-    onUpdate(initialModelName, initialModelEnabled);
-  }, [initialModelName, initialModelEnabled, onUpdate]);
+  // Use parent state as the single source of truth - controlled component
+  const modelName = initialModelName;
+  const modelEnabled = initialModelEnabled;
 
   const handleModelNameChange = (value: string) => {
-    setModelName(value);
-    // Update the parent component with the current values
+    // Directly update the parent component
     onUpdate(value, modelEnabled);
   };
 
   const handleModelEnabledChange = (enabled: boolean) => {
-    setModelEnabled(enabled);
-    // Update the parent component with the current values
+    // Directly update the parent component
     onUpdate(modelName, enabled);
   };
 
@@ -89,17 +79,20 @@ export interface IModelSelectionResult {
 export default class ModelSelectionDialog extends ReactWidget {
   private _modelName: string = '';
   private _modelEnabled: boolean = false;
-  private _isValid: boolean = true; // Always valid now since we have the toggle
 
   constructor(private initialModelName?: string, private initialModelEnabled?: boolean) {
     super();
     this.addClass('jp-react-widget');
     this._modelName = initialModelName || '';
     this._modelEnabled = initialModelEnabled || false;
-    // Valid if model is disabled OR if model is enabled and name is not empty
-    this._isValid = !this._modelEnabled || this._modelName.trim().length > 0;
   }
 
+  private handleUpdate = (modelName: string, modelEnabled: boolean) => {
+    this._modelName = modelName;
+    this._modelEnabled = modelEnabled;
+    // Update the React component by re-rendering
+    this.update();
+  };
 
   /**
    * Get the current model name
@@ -119,8 +112,6 @@ export default class ModelSelectionDialog extends ReactWidget {
    * Check if the current input is valid
    */
   public isValid(): boolean {
-    // Always compute validation based on current state
-    // Valid if model is disabled OR if model is enabled and name is not empty
     return !this._modelEnabled || this._modelName.trim().length > 0;
   }
 
@@ -129,7 +120,6 @@ export default class ModelSelectionDialog extends ReactWidget {
    */
   public getValue(): IModelSelectionResult {
     try {
-      console.log("ModelSelectionDialog.getValue() called!");
       return {
         modelName: this._modelName.trim(),
         modelEnabled: this._modelEnabled,
@@ -142,31 +132,14 @@ export default class ModelSelectionDialog extends ReactWidget {
         modelEnabled: false,
         cancelled: true
       };
+    }
   }
-  }
-
-  private handleUpdate = (modelName: string, modelEnabled: boolean) => {
-    this._modelName = modelName;
-    this._modelEnabled = modelEnabled;
-    // Valid if model is disabled OR if model is enabled and name is not empty
-    this._isValid = !modelEnabled || modelName.trim().length > 0;
-    
-    // Force a re-render to ensure the dialog reflects the current state
-    this.update();
-  };
-
-  private handleCancel = () => {
-    // Reset to initial values on cancel
-    this._modelName = this.initialModelName || '';
-    this._modelEnabled = this.initialModelEnabled || false;
-    this._isValid = !this._modelEnabled || this._modelName.trim().length > 0;
-  };
 
   render(): JSX.Element {
     return (
       <ModelSelectionComponent
-        initialModelName={this.initialModelName}
-        initialModelEnabled={this.initialModelEnabled}
+        initialModelName={this._modelName}
+        initialModelEnabled={this._modelEnabled}
         onUpdate={this.handleUpdate}
       />
     );

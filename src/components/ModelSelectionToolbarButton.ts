@@ -80,21 +80,15 @@ export class ModelSelectionToolbarButton extends Widget {
       });
 
       // Check if user clicked OK and the input is valid
-      if (result.button.accept) {
-        console.log('User accepted model selection dialog.');
-        if (dialogContent.isValid()) {
-          const modelName = dialogContent.getModelName();
-          const modelEnabled = dialogContent.getModelEnabled();
-          
-          this.setModelConfiguration(modelName, modelEnabled);
-          
-          // Notify the ImageViewerWidget about the model configuration
-          this._imageViewerWidget.setSelectedModel(modelName, modelEnabled);
-          console.log('Notified ImageViewerWidget about new model configuration.');
-        }
-      } else {
-        // User clicked Cancel, do nothing
-        console.log('User canceled model selection');
+      if (result.button.accept && dialogContent.isValid()) {
+        // Get values directly from the dialog content
+        const modelName = dialogContent.getModelName();
+        const modelEnabled = dialogContent.getModelEnabled();
+        
+        this.setModelConfiguration(modelName, modelEnabled);
+        
+        // Notify the ImageViewerWidget about the model configuration
+        this._imageViewerWidget.setSelectedModel(modelName, modelEnabled);
       }
     } catch (error) {
       console.error('Error showing model selection dialog:', error);
@@ -171,7 +165,10 @@ export class ModelSelectionToolbarButton extends Widget {
   handleEvent(event: Event): void {
     switch (event.type) {
       case 'click':
-        this._handleClick();
+        // Prevent the double click issue by only handling the direct button click
+        if (event.target === this._button) {
+          this._handleClick();
+        }
         break;
     }
   }
