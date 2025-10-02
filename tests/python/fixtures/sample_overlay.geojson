@@ -1,0 +1,80 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Test Point",
+        "type": "landmark",
+        "confidence": 0.95
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.4194,
+          37.7749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Test Polygon",
+        "type": "building",
+        "area": 1500.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.42,
+              37.77
+            ],
+            [
+              -122.41,
+              37.77
+            ],
+            [
+              -122.41,
+              37.78
+            ],
+            [
+              -122.42,
+              37.78
+            ],
+            [
+              -122.42,
+              37.77
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Test LineString",
+        "type": "road",
+        "length": 500.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.425,
+            37.775
+          ],
+          [
+            -122.42,
+            37.776
+          ],
+          [
+            -122.415,
+            37.777
+          ]
+        ]
+      }
+    }
+  ]
+}

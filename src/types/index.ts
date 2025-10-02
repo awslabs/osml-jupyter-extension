@@ -44,6 +44,8 @@ export interface CommMessage {
   img?: string;
   features?: any[];
   error?: string;
+  imageCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
+  worldCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
 }
 
 /**

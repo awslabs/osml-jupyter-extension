@@ -33,8 +33,9 @@
         "build:prod": "jlpm clean && jlpm build:lib:prod && jlpm build:labextension",
         "build:labextension": "jupyter labextension build .",
         "build:labextension:dev": "jupyter labextension build --development True .",
-        "build:lib": "tsc --sourceMap && cp -r src/kernel lib/ 2>/dev/null || true",
-        "build:lib:prod": "tsc && cp -r src/kernel lib/ 2>/dev/null || true",
+        "build:lib": "tsc --sourceMap && python scripts/concat-kernel.py && cp -r src/kernel lib/ 2>/dev/null || true",
+        "build:lib:prod": "tsc && python scripts/concat-kernel.py && cp -r src/kernel lib/ 2>/dev/null || true",
+        "concat:kernel": "python scripts/concat-kernel.py",
         "clean": "jlpm clean:lib",
         "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
@@ -50,9 +51,15 @@
         "prettier:check": "jlpm prettier:base --check",
         "stylelint": "jlpm stylelint:check --fix",
         "stylelint:check": "stylelint --cache \"style/**/*.css\"",
-        "test": "jest --coverage",
+        "test": "jlpm build:lib && jest --coverage && jlpm test:python",
+        "test:typescript": "jest --coverage",
+        "test:python": "python -m pytest tests/python/ -v --tb=short --cov=lib/kernel",
+        "test:python:watch": "python -m pytest tests/python/ -v -f --tb=short",
+        "test:python:integration": "python -m pytest tests/python/ -v -m integration",
+        "test:all": "jlpm test:typescript && jlpm test:python",
         "watch": "run-p watch:src watch:labextension",
-        "watch:src": "tsc -w --sourceMap",
+        "watch:src": "run-p \"tsc -w --sourceMap\" \"jlpm watch:kernel\"",
+        "watch:kernel": "chokidar \"src/kernel/[0-9][0-9]_*.py\" -c \"jlpm concat:kernel\"",
         "watch:labextension": "jupyter labextension watch ."
     },
     "dependencies": {
@@ -94,7 +101,8 @@
         "stylelint-csstree-validator": "^3.0.0",
         "stylelint-prettier": "^4.0.0",
         "typescript": "~5.0.2",
-        "yjs": "^13.5.0"
+        "yjs": "^13.5.0",
+        "chokidar-cli": "^3.0.0"
     },
     "sideEffects": [
         "style/*.css",

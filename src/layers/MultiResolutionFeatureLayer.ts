@@ -69,9 +69,9 @@ const defaultProps: DefaultProps<MultiResolutionFeatureLayerProps> = {
   heatmapZoomThreshold: -3,
   maxCacheSize: 100,
   maxCacheByteSize: 50 * 1024 * 1024, // 50MB
-  heatmapRadiusPixels: 25,
-  heatmapIntensity: 1,
-  featureFillColor: [255, 0, 0, 47], // Red with alpha
+  heatmapRadiusPixels: 50,
+  heatmapIntensity: 10,
+  featureFillColor: [255, 0, 0, 30], // Red with alpha
   featureLineColor: [255, 0, 0, 255], // Solid red
   featureLineWidth: 1,
   enableDebugLogging: false
@@ -334,18 +334,95 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
   }
 
   /**
+   * Calculate the area of a polygon using the shoelace formula
+   */
+  private calculatePolygonArea(coordinates: number[][]): number {
+    if (coordinates.length < 3) {
+      return 0;
+    }
+    
+    let area = 0;
+    const numPoints = coordinates.length - 1; // Exclude the closing point
+    
+    for (let i = 0; i < numPoints; i++) {
+      const j = (i + 1) % numPoints;
+      area += coordinates[i][0] * coordinates[j][1];
+      area -= coordinates[j][0] * coordinates[i][1];
+    }
+    
+    return Math.abs(area) / 2;
+  }
+
+  /**
+   * Calculate the length of a line string
+   */
+  private calculateLineStringLength(coordinates: number[][]): number {
+    if (coordinates.length < 2) {
+      return 0;
+    }
+    
+    let length = 0;
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const dx = coordinates[i + 1][0] - coordinates[i][0];
+      const dy = coordinates[i + 1][1] - coordinates[i][1];
+      length += Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    return length;
+  }
+
+  /**
+   * Calculate weight based on geometry size
+   */
+  private calculateGeometryWeight(geometry: any): number {
+    const tileSize = this.props.tileSize || 512;
+    const pixelsPerTile = tileSize * tileSize; // 512 * 512 = 262,144
+    
+    switch (geometry.type) {
+      case 'Point':
+        // Points have no dimensions, always weight = 1
+        return 1;
+        
+      case 'Polygon':
+        // Weight = (area of polygon / pixels in tile) * 255
+        const coords = geometry.coordinates[0]; // outer ring
+        if (coords.length > 0) {
+          const area = this.calculatePolygonArea(coords);
+          const weight = (area / pixelsPerTile) * 255;
+          return Math.min(255, Math.max(1, Math.round(weight))); // Clamp between 1-255
+        }
+        return 1;
+        
+      case 'LineString':
+        // Weight = (length of line / tile side length) * 255
+        const lineCoords = geometry.coordinates;
+        if (lineCoords.length > 0) {
+          const length = this.calculateLineStringLength(lineCoords);
+          const weight = (length / tileSize) * 255;
+          return Math.min(255, Math.max(1, Math.round(weight))); // Clamp between 1-255
+        }
+        return 1;
+        
+      default:
+        return 1;
+    }
+  }
+
+  /**
    * Extract point positions from features for heatmap rendering
    */
   private extractHeatmapPoints(features: Feature[]): HeatmapPoint[] {
     const points: HeatmapPoint[] = [];
     
     features.forEach(feature => {
-      const weight = feature.properties?.weight || 1;
       const geometry = feature.geometry || feature.properties?.imageGeometry;
       
       if (!geometry) {
         return;
       }
+      
+      // Calculate weight based on geometry size
+      const weight = this.calculateGeometryWeight(geometry);
       
       switch (geometry.type) {
         case 'Point':
