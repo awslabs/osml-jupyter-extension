@@ -1,5 +1,9 @@
 dev-jupyter-workspace/
 
+# This is generated code. All kernel setup logic should be in the files that
+# get concatinated.
+src/kernel/kernel-setup.py
+
 *.bundle.*
 lib/
 node_modules/
