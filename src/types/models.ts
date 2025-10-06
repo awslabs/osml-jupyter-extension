@@ -35,3 +35,34 @@ export interface ModelSelectionDialogProps {
   initialModelEnabled?: boolean;
   onUpdate: (modelName: string, modelEnabled: boolean) => void;
 }
+
+/**
+ * SageMaker endpoint information
+ */
+export interface EndpointInfo {
+  name: string;
+  status: string;
+  creationTime?: string;
+  lastModifiedTime?: string;
+  instanceType?: string;
+}
+
+/**
+ * Response from LIST_AVAILABLE_ENDPOINTS request
+ */
+export interface EndpointsResponse {
+  type: 'LIST_AVAILABLE_ENDPOINTS_RESPONSE';
+  status: 'SUCCESS' | 'ERROR';
+  endpoints?: EndpointInfo[];
+  error?: string;
+}
+
+/**
+ * Endpoint loading state
+ */
+export interface EndpointLoadingState {
+  isLoading: boolean;
+  error?: string;
+  endpoints: EndpointInfo[];
+  lastFetched?: Date;
+}

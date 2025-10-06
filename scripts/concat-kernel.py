@@ -17,11 +17,12 @@ def concatenate_kernel_files():
     output_file = src_dir / "kernel-setup.py"
     
     # Find all numbered Python files and sort them
-    numbered_files = sorted(glob.glob(str(src_dir / "[0-9][0-9]_*.py")))
+    # Pattern matches: 01_file.py, 04a_file.py, 044_file.py, etc.
+    numbered_files = sorted(glob.glob(str(src_dir / "[0-9][0-9]*_*.py")))
     
     if not numbered_files:
         print("No numbered Python files found in src/kernel/")
-        print("Looking for files matching pattern: src/kernel/[0-9][0-9]_*.py")
+        print("Looking for files matching pattern: src/kernel/[0-9][0-9]*_*.py")
         return False
     
     print(f"Found {len(numbered_files)} numbered Python files:")

@@ -7,7 +7,7 @@ import { CommService } from './CommService';
  */
 export class FeatureTileService {
   private featureCache: Map<string, FeatureCacheEntry> = new Map();
-  private enableDebugLogging: boolean = false;
+  private enableDebugLogging: boolean = true;
 
   constructor(private commService: CommService) {}
 
@@ -29,6 +29,18 @@ export class FeatureTileService {
   ): FeatureTileDataFunction {
     return async (tile: IFeatureTile): Promise<FeatureTileData> => {
       return this.loadRealFeatureData(tile, imageName, overlayName);
+    };
+  }
+
+  /**
+   * Create a model feature data function that uses MODEL_TILE_REQUEST messages
+   */
+  public createModelFeatureDataFunction(
+    dataset: string,
+    endpointName: string
+  ): FeatureTileDataFunction {
+    return async (tile: IFeatureTile): Promise<FeatureTileData> => {
+      return this.loadModelFeatureData(tile, dataset, endpointName);
     };
   }
 
@@ -170,6 +182,76 @@ export class FeatureTileService {
 
     } catch (error) {
       console.error(`Error loading features for tile ${tileKey}:`, error);
+      return { features: [], byteLength: 0 };
+    }
+  }
+
+  /**
+   * Load model feature data from the kernel via comm service using MODEL_TILE_REQUEST
+   */
+  private async loadModelFeatureData(
+    tile: IFeatureTile,
+    dataset: string,
+    endpointName: string
+  ): Promise<FeatureTileData> {
+    const tileKey = `model-${dataset}-${endpointName}-${tile.x}-${tile.y}-${tile.z}`;
+    
+    // Check cache first
+    if (this.featureCache.has(tileKey)) {
+      const cached = this.featureCache.get(tileKey)!;
+      this.debugLog(`Using cached model features for tile ${tileKey}`, { count: cached.features.length });
+      return { features: cached.features, byteLength: cached.byteLength };
+    }
+
+    if (!this.commService.isReady()) {
+      console.error('CommService not ready for model feature loading');
+      return { features: [], byteLength: 0 };
+    }
+
+    try {
+      this.debugLog(`Loading model features for tile ${tileKey}`);
+      
+      const response = await this.commService.sendMessage({
+        type: 'MODEL_TILE_REQUEST',
+        dataset: dataset,
+        endpointName: endpointName,
+        zoom: tile.z,
+        row: tile.y,
+        col: tile.x
+      });
+
+      const features = response.features || [];
+      
+      // Process features to ensure they have proper imageGeometry
+      const processedFeatures = features.map((feature: Feature) => {
+        if (feature.properties?.imageGeometry) {
+          // Use imageGeometry as the main geometry for rendering
+          return {
+            ...feature,
+            geometry: feature.properties.imageGeometry
+          };
+        }
+        return feature;
+      });
+      
+      // Calculate approximate byte length for the features
+      const byteLength = this.calculateFeaturesByteLength(processedFeatures);
+      
+      // Cache the result
+      const cacheEntry: FeatureCacheEntry = {
+        features: processedFeatures,
+        byteLength,
+        timestamp: Date.now(),
+        tileKey
+      };
+      this.featureCache.set(tileKey, cacheEntry);
+      
+      this.debugLog(`Loaded model features for tile ${tileKey}`, { count: processedFeatures.length });
+      
+      return { features: processedFeatures, byteLength };
+
+    } catch (error) {
+      console.error(`Error loading model features for tile ${tileKey}:`, error);
       return { features: [], byteLength: 0 };
     }
   }
