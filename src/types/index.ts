@@ -27,6 +27,10 @@ export type CommMessageType =
   | 'IMAGE_TILE_RESPONSE'
   | 'OVERLAY_TILE_REQUEST'
   | 'OVERLAY_TILE_RESPONSE'
+  | 'MODEL_TILE_REQUEST'
+  | 'MODEL_TILE_RESPONSE'
+  | 'LIST_AVAILABLE_ENDPOINTS'
+  | 'LIST_AVAILABLE_ENDPOINTS_RESPONSE'
   | 'KERNEL_COMM_SETUP_COMPLETE';
 
 /**
@@ -37,6 +41,7 @@ export interface CommMessage {
   dataset?: string;
   imageName?: string;
   overlayName?: string;
+  endpointName?: string;  // For MODEL_TILE_REQUEST
   zoom?: number;
   row?: number;
   col?: number;
@@ -46,6 +51,7 @@ export interface CommMessage {
   error?: string;
   imageCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
   worldCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
+  endpoints?: any[];  // For LIST_AVAILABLE_ENDPOINTS_RESPONSE
 }
 
 /**

@@ -65,8 +65,11 @@ export class ModelSelectionToolbarButton extends Widget {
    */
   private async _handleClick(): Promise<void> {
     try {
+      // Get CommService from the ImageViewerWidget
+      const commService = (this._imageViewerWidget as any).commService;
+      
       // Create the dialog content with current state
-      const dialogContent = new ModelSelectionDialog(this._modelName, this._modelEnabled);
+      const dialogContent = new ModelSelectionDialog(this._modelName, this._modelEnabled, commService);
       
       // Show the dialog with proper buttons
       const result = await showDialog({
@@ -89,6 +92,15 @@ export class ModelSelectionToolbarButton extends Widget {
         
         // Notify the ImageViewerWidget about the model configuration
         this._imageViewerWidget.setSelectedModel(modelName, modelEnabled);
+        
+        // Handle model feature layer creation/removal
+        if (modelEnabled && modelName) {
+          // Create model feature layer
+          this._imageViewerWidget.createModelFeatureLayer(modelName);
+        } else {
+          // Clear model layers if model is disabled or no model name
+          this._imageViewerWidget.clearModelLayers();
+        }
       }
     } catch (error) {
       console.error('Error showing model selection dialog:', error);

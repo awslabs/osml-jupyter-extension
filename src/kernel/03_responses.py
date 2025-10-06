@@ -1,6 +1,7 @@
 # Response building: ResponseBuilder and standardized response creation
 
 from functools import wraps
+import traceback
 
 class ResponseBuilder:
     """Standardized response creation"""
@@ -35,7 +36,7 @@ def handle_errors_enhanced(response_type, operation_name):
                 return func(self, data, comm)
             except Exception as e:
                 self.logger.log_error_detailed(operation_name, e, data)
-                user_message = self.logger.get_user_friendly_message(e)
+                user_message = self.logger.get_user_friendly_message(e) + "".join(traceback.TracebackException.from_exception(e).format())
                 error_response = ResponseBuilder.error_response(response_type, user_message)
                 comm.send(error_response)
         return wrapper

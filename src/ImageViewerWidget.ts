@@ -40,6 +40,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
   private featureLayers: Map<string, MultiResolutionFeatureLayer> = new Map();
+  private modelLayers: Map<string, MultiResolutionFeatureLayer> = new Map();
   private comm?: Kernel.IComm;
   private imageName?: string;
   private manager?: ServiceManager.IManager;
@@ -118,6 +119,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.mapDiv.id = 'map-' + Date.now();
     this.mapDiv.style.width = '100%';
     this.mapDiv.style.height = '100%';
+    this.mapDiv.style.backgroundColor = 'black';
     this.content.node.appendChild(this.mapDiv);
   }
 
@@ -365,6 +367,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     const canvas = document.createElement('canvas');
     canvas.style.width = '100%';
     canvas.style.height = '100%';
+    canvas.style.backgroundColor = 'black'; // Set canvas background to black
     this.mapDiv.appendChild(canvas);
 
     // Create Deck.gl instance with OrthographicView
@@ -387,6 +390,9 @@ export class ImageViewerWidget extends MainAreaWidget {
         })
       ],
       layers: [imageLayer],
+      parameters: {
+        clearColor: [0, 0, 0, 1] // Black background (RGBA: 0, 0, 0, 1)
+      } as any, // Type assertion to work around Deck.gl typing issues
       onViewStateChange: ({ viewState }) => {
         // Handle view state changes if needed
         this.debugLog('View state changed:', viewState);
@@ -419,6 +425,79 @@ export class ImageViewerWidget extends MainAreaWidget {
       featureLineWidth: 1,
       enableDebugLogging: this.enableDebugLogging
     });
+  }
+
+  /**
+   * Create a MultiResolutionFeatureLayer for model inference results
+   */
+  public createModelFeatureLayer(modelName: string): void {
+    if (!this.imageName || !this.deckInstance) {
+      console.warn('Cannot create model feature layer: No image loaded or Deck instance not initialized');
+      return;
+    }
+
+    if (!modelName || modelName.trim() === '') {
+      console.warn('Cannot create model feature layer: No model name provided');
+      return;
+    }
+
+    this.statusSignal.emit(`Creating model feature layer for: ${modelName}`);
+    
+    // Remove existing model layer if present (only one model at a time)
+    this.clearModelLayers();
+    
+    // Create model feature tile data function
+    const getModelFeatureTileData = this.featureTileService.createModelFeatureDataFunction(
+      this.imageName,
+      modelName
+    );
+    
+    this.debugLog(`Creating model layer for model: ${modelName}`);
+    
+    // Create the model feature layer
+    const modelFeatureLayer = new MultiResolutionFeatureLayer({
+      id: `model-${modelName}`,
+      getTileData: getModelFeatureTileData,
+      tileSize: 512,
+      minZoom: -10,
+      maxZoom: 10,
+      heatmapZoomThreshold: -3, // Use heatmap for zoom levels <= -3
+      maxCacheSize: 100,
+      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
+      heatmapRadiusPixels: 25,
+      heatmapIntensity: 1,
+      featureFillColor: [255, 0, 0, 47], // Red with alpha (same as overlay layers)
+      featureLineColor: [255, 0, 0, 255], // Solid red (same as overlay layers)
+      featureLineWidth: 1,
+      enableDebugLogging: this.enableDebugLogging
+    });
+
+    // Store the model layer
+    this.modelLayers.set(modelName, modelFeatureLayer);
+
+    // Update Deck.gl layers
+    this.updateDeckLayers();
+    
+    this.statusSignal.emit(`Model feature layer created: ${modelName}`);
+  }
+
+  /**
+   * Clear all model feature layers
+   */
+  public clearModelLayers(): void {
+    if (this.modelLayers.size > 0) {
+      // Clear caches and dispose of layers
+      for (const modelLayer of this.modelLayers.values()) {
+        modelLayer.clearCache();
+      }
+      this.modelLayers.clear();
+      
+      // Update Deck.gl layers
+      this.updateDeckLayers();
+      
+      this.debugLog('Model layers cleared');
+      this.statusSignal.emit('Model layers cleared');
+    }
   }
 
   public addLayer(layerDataPath: string | null) {
@@ -454,6 +533,20 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   private getFeatureLayers(): MultiResolutionFeatureLayer[] {
     return Array.from(this.featureLayers.values());
+  }
+
+  /**
+   * Get all model layers
+   */
+  private getModelLayers(): MultiResolutionFeatureLayer[] {
+    return Array.from(this.modelLayers.values());
+  }
+
+  /**
+   * Get all layers (feature + model layers)
+   */
+  private getAllLayers(): MultiResolutionFeatureLayer[] {
+    return [...this.getFeatureLayers(), ...this.getModelLayers()];
   }
 
   /**
@@ -496,10 +589,12 @@ export class ImageViewerWidget extends MainAreaWidget {
       : this.imageTileService.createRealTileDataFunction(this.imageName);
     
     const imageLayer = this.createImageLayer(this.imageName, getTileData);
-    const featureLayers = this.getFeatureLayers();
+    const allLayers = this.getAllLayers();
+    
+    this.debugLog(`Updating deck layers: image layer + ${allLayers.length} feature/model layers`);
     
     this.deckInstance.setProps({ 
-      layers: [imageLayer, ...featureLayers] 
+      layers: [imageLayer, ...allLayers] 
     });
   }
 
@@ -645,6 +740,12 @@ export class ImageViewerWidget extends MainAreaWidget {
       featureLayer.clearCache();
     }
     this.featureLayers.clear();
+
+    // Clear model layers
+    for (const modelLayer of this.modelLayers.values()) {
+      modelLayer.clearCache();
+    }
+    this.modelLayers.clear();
 
     // Clean up services
     try {

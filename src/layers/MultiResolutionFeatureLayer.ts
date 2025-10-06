@@ -173,18 +173,18 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
         // Check cache first
         if (this.state.featureCache.has(tileKey)) {
           const cachedTileData = this.state.featureCache.get(tileKey)!;
-          console.log(`[MultiResolutionFeatureLayer] Using cached features for tile ${tileKey}`, { count: cachedTileData.features.length });
           this.debugLog(`Using cached features for tile ${tileKey}`, { count: cachedTileData.features.length });
           return cachedTileData;
         }
         
-        console.log(`[MultiResolutionFeatureLayer] Loading features for tile ${tileKey}`, tile);
         this.debugLog(`Loading features for tile ${tileKey}`, tile);
         
         try {
           const tileData = await getTileData(tile);
           
-          console.log(`[MultiResolutionFeatureLayer] Loaded ${tileData.features.length} features for tile ${tileKey}`);
+          if (tileData.features.length > 0) {
+            console.log(`[MultiResolutionFeatureLayer] Loaded ${tileData.features.length} features for tile ${tileKey}`);
+          }
           
           // Cache the tile data
           this.state.featureCache.set(tileKey, tileData);
@@ -239,7 +239,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       allFeatures.push(...tileData.features);
     }
 
-    console.log(`[MultiResolutionFeatureLayer] Creating GeoJsonLayer with ${allFeatures.length} features`);
+    this.debugLog(`[MultiResolutionFeatureLayer] Creating GeoJsonLayer with ${allFeatures.length} features`);
     if (allFeatures.length > 0) {
       console.log(`[MultiResolutionFeatureLayer] Sample feature:`, allFeatures[0]);
     }
@@ -299,8 +299,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
     // Extract heatmap points from features
     const heatmapPoints = this.extractHeatmapPoints(allFeatures);
     
-    console.log(`[MultiResolutionFeatureLayer] Creating heatmap with ${heatmapPoints.length} points from ${allFeatures.length} features`);
-    console.log(`[MultiResolutionFeatureLayer] Feature cache has ${this.state.featureCache.size} tiles`);
+    this.debugLog(`[MultiResolutionFeatureLayer] Creating heatmap with ${heatmapPoints.length} points from ${allFeatures.length} features`);
+    this.debugLog(`[MultiResolutionFeatureLayer] Feature cache has ${this.state.featureCache.size} tiles`);
     if (heatmapPoints.length > 0) {
       console.log(`[MultiResolutionFeatureLayer] Sample heatmap point:`, heatmapPoints[0]);
     }
