@@ -29,6 +29,7 @@ import {
   FeatureTileService, 
   KernelService 
 } from './services';
+import { LayerControlToolbarButton } from './components';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -61,6 +62,11 @@ export class ImageViewerWidget extends MainAreaWidget {
   // Model selection state
   private selectedModel: string = '';
   private selectedModelEnabled: boolean = false;
+  
+  // Layer management state
+  private layerVisibility: Map<string, boolean> = new Map();
+  private layerColors: Map<string, [number, number, number, number]> = new Map();
+  private layerControlButton?: LayerControlToolbarButton;
 
   /**
    * Static Factory Method for the ImageViewerWidget.
@@ -121,6 +127,9 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.mapDiv.style.height = '100%';
     this.mapDiv.style.backgroundColor = 'black';
     this.content.node.appendChild(this.mapDiv);
+    
+    // Add layer control button to toolbar
+    this.addLayerControlButton();
   }
 
   private async initialize(selectedFileName: string | null) {
@@ -409,6 +418,11 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Create a MultiResolutionFeatureLayer for overlay data
    */
   private createFeatureLayer(overlayName: string, getTileData: FeatureTileDataFunction): MultiResolutionFeatureLayer {
+    // Get current colors from state
+    const customColor = this.layerColors.get(overlayName) ?? [255, 0, 0, 128];
+    const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
+    const lineColor = customColor;
+    
     return new MultiResolutionFeatureLayer({
       id: `features-${overlayName}`,
       getTileData,
@@ -420,8 +434,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
       heatmapRadiusPixels: 25,
       heatmapIntensity: 1,
-      featureFillColor: [255, 0, 0, 47], // Red with alpha
-      featureLineColor: [255, 0, 0, 255], // Solid red
+      featureFillColor: fillColor,
+      featureLineColor: lineColor,
       featureLineWidth: 1,
       enableDebugLogging: this.enableDebugLogging
     });
@@ -454,6 +468,11 @@ export class ImageViewerWidget extends MainAreaWidget {
     
     this.debugLog(`Creating model layer for model: ${modelName}`);
     
+    // Get current colors from state
+    const customColor = this.layerColors.get(modelName) ?? [255, 0, 0, 128];
+    const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
+    const lineColor = customColor;
+    
     // Create the model feature layer
     const modelFeatureLayer = new MultiResolutionFeatureLayer({
       id: `model-${modelName}`,
@@ -466,8 +485,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
       heatmapRadiusPixels: 25,
       heatmapIntensity: 1,
-      featureFillColor: [255, 0, 0, 47], // Red with alpha (same as overlay layers)
-      featureLineColor: [255, 0, 0, 255], // Solid red (same as overlay layers)
+      featureFillColor: fillColor,
+      featureLineColor: lineColor,
       featureLineWidth: 1,
       enableDebugLogging: this.enableDebugLogging
     });
@@ -524,6 +543,11 @@ export class ImageViewerWidget extends MainAreaWidget {
     // Update Deck.gl layers
     this.updateDeckLayers();
     
+    // Notify layer control button to update state
+    if (this.layerControlButton) {
+      this.layerControlButton.onLayersChanged();
+    }
+    
     this.statusSignal.emit(`Added overlay layer: ${layerDataPath}`);
     return;
   }
@@ -543,10 +567,28 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Get all layers (feature + model layers)
+   * Get all layers (feature + model layers) that are visible
    */
   private getAllLayers(): MultiResolutionFeatureLayer[] {
-    return [...this.getFeatureLayers(), ...this.getModelLayers()];
+    const visibleLayers: MultiResolutionFeatureLayer[] = [];
+    
+    // Add visible feature layers
+    for (const [layerId, layer] of this.featureLayers.entries()) {
+      const visible = this.layerVisibility.get(layerId) ?? true;
+      if (visible) {
+        visibleLayers.push(layer);
+      }
+    }
+    
+    // Add visible model layers
+    for (const [layerId, layer] of this.modelLayers.entries()) {
+      const visible = this.layerVisibility.get(layerId) ?? true;
+      if (visible) {
+        visibleLayers.push(layer);
+      }
+    }
+    
+    return visibleLayers;
   }
 
   /**
@@ -717,6 +759,165 @@ export class ImageViewerWidget extends MainAreaWidget {
       selectedModel: this.selectedModel,
       selectedModelEnabled: this.selectedModelEnabled
     };
+  }
+
+  /**
+   * Layer management methods for LayerControl
+   */
+
+  /**
+   * Set layer visibility
+   */
+  public setLayerVisibility(layerId: string, visible: boolean): void {
+    this.layerVisibility.set(layerId, visible);
+    this.updateDeckLayers();
+    
+    // Notify layer control button to update state
+    if (this.layerControlButton) {
+      this.layerControlButton.onLayersChanged();
+    }
+    
+    this.statusSignal.emit(`Layer ${layerId} ${visible ? 'shown' : 'hidden'}`);
+  }
+
+  /**
+   * Set layer color
+   */
+  public setLayerColor(layerId: string, color: [number, number, number, number]): void {
+    this.layerColors.set(layerId, color);
+    
+    // Recreate the specific layer with new color
+    if (this.featureLayers.has(layerId)) {
+      const layer = this.featureLayers.get(layerId);
+      if (layer) {
+        // Get the existing getTileData function
+        const existingLayer = layer as any;
+        const getTileData = existingLayer.props.getTileData;
+        
+        // Create new layer with updated color
+        const newLayer = this.createFeatureLayer(layerId, getTileData);
+        
+        // Replace the layer
+        this.featureLayers.set(layerId, newLayer);
+      }
+    }
+    
+    if (this.modelLayers.has(layerId)) {
+      const layer = this.modelLayers.get(layerId);
+      if (layer) {
+        // For model layers, we need to recreate using the existing pattern
+        const existingLayer = layer as any;
+        const getTileData = existingLayer.props.getTileData;
+        
+        const customColor = this.layerColors.get(layerId) ?? [255, 0, 0, 128];
+        const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
+        const lineColor = customColor;
+        
+        // Create new model layer with updated color
+        const newModelLayer = new MultiResolutionFeatureLayer({
+          id: `model-${layerId}`,
+          getTileData,
+          tileSize: 512,
+          minZoom: -10,
+          maxZoom: 10,
+          heatmapZoomThreshold: -3,
+          maxCacheSize: 100,
+          maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
+          heatmapRadiusPixels: 25,
+          heatmapIntensity: 1,
+          featureFillColor: fillColor,
+          featureLineColor: lineColor,
+          featureLineWidth: 1,
+          enableDebugLogging: this.enableDebugLogging
+        });
+        
+        // Replace the layer
+        this.modelLayers.set(layerId, newModelLayer);
+      }
+    }
+    
+    // Update Deck.gl layers
+    this.updateDeckLayers();
+    
+    this.statusSignal.emit(`Layer ${layerId} color updated`);
+  }
+
+  /**
+   * Delete a layer
+   */
+  public deleteLayer(layerId: string): void {
+    // Remove from feature layers
+    if (this.featureLayers.has(layerId)) {
+      const layer = this.featureLayers.get(layerId);
+      if (layer) {
+        layer.clearCache();
+      }
+      this.featureLayers.delete(layerId);
+    }
+    
+    // Remove from model layers
+    if (this.modelLayers.has(layerId)) {
+      const layer = this.modelLayers.get(layerId);
+      if (layer) {
+        layer.clearCache();
+      }
+      this.modelLayers.delete(layerId);
+    }
+    
+    // Clean up layer state
+    this.layerVisibility.delete(layerId);
+    this.layerColors.delete(layerId);
+    
+    // Update deck layers
+    this.updateDeckLayers();
+    
+    // Notify layer control button to update state
+    if (this.layerControlButton) {
+      this.layerControlButton.onLayersChanged();
+    }
+    
+    this.statusSignal.emit(`Layer ${layerId} deleted`);
+  }
+
+  /**
+   * Get layer information for the layer control dialog
+   */
+  public getLayerInfo(): any[] {
+    const layers: any[] = [];
+    
+    // Add feature layers
+    for (const [layerId] of this.featureLayers.entries()) {
+      layers.push({
+        id: layerId,
+        name: layerId,
+        visible: this.layerVisibility.get(layerId) ?? true,
+        color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
+        type: 'feature'
+      });
+    }
+    
+    // Add model layers
+    for (const [layerId] of this.modelLayers.entries()) {
+      layers.push({
+        id: layerId,
+        name: layerId,
+        visible: this.layerVisibility.get(layerId) ?? true,
+        color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
+        type: 'model'
+      });
+    }
+    
+    return layers;
+  }
+
+  /**
+   * Initialize layer control toolbar button
+   */
+  public addLayerControlButton(): void {
+    if (!this.layerControlButton) {
+      this.layerControlButton = new LayerControlToolbarButton(this);
+      this.toolbar.addItem('layerControl', this.layerControlButton);
+    }
   }
 
   /**

@@ -262,6 +262,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
     }
 
     this.debugLog(`[MultiResolutionFeatureLayer] Creating GeoJsonLayer with ${allFeatures.length} features`);
+    this.debugLog(`Using colors - Fill: [${featureFillColor}], Line: [${featureLineColor}]`);
     if (allFeatures.length > 0) {
       console.log(`[MultiResolutionFeatureLayer] Sample feature:`, allFeatures[0]);
     }
@@ -275,11 +276,11 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
         features: allFeatures
       },
       
-      // Styling - make more visible for debugging
-      getFillColor: [255, 0, 0, 128], // Bright red with 50% alpha
-      getLineColor: [255, 0, 0, 255], // Solid red
-      getLineWidth: 2, // Thicker line
-      getPointRadius: 30, // Larger points
+      // Use the actual color props instead of hardcoded colors
+      getFillColor: featureFillColor!, 
+      getLineColor: featureLineColor!,
+      getLineWidth: featureLineWidth!,
+      getPointRadius: 30, // Keep reasonable point size
       
       // Properties
       filled: true,
@@ -287,7 +288,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       pickable: true,
       
       // Line properties
-      lineWidthMinPixels: 2,
+      lineWidthMinPixels: Math.max(1, featureLineWidth! / 2),
       
       // Point properties
       pointRadiusMinPixels: 10,
@@ -298,7 +299,10 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       opacity: 1.0,
       
       updateTriggers: {
-        data: [this.state.featureCache.size, this.getAllFeatures().length] // Trigger update when cache or feature count changes
+        data: [this.state.featureCache.size, this.getAllFeatures().length], // Trigger update when cache or feature count changes
+        getFillColor: featureFillColor, // Trigger update when fill color changes
+        getLineColor: featureLineColor, // Trigger update when line color changes
+        getLineWidth: featureLineWidth  // Trigger update when line width changes
       }
     });
   }
