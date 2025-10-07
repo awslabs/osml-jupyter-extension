@@ -75,8 +75,8 @@ const defaultProps: DefaultProps<MultiResolutionFeatureLayerProps> = {
   tileSize: 512,
   minZoom: -10,
   maxZoom: 10,
-  minModelZoom: -1,
-  maxModelZoom: 1,
+  minModelZoom: -10,
+  maxModelZoom: 3,
   heatmapZoomThreshold: -3,
   maxCacheSize: 100,
   maxCacheByteSize: 50 * 1024 * 1024, // 50MB
@@ -99,13 +99,15 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
   static defaultProps = defaultProps;
 
   state!: {
-    allFeatures: Feature[];
+    dataVersion: number;
+    loadedTileIds: Set<string>;
     featureCache: Map<string, FeatureTileData>;
   };
 
   initializeState(): void {
     this.state = {
-      allFeatures: [],
+      dataVersion: 0,
+      loadedTileIds: new Set(),
       featureCache: new Map()
     };
   }
@@ -114,7 +116,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
     // Clear cache if data source changes
     if (changeFlags.dataChanged || changeFlags.propsChanged) {
       this.state.featureCache.clear();
-      this.state.allFeatures = [];
+      this.state.loadedTileIds.clear();
+      this.state.dataVersion = 0;
     }
   }
 
@@ -136,7 +139,25 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
   }
 
   /**
-   * Create a tile layer for loading feature data with performance optimizations
+   * Callback for when async tile data is loaded
+   */
+  private onTileDataLoaded = (tileId: string, data: FeatureTileData): void => {
+    this.debugLog(`Async data arrived for tile ${tileId}`, { count: data.features.length });
+    
+    // Update cache and state
+    this.state.featureCache.set(tileId, data);
+    this.state.loadedTileIds.add(tileId);
+    
+    // Increment data version to trigger updateTriggers
+    this.setState({
+      dataVersion: this.state.dataVersion + 1,
+      loadedTileIds: new Set(this.state.loadedTileIds),
+      featureCache: new Map(this.state.featureCache)
+    });
+  };
+
+  /**
+   * Create a tile layer for loading feature data with async performance optimizations
    */
   private createFeatureTileLayer(): TileLayer {
     const {
@@ -162,7 +183,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       refinementStrategy: 'best-available',
       debounceTime: tileRequestDebounceTime!,
       
-      getTileData: async (tileProps: any) => {
+      getTileData: (tileProps: any) => {
         const x = tileProps.x ?? tileProps.index?.x;
         const y = tileProps.y ?? tileProps.index?.y;
         const z = tileProps.z ?? tileProps.index?.z;
@@ -173,9 +194,6 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
           this.debugLog(`Skipping model inference for tile ${tileKey} at zoom ${z} (outside range ${minModelZoom}-${maxModelZoom})`);
           return { features: [], byteLength: 0 };
         }
-        
-        // Always log tile requests for debugging
-        console.log(`[MultiResolutionFeatureLayer] getTileData called for tile ${x}-${y}-${z}`, tileProps);
         
         // Convert TileLayer's tile format to our IFeatureTile format
         const scale = Math.pow(2, -z);
@@ -199,34 +217,23 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
           return cachedTileData;
         }
         
-        this.debugLog(`Loading features for tile ${tileKey}`, tile);
+        this.debugLog(`Requesting async load for tile ${tileKey}`, tile);
         
-        try {
-          const tileData = await getTileData(tile);
-          
-          if (tileData.features.length > 0) {
-            console.log(`[MultiResolutionFeatureLayer] Loaded ${tileData.features.length} features for tile ${tileKey}`);
-          }
-          
-          // Cache the tile data
-          this.state.featureCache.set(tileKey, tileData);
-          
-          // Add to all features collection (for heatmap)
-          this.state.allFeatures.push(...tileData.features);
-          
-          // Force layer re-render when new features are loaded
-          // We need to trigger a state change to force renderLayers() to be called again
-          this.setState({
-            featureCache: new Map(this.state.featureCache), // Create new Map to trigger change
-            allFeatures: [...this.state.allFeatures] // Create new array to trigger change
-          });
-          
-          this.debugLog(`Loaded ${tileData.features.length} features for tile ${tileKey}`);
-          return tileData;
-        } catch (error) {
-          console.error(`[MultiResolutionFeatureLayer] Error loading features for tile ${tileKey}:`, error);
-          return { features: [], byteLength: 0 };
+        // Use the original getTileData if it's a function
+        if (typeof getTileData === 'function') {
+          // For backward compatibility, call the function and handle the promise
+          const promise = Promise.resolve(getTileData(tile));
+          promise
+            .then((tileData) => {
+              this.onTileDataLoaded(tileKey, tileData);
+            })
+            .catch((error) => {
+              console.error(`[MultiResolutionFeatureLayer] Error loading features for tile ${tileKey}:`, error);
+            });
         }
+        
+        // Return empty data immediately - callback will update when data arrives
+        return { features: [], byteLength: 0 };
       },
       
       renderSubLayers: () => {
@@ -299,10 +306,11 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       opacity: 1.0,
       
       updateTriggers: {
-        data: [this.state.featureCache.size, this.getAllFeatures().length], // Trigger update when cache or feature count changes
-        getFillColor: featureFillColor, // Trigger update when fill color changes
-        getLineColor: featureLineColor, // Trigger update when line color changes
-        getLineWidth: featureLineWidth  // Trigger update when line width changes
+        // Use dataVersion to trigger updates only when new data arrives
+        data: this.state.dataVersion,
+        getFillColor: featureFillColor,
+        getLineColor: featureLineColor,
+        getLineWidth: featureLineWidth
       }
     });
   }
@@ -354,7 +362,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       ],
       
       updateTriggers: {
-        data: [this.state.featureCache.size, allFeatures.length] // Trigger update when cache or feature count changes
+        // Use dataVersion to trigger updates only when new data arrives
+        data: this.state.dataVersion
       }
     });
   }
@@ -539,7 +548,8 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
    */
   clearCache(): void {
     this.state.featureCache.clear();
-    this.state.allFeatures = [];
+    this.state.loadedTileIds.clear();
+    this.setState({ dataVersion: this.state.dataVersion + 1 });
   }
 
   /**

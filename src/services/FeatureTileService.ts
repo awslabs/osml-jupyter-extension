@@ -3,13 +3,60 @@ import { IFeatureTile, FeatureTileData, FeatureTileDataFunction, FeatureCacheEnt
 import { CommService } from './CommService';
 
 /**
+ * Callback function for when async tile data is loaded
+ */
+export type TileDataCallback = (tileId: string, data: FeatureTileData) => void;
+
+/**
  * Service for managing feature tile data loading and processing
  */
 export class FeatureTileService {
   private featureCache: Map<string, FeatureCacheEntry> = new Map();
+  private loadingPromises: Map<string, Promise<FeatureTileData>> = new Map();
+  private dataChangeCallbacks: Map<string, Set<TileDataCallback>> = new Map();
   private enableDebugLogging: boolean = true;
 
   constructor(private commService: CommService) {}
+
+  /**
+   * Get tile data asynchronously with callback support
+   * Returns cached data immediately or empty data, triggers callback when async data arrives
+   */
+  public getTileDataAsync(
+    tile: IFeatureTile, 
+    callback: TileDataCallback,
+    dataType: 'mock' | 'real' | 'model' = 'mock',
+    options?: { 
+      imageName?: string; 
+      overlayName?: string; 
+      dataset?: string; 
+      endpointName?: string;
+      squareSize?: number;
+    }
+  ): FeatureTileData {
+    const tileId = this.getTileId(tile, dataType, options);
+    
+    // Return cached data immediately if available
+    if (this.featureCache.has(tileId)) {
+      const cached = this.featureCache.get(tileId)!;
+      this.debugLog(`Returning cached data for tile ${tileId}`, { count: cached.features.length });
+      return { features: cached.features, byteLength: cached.byteLength };
+    }
+
+    // Add callback to notification list
+    if (!this.dataChangeCallbacks.has(tileId)) {
+      this.dataChangeCallbacks.set(tileId, new Set());
+    }
+    this.dataChangeCallbacks.get(tileId)!.add(callback);
+
+    // Start loading if not already in progress
+    if (!this.loadingPromises.has(tileId)) {
+      this.startAsyncTileLoad(tile, dataType, options, tileId);
+    }
+
+    // Return empty data immediately - callback will be triggered when data arrives
+    return { features: [], byteLength: 0 };
+  }
 
   /**
    * Create a mock feature data function for testing
@@ -218,7 +265,7 @@ export class FeatureTileService {
         zoom: tile.z,
         row: tile.y,
         col: tile.x
-      });
+      }, 60000); // 60 second timeout for model requests
 
       const features = response.features || [];
       
@@ -315,10 +362,114 @@ export class FeatureTileService {
   }
 
   /**
-   * Clear the feature cache
+   * Generate a unique tile ID based on tile coordinates and data type
+   */
+  private getTileId(
+    tile: IFeatureTile, 
+    dataType: string, 
+    options?: any
+  ): string {
+    switch (dataType) {
+      case 'mock':
+        return `mock-${tile.x}-${tile.y}-${tile.z}`;
+      case 'real':
+        return `${options?.imageName || 'unknown'}-${options?.overlayName || 'unknown'}-${tile.x}-${tile.y}-${tile.z}`;
+      case 'model':
+        return `model-${options?.dataset || 'unknown'}-${options?.endpointName || 'unknown'}-${tile.x}-${tile.y}-${tile.z}`;
+      default:
+        return `${dataType}-${tile.x}-${tile.y}-${tile.z}`;
+    }
+  }
+
+  /**
+   * Start async loading of tile data
+   */
+  private startAsyncTileLoad(
+    tile: IFeatureTile,
+    dataType: 'mock' | 'real' | 'model',
+    options: any = {},
+    tileId: string
+  ): void {
+    this.debugLog(`Starting async load for tile ${tileId}`);
+
+    let loadPromise: Promise<FeatureTileData>;
+
+    switch (dataType) {
+      case 'mock':
+        loadPromise = this.createMockFeatureData(tile, options.squareSize || 0.1);
+        break;
+      case 'real':
+        if (!options.imageName || !options.overlayName) {
+          console.error('Real data loading requires imageName and overlayName');
+          this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
+          return;
+        }
+        loadPromise = this.loadRealFeatureData(tile, options.imageName, options.overlayName);
+        break;
+      case 'model':
+        if (!options.dataset || !options.endpointName) {
+          console.error('Model data loading requires dataset and endpointName');
+          this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
+          return;
+        }
+        loadPromise = this.loadModelFeatureData(tile, options.dataset, options.endpointName);
+        break;
+      default:
+        console.error(`Unknown data type: ${dataType}`);
+        this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
+        return;
+    }
+
+    this.loadingPromises.set(tileId, loadPromise);
+
+    loadPromise
+      .then((data) => {
+        this.debugLog(`Async load completed for tile ${tileId}`, { count: data.features.length });
+        this.notifyCallbacks(tileId, data);
+      })
+      .catch((error) => {
+        console.error(`Async load failed for tile ${tileId}:`, error);
+        this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
+      })
+      .finally(() => {
+        // Clean up loading promise and callbacks
+        this.loadingPromises.delete(tileId);
+        this.dataChangeCallbacks.delete(tileId);
+      });
+  }
+
+  /**
+   * Notify all callbacks for a tile that data has arrived
+   */
+  private notifyCallbacks(tileId: string, data: FeatureTileData): void {
+    const callbacks = this.dataChangeCallbacks.get(tileId);
+    if (callbacks) {
+      callbacks.forEach(callback => {
+        try {
+          callback(tileId, data);
+        } catch (error) {
+          console.error('Error in tile data callback:', error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Cancel loading for a specific tile
+   */
+  public cancelTileLoad(tileId: string): void {
+    this.loadingPromises.delete(tileId);
+    this.dataChangeCallbacks.delete(tileId);
+    this.debugLog(`Cancelled loading for tile ${tileId}`);
+  }
+
+  /**
+   * Clear the feature cache and cancel all loading operations
    */
   public clearCache(): void {
     this.featureCache.clear();
+    this.loadingPromises.clear();
+    this.dataChangeCallbacks.clear();
     this.debugLog('Feature cache cleared');
   }
 

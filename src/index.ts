@@ -95,8 +95,8 @@ async function activate(
           console.log('Adding toolbar items to ImageViewerWidget');
           
           // Create and add the model selection button
-          const modelSelectionButton = new ModelSelectionToolbarButton(widget);
-          widget.toolbar.addItem('modelSelection', modelSelectionButton);
+          //const modelSelectionButton = new ModelSelectionToolbarButton(widget);
+          //widget.toolbar.addItem('modelSelection', modelSelectionButton);
 
           // Create and add the image metadata button
           const imageMetadataButton = new ImageMetadataToolbarButton(widget);
