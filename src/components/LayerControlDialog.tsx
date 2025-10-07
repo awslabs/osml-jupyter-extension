@@ -49,6 +49,8 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
   layers,
   actions
 }) => {
+  const [datasetName, setDatasetName] = useState('');
+
   // Handle visibility toggle
   const handleVisibilityToggle = (layerId: string) => {
     actions.toggleVisibility(layerId);
@@ -70,110 +72,197 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
     actions.deleteLayer(layerId);
   };
 
-  if (layers.length === 0) {
-    return (
-      <div style={{ 
-        padding: '16px',
-        textAlign: 'center',
-        color: '#666',
-        backgroundColor: '#f8f9fa',
-        border: '1px solid #dee2e6',
-        borderRadius: '4px'
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>No Overlay Layers</div>
-        <div style={{ fontSize: '14px' }}>
-          Use "OversightML: Add Layer" from the file browser context menu to add overlay layers.
-        </div>
-      </div>
-    );
-  }
+  // Handle adding named dataset
+  const handleAddDataset = () => {
+    if (datasetName.trim()) {
+      actions.addNamedDataset(datasetName.trim());
+      setDatasetName(''); // Clear input after adding
+    }
+  };
+
+  // Handle Enter key press in text input
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAddDataset();
+    }
+  };
 
   return (
     <div style={{ 
       display: 'flex', 
       flexDirection: 'column', 
       height: '100%',
-      maxHeight: '400px',
-      overflow: 'auto'
+      maxHeight: '400px'
     }}>
-      {layers.map((layer) => (
-        <div
-          key={layer.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '8px 12px',
-            borderBottom: '1px solid #e9ecef',
-            gap: '12px'
-          }}
-        >
-          {/* Visibility Checkbox */}
+      {/* Add Named Dataset Section */}
+      <div style={{
+        padding: '16px',
+        borderBottom: '2px solid #e9ecef',
+        backgroundColor: '#f8f9fa'
+      }}>
+        <div style={{ 
+          fontWeight: 'bold', 
+          marginBottom: '8px', 
+          fontSize: '14px',
+          color: '#495057'
+        }}>
+          Add Dataset Layer
+        </div>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center'
+        }}>
           <input
-            type="checkbox"
-            checked={layer.visible}
-            onChange={() => handleVisibilityToggle(layer.id)}
+            type="text"
+            value={datasetName}
+            onChange={(e) => setDatasetName(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Enter dataset name..."
             style={{
-              width: '16px',
-              height: '16px',
-              cursor: 'pointer'
-            }}
-            title={layer.visible ? 'Hide layer' : 'Show layer'}
-          />
-
-          {/* Layer Name */}
-          <div style={{ 
-            flex: 1,
-            minWidth: 0,
-            wordBreak: 'break-word'
-          }}>
-            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-              {generateLayerName(layer.id, layer.type)}
-            </div>
-          </div>
-
-          {/* Color Picker */}
-          <input
-            type="color"
-            value={rgbaToHex(layer.color)}
-            onChange={(e) => handleColorChange(layer.id, e.target.value)}
-            style={{
-              width: '32px',
-              height: '32px',
-              border: '2px solid #ddd',
+              flex: 1,
+              padding: '8px 12px',
+              border: '1px solid #ced4da',
               borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: 'transparent',
-              padding: '0'
+              fontSize: '14px',
+              outline: 'none'
             }}
-            title={`Change layer color (current: ${rgbaToHex(layer.color)})`}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#007bff';
+              e.target.style.boxShadow = '0 0 0 2px rgba(0, 123, 255, 0.25)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#ced4da';
+              e.target.style.boxShadow = 'none';
+            }}
           />
-
-          {/* Delete Button */}
           <button
-            onClick={() => handleDelete(layer.id)}
+            onClick={handleAddDataset}
+            disabled={!datasetName.trim()}
             style={{
-              background: 'none',
+              padding: '8px 16px',
+              backgroundColor: datasetName.trim() ? '#007bff' : '#6c757d',
+              color: 'white',
               border: 'none',
-              cursor: 'pointer',
-              fontSize: '16px',
-              padding: '4px',
               borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              fontSize: '14px',
+              cursor: datasetName.trim() ? 'pointer' : 'not-allowed',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8f9fa';
+              if (datasetName.trim()) {
+                e.currentTarget.style.backgroundColor = '#0056b3';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              if (datasetName.trim()) {
+                e.currentTarget.style.backgroundColor = '#007bff';
+              }
             }}
-            title="Delete layer"
           >
-            ❌
+            Add
           </button>
         </div>
-      ))}
+      </div>
+
+      {/* Layer List Section */}
+      <div style={{
+        flex: 1,
+        overflow: 'auto'
+      }}>
+        {layers.length === 0 ? (
+          <div style={{ 
+            padding: '16px',
+            textAlign: 'center',
+            color: '#666'
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>No Overlay Layers</div>
+            <div style={{ fontSize: '14px' }}>
+              Add dataset layers using the input above or "OversightML: Add Layer" from the file browser context menu.
+            </div>
+          </div>
+        ) : (
+          layers.map((layer) => (
+            <div
+              key={layer.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                gap: '12px'
+              }}
+            >
+              {/* Visibility Checkbox */}
+              <input
+                type="checkbox"
+                checked={layer.visible}
+                onChange={() => handleVisibilityToggle(layer.id)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer'
+                }}
+                title={layer.visible ? 'Hide layer' : 'Show layer'}
+              />
+
+              {/* Layer Name */}
+              <div style={{ 
+                flex: 1,
+                minWidth: 0,
+                wordBreak: 'break-word'
+              }}>
+                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                  {generateLayerName(layer.id, layer.type)}
+                </div>
+              </div>
+
+              {/* Color Picker */}
+              <input
+                type="color"
+                value={rgbaToHex(layer.color)}
+                onChange={(e) => handleColorChange(layer.id, e.target.value)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  border: '2px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  backgroundColor: 'transparent',
+                  padding: '0'
+                }}
+                title={`Change layer color (current: ${rgbaToHex(layer.color)})`}
+              />
+
+              {/* Delete Button */}
+              <button
+                onClick={() => handleDelete(layer.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Delete layer"
+              >
+                ❌
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
