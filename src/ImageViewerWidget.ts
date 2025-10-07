@@ -175,7 +175,7 @@ export class ImageViewerWidget extends MainAreaWidget {
             const kernel = this.imageSessionContext.session?.kernel;
             if (kernel) {
               this.commService = new CommService(kernel);
-              this.commService.setDebugMode(true);
+              // this.commService.setDebugMode(true);
               
               await this.commService.initialize('osml_comm_target');
               

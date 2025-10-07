@@ -52,13 +52,14 @@ export class CommService {
   /**
    * Send a message through the comm channel
    */
-  public async sendMessage(message: CommMessage): Promise<any> {
+  public async sendMessage(message: CommMessage, timeoutMs: number = 30000): Promise<any> {
     if (!this.comm) {
       throw new Error('Comm channel not initialized');
     }
 
     if (this.debug) {
       console.log('[CommService] Sending message:', JSON.stringify(message, null, 2));
+      console.log(`[CommService] Using timeout: ${timeoutMs}ms for message type: ${message.type}`);
     }
 
     return new Promise((resolve, reject) => {
@@ -66,10 +67,10 @@ export class CommService {
       
       const timeoutId = setTimeout(() => {
         if (this.debug) {
-          console.warn(`[CommService] Timeout waiting for response to ${message.type}`);
+          console.warn(`[CommService] Timeout (${timeoutMs}ms) waiting for response to ${message.type}`);
         }
         reject(new Error(`Timeout waiting for response to ${message.type}`));
-      }, 30000); // 30 second timeout
+      }, timeoutMs);
 
       commFuture.onIOPub = (msg: any): void => {
         const msgType = msg.header.msg_type;
