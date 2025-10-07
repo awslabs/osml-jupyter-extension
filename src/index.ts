@@ -10,7 +10,7 @@ import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { LOGO_ICON } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
-import { ModelSelectionToolbarButton } from './components';
+import { ModelSelectionToolbarButton, ImageMetadataToolbarButton } from './components';
 import { Widget } from '@lumino/widgets';
 
 namespace CommandIDs {
@@ -57,6 +57,16 @@ async function activate(
         return new ModelSelectionToolbarButton(widget);
       }
     );
+
+    // Register the image metadata toolbar button factory
+    toolbarRegistry.addFactory<ImageViewerWidget>(
+      'ImageViewer',
+      'imageMetadata',
+      (widget: ImageViewerWidget) => {
+        console.log('Creating ImageMetadataToolbarButton for widget');
+        return new ImageMetadataToolbarButton(widget);
+      }
+    );
   }
 
   app.commands.addCommand(CommandIDs.openWithViewer, {
@@ -87,6 +97,10 @@ async function activate(
           // Create and add the model selection button
           const modelSelectionButton = new ModelSelectionToolbarButton(widget);
           widget.toolbar.addItem('modelSelection', modelSelectionButton);
+
+          // Create and add the image metadata button
+          const imageMetadataButton = new ImageMetadataToolbarButton(widget);
+          widget.toolbar.addItem('imageMetadata', imageMetadataButton);
         }
         if (statusBar) {
           console.log('StatusBar found. Setting up status widget.');

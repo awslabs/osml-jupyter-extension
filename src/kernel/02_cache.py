@@ -1,5 +1,6 @@
 # Cache management: AdvancedCacheManager and caching logic
 
+import time
 from osgeo import gdal, gdalconst
 gdal.UseExceptions()
 
@@ -121,19 +122,41 @@ class AdvancedCacheManager:
         return False
     
     def get_model_results(self, dataset, endpoint, zoom, row, col):
-        """Get cached model results"""
+        """Get cached model results with access tracking"""
         key = f"{dataset}:{endpoint}:{zoom}:{row}:{col}"
         if key in self.model_results_cache:
             self.cache_stats['hits'] += 1
-            return self.model_results_cache[key]
+            cache_entry = self.model_results_cache[key]
+            
+            # Update access statistics for LRU
+            if isinstance(cache_entry, dict) and 'features' in cache_entry:
+                cache_entry['access_count'] = cache_entry.get('access_count', 0) + 1
+                cache_entry['last_access'] = time.time()
+                return cache_entry['features']
+            else:
+                # Handle old cache format
+                return cache_entry
         else:
             self.cache_stats['misses'] += 1
             return None
     
     def cache_model_results(self, dataset, endpoint, zoom, row, col, features):
-        """Cache model inference results"""
+        """Cache model inference results with memory management"""
         key = f"{dataset}:{endpoint}:{zoom}:{row}:{col}"
-        self.model_results_cache[key] = features
+        
+        # Implement LRU-style cache with size limit
+        max_cache_size = 1000  # Maximum number of cached model results
+        if len(self.model_results_cache) >= max_cache_size:
+            # Remove oldest entries (simple FIFO for now, could be enhanced to true LRU)
+            keys_to_remove = list(self.model_results_cache.keys())[:100]  # Remove oldest 100 entries
+            for old_key in keys_to_remove:
+                del self.model_results_cache[old_key]
+        
+        self.model_results_cache[key] = {
+            'features': features,
+            'timestamp': time.time(),
+            'access_count': 1
+        }
     
     def clear_model_cache_for_dataset(self, dataset):
         """Clear all model results for a specific dataset"""

@@ -51,7 +51,7 @@ class ImageTileProcessor(BaseMessageProcessor):
         if tile_factory is None:
             raise ValueError(f"Image not loaded: {dataset}")
         
-        # Calculate scale and tile parameters (matching legacy logic)
+        # Calculate scale and tile parameters 
         scale = 2**(-1 * zoom)
         scaled_tile_size = 512 * scale
         
