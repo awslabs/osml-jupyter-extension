@@ -44,20 +44,7 @@ export class ModelSelectionToolbarButton extends Widget {
     iconSpan.className = 'jp-ToolbarButtonComponent-icon';
     iconSpan.innerHTML = '🤖'; // Using emoji for now, could be replaced with proper icon
     
-    // Create label span
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'jp-ToolbarButtonComponent-label';
-    
-    if (!this._modelEnabled) {
-      labelSpan.textContent = 'No Model Running';
-    } else if (this._modelName) {
-      labelSpan.textContent = this._modelName;
-    } else {
-      labelSpan.textContent = 'No Model Selected';
-    }
-    
     this._button.appendChild(iconSpan);
-    this._button.appendChild(labelSpan);
   }
 
   /**

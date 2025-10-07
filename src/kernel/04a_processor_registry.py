@@ -47,3 +47,11 @@ class MessageHandlerRegistry:
     def get_performance_stats(self):
         """Get performance statistics"""
         return self.performance_monitor.get_stats()
+    
+    def get_registered_message_types(self):
+        """Get list of registered message types"""
+        return list(self.handlers.keys())
+
+def get_registered_message_types():
+    """Get list of registered message types from global registry"""
+    return global_message_registry.get_registered_message_types()

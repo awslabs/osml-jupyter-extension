@@ -42,13 +42,7 @@ export class ImageMetadataToolbarButton extends Widget {
     iconSpan.className = 'jp-ToolbarButtonComponent-icon';
     iconSpan.innerHTML = '📄'; // Using document emoji as icon
     
-    // Create label span
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'jp-ToolbarButtonComponent-label';
-    labelSpan.textContent = 'Image Info';
-    
     this._button.appendChild(iconSpan);
-    this._button.appendChild(labelSpan);
   }
 
   /**
