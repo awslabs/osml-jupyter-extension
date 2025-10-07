@@ -100,3 +100,20 @@ export interface ViewportState {
   minZoom?: number;
   maxZoom?: number;
 }
+
+/**
+ * Layer management types
+ */
+export interface LayerInfo {
+  id: string;
+  name: string;
+  visible: boolean;
+  color: [number, number, number, number]; // RGBA
+  type: 'feature' | 'model';
+}
+
+export interface LayerControlActions {
+  toggleVisibility: (layerId: string) => void;
+  updateColor: (layerId: string, color: [number, number, number, number]) => void;
+  deleteLayer: (layerId: string) => void;
+}
