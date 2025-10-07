@@ -1,13 +1,191 @@
-# Model processors: Handle endpoint listing and model inference
+# Model processors: Handle endpoint listing and model inference with async optimization
 
 import time
 import json
+import asyncio
+import concurrent.futures
+from threading import Lock, Semaphore
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Optional
 import boto3
 try:
     from aws.osml.features import ImagedFeaturePropertyAccessor
 except ImportError:
     # Fallback if osml.features is not available
     ImagedFeaturePropertyAccessor = None
+
+@dataclass
+class ModelTileRequest:
+    """Request structure for model tile processing"""
+    dataset: str
+    endpoint_name: str
+    zoom: int
+    row: int
+    col: int
+    comm: any
+    request_id: str
+    timestamp: float
+
+class AsyncModelInferenceManager:
+    """Manages async model inference with concurrency control and request batching"""
+    
+    def __init__(self, max_concurrent_requests=3, request_timeout=30.0):
+        self.max_concurrent_requests = max_concurrent_requests
+        self.request_timeout = request_timeout
+        
+        # Threading controls
+        self.semaphore = Semaphore(max_concurrent_requests)
+        self.request_queue = deque()
+        self.active_requests: Dict[str, ModelTileRequest] = {}
+        self.request_lock = Lock()
+        
+        # Thread pool for async operations
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_concurrent_requests,
+            thread_name_prefix="model_inference"
+        )
+        
+        # Request deduplication
+        self.pending_requests: Dict[str, List[any]] = defaultdict(list)
+        
+        # Statistics
+        self.stats = {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'concurrent_requests': 0,
+            'deduplicated_requests': 0,
+            'timeout_requests': 0
+        }
+    
+    def generate_request_key(self, dataset: str, endpoint: str, zoom: int, row: int, col: int) -> str:
+        """Generate unique key for request deduplication"""
+        return f"{dataset}:{endpoint}:{zoom}:{row}:{col}"
+    
+    def submit_request(self, request: ModelTileRequest, cache_manager, logger) -> bool:
+        """Submit a model inference request for async processing"""
+        request_key = self.generate_request_key(
+            request.dataset, request.endpoint_name, request.zoom, request.row, request.col
+        )
+        
+        with self.request_lock:
+            self.stats['total_requests'] += 1
+            
+            # Check if identical request is already pending
+            if request_key in self.pending_requests:
+                self.pending_requests[request_key].append(request.comm)
+                self.stats['deduplicated_requests'] += 1
+                logger.debug(f"Deduplicated request for {request_key}")
+                return True
+            
+            # Add to pending requests
+            self.pending_requests[request_key] = [request.comm]
+            
+            # Submit to executor
+            future = self.executor.submit(
+                self._process_request_async,
+                request, cache_manager, logger
+            )
+            
+            # Store active request
+            self.active_requests[request.request_id] = request
+            
+        logger.debug(f"Submitted async model request: {request_key}")
+        return True
+    
+    def _process_request_async(self, request: ModelTileRequest, cache_manager, logger):
+        """Process model inference request in background thread"""
+        request_key = self.generate_request_key(
+            request.dataset, request.endpoint_name, request.zoom, request.row, request.col
+        )
+        
+        try:
+            # Acquire semaphore to limit concurrent SageMaker calls
+            acquired = self.semaphore.acquire(timeout=self.request_timeout)
+            if not acquired:
+                raise TimeoutError(f"Request timeout waiting for semaphore: {request_key}")
+            
+            try:
+                with self.request_lock:
+                    self.stats['concurrent_requests'] += 1
+                
+                logger.debug(f"Processing async request: {request_key}")
+                
+                # Process the model inference
+                processor = ModelTileProcessor()
+                processor.cache_manager = cache_manager
+                processor.logger = logger
+                
+                if request.zoom == 0:
+                    features = processor._process_zoom0_tile(
+                        request.dataset, request.endpoint_name, request.row, request.col
+                    )
+                else:
+                    features = processor._process_higher_zoom_tile(
+                        request.dataset, request.endpoint_name, request.zoom, request.row, request.col
+                    )
+                
+                # Send response to all pending comms for this request
+                with self.request_lock:
+                    comms = self.pending_requests.pop(request_key, [])
+                    
+                from kernel.kernel_03_responses import ResponseBuilder
+                response = ResponseBuilder.success_response('MODEL_TILE_RESPONSE', {
+                    'features': features
+                })
+                
+                for comm in comms:
+                    try:
+                        comm.send(response)
+                    except Exception as e:
+                        logger.error(f"Failed to send response for {request_key}: {e}")
+                
+                logger.debug(f"Completed async request: {request_key}, features: {len(features)}")
+                
+            finally:
+                self.semaphore.release()
+                with self.request_lock:
+                    self.stats['concurrent_requests'] -= 1
+                    self.active_requests.pop(request.request_id, None)
+                    
+        except Exception as e:
+            logger.error(f"Async request failed: {request_key}, error: {e}")
+            
+            # Send error response to all pending comms
+            with self.request_lock:
+                comms = self.pending_requests.pop(request_key, [])
+                
+            from kernel.kernel_03_responses import ResponseBuilder
+            error_response = ResponseBuilder.error_response('MODEL_TILE_RESPONSE', str(e))
+            
+            for comm in comms:
+                try:
+                    comm.send(error_response)
+                except Exception as send_error:
+                    logger.error(f"Failed to send error response for {request_key}: {send_error}")
+    
+    def get_stats(self) -> dict:
+        """Get current statistics"""
+        with self.request_lock:
+            return {
+                **self.stats,
+                'active_requests': len(self.active_requests),
+                'pending_requests': len(self.pending_requests)
+            }
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        self.executor.shutdown(wait=True)
+
+# Global inference manager instance
+_inference_manager = None
+
+def get_inference_manager() -> AsyncModelInferenceManager:
+    """Get or create the global inference manager"""
+    global _inference_manager
+    if _inference_manager is None:
+        _inference_manager = AsyncModelInferenceManager()
+    return _inference_manager
 
 class EndpointListProcessor(BaseMessageProcessor):
     """Process LIST_AVAILABLE_ENDPOINTS messages"""

@@ -31,6 +31,8 @@ export type CommMessageType =
   | 'MODEL_TILE_RESPONSE'
   | 'LIST_AVAILABLE_ENDPOINTS'
   | 'LIST_AVAILABLE_ENDPOINTS_RESPONSE'
+  | 'IMAGE_METADATA_REQUEST'
+  | 'IMAGE_METADATA_RESPONSE'
   | 'KERNEL_COMM_SETUP_COMPLETE';
 
 /**
@@ -52,7 +54,17 @@ export interface CommMessage {
   imageCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
   worldCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
   endpoints?: any[];  // For LIST_AVAILABLE_ENDPOINTS_RESPONSE
+  metadata?: MetadataObject;  // For IMAGE_METADATA_RESPONSE
 }
+
+/**
+ * Metadata type definitions for flexible hierarchical data
+ */
+export interface MetadataObject {
+  [key: string]: MetadataValue;
+}
+
+export type MetadataValue = string | number | boolean | null | MetadataObject | MetadataValue[];
 
 /**
  * Debug information interface

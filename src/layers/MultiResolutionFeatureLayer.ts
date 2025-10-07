@@ -34,6 +34,12 @@ export interface MultiResolutionFeatureLayerProps extends CompositeLayerProps {
   /** Maximum zoom level */
   maxZoom?: number;
   
+  /** Minimum zoom level for model inference (performance optimization) */
+  minModelZoom?: number;
+  
+  /** Maximum zoom level for model inference (performance optimization) */
+  maxModelZoom?: number;
+  
   /** Zoom level threshold below which to use heatmap (default: -3) */
   heatmapZoomThreshold?: number;
   
@@ -60,12 +66,17 @@ export interface MultiResolutionFeatureLayerProps extends CompositeLayerProps {
   
   /** Enable debug logging */
   enableDebugLogging?: boolean;
+  
+  /** Debounce time for tile requests (ms) */
+  tileRequestDebounceTime?: number;
 }
 
 const defaultProps: DefaultProps<MultiResolutionFeatureLayerProps> = {
   tileSize: 512,
   minZoom: -10,
   maxZoom: 10,
+  minModelZoom: -1,
+  maxModelZoom: 1,
   heatmapZoomThreshold: -3,
   maxCacheSize: 100,
   maxCacheByteSize: 50 * 1024 * 1024, // 50MB
@@ -74,7 +85,8 @@ const defaultProps: DefaultProps<MultiResolutionFeatureLayerProps> = {
   featureFillColor: [255, 0, 0, 30], // Red with alpha
   featureLineColor: [255, 0, 0, 255], // Solid red
   featureLineWidth: 1,
-  enableDebugLogging: false
+  enableDebugLogging: false,
+  tileRequestDebounceTime: 150  // Debounce tile requests by 150ms
 };
 
 /**
@@ -124,7 +136,7 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
   }
 
   /**
-   * Create a tile layer for loading feature data
+   * Create a tile layer for loading feature data with performance optimizations
    */
   private createFeatureTileLayer(): TileLayer {
     const {
@@ -132,8 +144,11 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       tileSize,
       minZoom,
       maxZoom,
+      minModelZoom,
+      maxModelZoom,
       maxCacheSize,
-      maxCacheByteSize
+      maxCacheByteSize,
+      tileRequestDebounceTime
     } = this.props;
 
     return new TileLayer({
@@ -145,12 +160,19 @@ export class MultiResolutionFeatureLayer extends CompositeLayer<MultiResolutionF
       maxCacheSize: maxCacheSize!,
       maxCacheByteSize: maxCacheByteSize!,
       refinementStrategy: 'best-available',
-      debounceTime: 100,
+      debounceTime: tileRequestDebounceTime!,
       
       getTileData: async (tileProps: any) => {
         const x = tileProps.x ?? tileProps.index?.x;
         const y = tileProps.y ?? tileProps.index?.y;
         const z = tileProps.z ?? tileProps.index?.z;
+        
+        // Performance optimization: Skip model inference outside zoom range
+        if (z < minModelZoom! || z > maxModelZoom!) {
+          const tileKey = `${x}-${y}-${z}`;
+          this.debugLog(`Skipping model inference for tile ${tileKey} at zoom ${z} (outside range ${minModelZoom}-${maxModelZoom})`);
+          return { features: [], byteLength: 0 };
+        }
         
         // Always log tile requests for debugging
         console.log(`[MultiResolutionFeatureLayer] getTileData called for tile ${x}-${y}-${z}`, tileProps);
