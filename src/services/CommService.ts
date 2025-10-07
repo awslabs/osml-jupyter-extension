@@ -6,7 +6,6 @@ import { CommMessage, CommMessageType } from '../types';
  */
 export class CommService {
   private comm?: Kernel.IComm;
-  private messageHandlers: Map<CommMessageType, (message: any) => void> = new Map();
   private debug: boolean = false;
 
   constructor(private kernel?: Kernel.IKernelConnection) {}
@@ -43,7 +42,6 @@ export class CommService {
     this.comm = this.kernel.createComm(targetName);
     if (this.comm) {
       this.comm.open('Open comm');
-      this.setupMessageHandling();
       
       if (this.debug) {
         console.log('[CommService] Comm channel initialized successfully');
@@ -102,58 +100,6 @@ export class CommService {
     });
   }
 
-  /**
-   * Register a message handler for a specific message type
-   */
-  public onMessage(messageType: CommMessageType, handler: (message: any) => void): void {
-    if (this.debug) {
-      console.log(`[CommService] Registering message handler for type: ${messageType}`);
-    }
-    this.messageHandlers.set(messageType, handler);
-  }
-
-  /**
-   * Remove a message handler
-   */
-  public offMessage(messageType: CommMessageType): void {
-    if (this.debug) {
-      console.log(`[CommService] Removing message handler for type: ${messageType}`);
-    }
-    this.messageHandlers.delete(messageType);
-  }
-
-  /**
-   * Setup message handling for the comm channel
-   */
-  private setupMessageHandling(): void {
-    if (!this.comm) return;
-
-    this.comm.onMsg = (msg: any) => {
-      const messageType = msg.content?.data?.type;
-      const messageData = msg.content.data;
-      
-      if (this.debug) {
-        console.log('[CommService] Received message:', JSON.stringify(messageData, null, 2));
-      }
-      
-      // Always log messages with non-SUCCESS status, even when debug is off
-      if (messageData?.status && messageData.status !== 'SUCCESS') {
-        console.error('[CommService] Received message with error status:', JSON.stringify(messageData, null, 2));
-      }
-      
-      if (messageType && this.messageHandlers.has(messageType)) {
-        const handler = this.messageHandlers.get(messageType);
-        if (handler) {
-          if (this.debug) {
-            console.log(`[CommService] Calling handler for message type: ${messageType}`);
-          }
-          handler(messageData);
-        }
-      } else if (this.debug && messageType) {
-        console.warn(`[CommService] No handler registered for message type: ${messageType}`);
-      }
-    };
-  }
 
   /**
    * Check if comm is available and ready
@@ -176,6 +122,5 @@ export class CommService {
         console.log('[CommService] Comm channel closed');
       }
     }
-    this.messageHandlers.clear();
   }
 }

@@ -1,191 +1,17 @@
-# Model processors: Handle endpoint listing and model inference with async optimization
+# Model processors: Handle endpoint listing and model inference with integrated async optimization
 
 import time
 import json
-import asyncio
 import concurrent.futures
 from threading import Lock, Semaphore
-from collections import defaultdict, deque
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional
 import boto3
 try:
     from aws.osml.features import ImagedFeaturePropertyAccessor
 except ImportError:
     # Fallback if osml.features is not available
     ImagedFeaturePropertyAccessor = None
-
-@dataclass
-class ModelTileRequest:
-    """Request structure for model tile processing"""
-    dataset: str
-    endpoint_name: str
-    zoom: int
-    row: int
-    col: int
-    comm: any
-    request_id: str
-    timestamp: float
-
-class AsyncModelInferenceManager:
-    """Manages async model inference with concurrency control and request batching"""
-    
-    def __init__(self, max_concurrent_requests=3, request_timeout=30.0):
-        self.max_concurrent_requests = max_concurrent_requests
-        self.request_timeout = request_timeout
-        
-        # Threading controls
-        self.semaphore = Semaphore(max_concurrent_requests)
-        self.request_queue = deque()
-        self.active_requests: Dict[str, ModelTileRequest] = {}
-        self.request_lock = Lock()
-        
-        # Thread pool for async operations
-        self.executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_concurrent_requests,
-            thread_name_prefix="model_inference"
-        )
-        
-        # Request deduplication
-        self.pending_requests: Dict[str, List[any]] = defaultdict(list)
-        
-        # Statistics
-        self.stats = {
-            'total_requests': 0,
-            'cache_hits': 0,
-            'concurrent_requests': 0,
-            'deduplicated_requests': 0,
-            'timeout_requests': 0
-        }
-    
-    def generate_request_key(self, dataset: str, endpoint: str, zoom: int, row: int, col: int) -> str:
-        """Generate unique key for request deduplication"""
-        return f"{dataset}:{endpoint}:{zoom}:{row}:{col}"
-    
-    def submit_request(self, request: ModelTileRequest, cache_manager, logger) -> bool:
-        """Submit a model inference request for async processing"""
-        request_key = self.generate_request_key(
-            request.dataset, request.endpoint_name, request.zoom, request.row, request.col
-        )
-        
-        with self.request_lock:
-            self.stats['total_requests'] += 1
-            
-            # Check if identical request is already pending
-            if request_key in self.pending_requests:
-                self.pending_requests[request_key].append(request.comm)
-                self.stats['deduplicated_requests'] += 1
-                logger.debug(f"Deduplicated request for {request_key}")
-                return True
-            
-            # Add to pending requests
-            self.pending_requests[request_key] = [request.comm]
-            
-            # Submit to executor
-            future = self.executor.submit(
-                self._process_request_async,
-                request, cache_manager, logger
-            )
-            
-            # Store active request
-            self.active_requests[request.request_id] = request
-            
-        logger.debug(f"Submitted async model request: {request_key}")
-        return True
-    
-    def _process_request_async(self, request: ModelTileRequest, cache_manager, logger):
-        """Process model inference request in background thread"""
-        request_key = self.generate_request_key(
-            request.dataset, request.endpoint_name, request.zoom, request.row, request.col
-        )
-        
-        try:
-            # Acquire semaphore to limit concurrent SageMaker calls
-            acquired = self.semaphore.acquire(timeout=self.request_timeout)
-            if not acquired:
-                raise TimeoutError(f"Request timeout waiting for semaphore: {request_key}")
-            
-            try:
-                with self.request_lock:
-                    self.stats['concurrent_requests'] += 1
-                
-                logger.debug(f"Processing async request: {request_key}")
-                
-                # Process the model inference
-                processor = ModelTileProcessor()
-                processor.cache_manager = cache_manager
-                processor.logger = logger
-                
-                if request.zoom == 0:
-                    features = processor._process_zoom0_tile(
-                        request.dataset, request.endpoint_name, request.row, request.col
-                    )
-                else:
-                    features = processor._process_higher_zoom_tile(
-                        request.dataset, request.endpoint_name, request.zoom, request.row, request.col
-                    )
-                
-                # Send response to all pending comms for this request
-                with self.request_lock:
-                    comms = self.pending_requests.pop(request_key, [])
-                    
-                from kernel.kernel_03_responses import ResponseBuilder
-                response = ResponseBuilder.success_response('MODEL_TILE_RESPONSE', {
-                    'features': features
-                })
-                
-                for comm in comms:
-                    try:
-                        comm.send(response)
-                    except Exception as e:
-                        logger.error(f"Failed to send response for {request_key}: {e}")
-                
-                logger.debug(f"Completed async request: {request_key}, features: {len(features)}")
-                
-            finally:
-                self.semaphore.release()
-                with self.request_lock:
-                    self.stats['concurrent_requests'] -= 1
-                    self.active_requests.pop(request.request_id, None)
-                    
-        except Exception as e:
-            logger.error(f"Async request failed: {request_key}, error: {e}")
-            
-            # Send error response to all pending comms
-            with self.request_lock:
-                comms = self.pending_requests.pop(request_key, [])
-                
-            from kernel.kernel_03_responses import ResponseBuilder
-            error_response = ResponseBuilder.error_response('MODEL_TILE_RESPONSE', str(e))
-            
-            for comm in comms:
-                try:
-                    comm.send(error_response)
-                except Exception as send_error:
-                    logger.error(f"Failed to send error response for {request_key}: {send_error}")
-    
-    def get_stats(self) -> dict:
-        """Get current statistics"""
-        with self.request_lock:
-            return {
-                **self.stats,
-                'active_requests': len(self.active_requests),
-                'pending_requests': len(self.pending_requests)
-            }
-    
-    def cleanup(self):
-        """Cleanup resources"""
-        self.executor.shutdown(wait=True)
-
-# Global inference manager instance
-_inference_manager = None
-
-def get_inference_manager() -> AsyncModelInferenceManager:
-    """Get or create the global inference manager"""
-    global _inference_manager
-    if _inference_manager is None:
-        _inference_manager = AsyncModelInferenceManager()
-    return _inference_manager
 
 class EndpointListProcessor(BaseMessageProcessor):
     """Process LIST_AVAILABLE_ENDPOINTS messages"""
@@ -282,10 +108,42 @@ class EndpointListProcessor(BaseMessageProcessor):
 
 
 class ModelTileProcessor(BaseMessageProcessor):
-    """Process MODEL_TILE_REQUEST messages with zoom-aware inference"""
+    """Process MODEL_TILE_REQUEST messages with integrated async processing and zoom-level-aware optimization"""
     
-    @handle_errors_enhanced('MODEL_TILE_RESPONSE', 'model_tile')
+    def __init__(self, cache_manager, logger):
+        super().__init__(cache_manager, logger)
+        
+        # Threading controls for async operations
+        self.max_concurrent = 3
+        self.request_timeout = 30.0
+        self.semaphore = Semaphore(self.max_concurrent)
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_concurrent,
+            thread_name_prefix="model_inference"
+        )
+        
+        # Request deduplication for zoom 0 tiles only
+        self.pending_zoom0_requests: Dict[str, List] = defaultdict(list)
+        self.request_lock = Lock()
+        
+        # Statistics
+        self.stats = {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'concurrent_requests': 0,
+            'deduplicated_requests': 0,
+            'timeout_requests': 0,
+            'zoom0_async_requests': 0,
+            'higher_zoom_sync_requests': 0
+        }
+    
+    def _generate_zoom0_request_key(self, dataset: str, endpoint: str, row: int, col: int) -> str:
+        """Generate unique key for zoom 0 request deduplication"""
+        return f"{dataset}:{endpoint}:0:{row}:{col}"
+    
+    @handle_errors_enhanced('MODEL_TILE_RESPONSE', 'model_tile')  
     def process(self, data, comm):
+        """Process model tile request with zoom-level-aware async optimization"""
         # Validate request
         self.validate_request(data, ['dataset', 'endpointName', 'zoom', 'row', 'col'])
         dataset = data['dataset']
@@ -294,29 +152,157 @@ class ModelTileProcessor(BaseMessageProcessor):
         row = data['row']
         col = data['col']
         
+        with self.request_lock:
+            self.stats['total_requests'] += 1
+        
         self.logger.debug(f"Processing model tile request for dataset: {dataset}, endpoint: {endpoint_name}, zoom: {zoom}, row: {row}, col: {col}")
         
-        # Get features for the requested tile
+        if zoom == 0:
+            # Zoom 0: Use async processing with deduplication
+            self._process_zoom0_async(dataset, endpoint_name, row, col, comm)
+        else:
+            # Higher zoom: Process synchronously by aggregating zoom 0 results
+            self._process_higher_zoom_sync(dataset, endpoint_name, zoom, row, col, comm)
+    
+    def _process_zoom0_async(self, dataset: str, endpoint_name: str, row: int, col: int, comm):
+        """Process zoom 0 tile with async deduplication"""
+        request_key = self._generate_zoom0_request_key(dataset, endpoint_name, row, col)
+        
+        with self.request_lock:
+            self.stats['zoom0_async_requests'] += 1
+            
+            # Check if identical request is already being processed
+            if request_key in self.pending_zoom0_requests:
+                # Add comm to existing request's callback list
+                self.pending_zoom0_requests[request_key].append(comm)
+                self.stats['deduplicated_requests'] += 1
+                self.logger.debug(f"Deduplicated zoom 0 request: {request_key}")
+                return
+            
+            # Mark request as pending and add comm to callback list
+            self.pending_zoom0_requests[request_key] = [comm]
+        
+        # Submit async work
+        future = self.executor.submit(
+            self._execute_zoom0_inference,
+            dataset, endpoint_name, row, col, request_key
+        )
+        
+        self.logger.debug(f"Submitted async zoom 0 request: {request_key}")
+    
+    def _process_higher_zoom_sync(self, dataset: str, endpoint_name: str, zoom: int, row: int, col: int, comm):
+        """Process higher zoom tile synchronously by aggregating zoom 0 results"""
+        with self.request_lock:
+            self.stats['higher_zoom_sync_requests'] += 1
+        
         try:
-            if zoom == 0:
-                # Direct model inference at zoom 0
-                features = self._process_zoom0_tile(dataset, endpoint_name, row, col)
-            else:
-                # Aggregate zoom 0 results for higher zoom levels
-                features = self._process_higher_zoom_tile(dataset, endpoint_name, zoom, row, col)
+            # Calculate covering zoom 0 tiles
+            covering_tiles = self._calculate_covering_zoom0_tiles(zoom, row, col)
+            self.logger.debug(f"Higher zoom request needs {len(covering_tiles)} zoom 0 tiles")
             
-            feature_count = len(features) if features else 0
-            self.logger.debug(f"Returning {feature_count} features for model tile at zoom {zoom}")
+            # Collect features from all covering tiles (uses caching, may be instant)
+            all_features = []
+            for z0_row, z0_col in covering_tiles:
+                features = self._get_zoom0_features_sync(dataset, endpoint_name, z0_row, z0_col)
+                all_features.extend(features)
             
-            # Send successful response
+            # Filter features to requested tile bounds
+            filtered_features = self._filter_features_to_tile_bounds(all_features, zoom, row, col)
+            
+            feature_count = len(filtered_features) if filtered_features else 0
+            self.logger.debug(f"Returning {feature_count} features for higher zoom tile at zoom {zoom}")
+            
+            # Send response immediately
             response = ResponseBuilder.success_response('MODEL_TILE_RESPONSE', {
-                'features': features
+                'features': filtered_features
             })
             comm.send(response)
             
         except Exception as e:
+            self.logger.error(f"Higher zoom processing failed: {e}")
             # Re-raise to be caught by error handler decorator
             raise e
+    
+    def _execute_zoom0_inference(self, dataset: str, endpoint_name: str, row: int, col: int, request_key: str):
+        """Execute zoom 0 model inference in background thread"""
+        try:
+            # Acquire semaphore to limit concurrent SageMaker calls
+            acquired = self.semaphore.acquire(timeout=self.request_timeout)
+            if not acquired:
+                raise TimeoutError(f"Request timeout waiting for semaphore: {request_key}")
+            
+            try:
+                with self.request_lock:
+                    self.stats['concurrent_requests'] += 1
+                
+                self.logger.debug(f"Executing async zoom 0 inference: {request_key}")
+                
+                # Process the zoom 0 tile
+                features = self._process_zoom0_tile(dataset, endpoint_name, row, col)
+                
+                # Send response to all pending comms for this request
+                with self.request_lock:
+                    comms = self.pending_zoom0_requests.pop(request_key, [])
+                
+                response = ResponseBuilder.success_response('MODEL_TILE_RESPONSE', {
+                    'features': features
+                })
+                
+                for comm in comms:
+                    try:
+                        comm.send(response)
+                    except Exception as e:
+                        self.logger.error(f"Failed to send response for {request_key}: {e}")
+                
+                feature_count = len(features) if features else 0
+                self.logger.debug(f"Completed async zoom 0 inference: {request_key}, features: {feature_count}")
+                
+            finally:
+                self.semaphore.release()
+                with self.request_lock:
+                    self.stats['concurrent_requests'] -= 1
+                    
+        except Exception as e:
+            self.logger.error(f"Async zoom 0 inference failed: {request_key}, error: {e}")
+            
+            # Send error response to all pending comms
+            with self.request_lock:
+                comms = self.pending_zoom0_requests.pop(request_key, [])
+            
+            error_response = ResponseBuilder.error_response('MODEL_TILE_RESPONSE', str(e))
+            
+            for comm in comms:
+                try:
+                    comm.send(error_response)
+                except Exception as send_error:
+                    self.logger.error(f"Failed to send error response for {request_key}: {send_error}")
+    
+    def _get_zoom0_features_sync(self, dataset: str, endpoint_name: str, row: int, col: int) -> List:
+        """Get zoom 0 features synchronously (from cache or direct processing)"""
+        # Check cache first
+        cached_features = self.cache_manager.get_model_results(dataset, endpoint_name, 0, row, col)
+        if cached_features is not None:
+            with self.request_lock:
+                self.stats['cache_hits'] += 1
+            self.logger.debug(f"Using cached zoom 0 features for ({row}, {col})")
+            return cached_features
+        
+        # Process synchronously if not cached
+        self.logger.debug(f"Processing zoom 0 tile synchronously for aggregation: ({row}, {col})")
+        return self._process_zoom0_tile(dataset, endpoint_name, row, col)
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        if hasattr(self, 'executor'):
+            self.executor.shutdown(wait=True)
+    
+    def get_stats(self) -> dict:
+        """Get current statistics"""
+        with self.request_lock:
+            return {
+                **self.stats,
+                'pending_zoom0_requests': len(self.pending_zoom0_requests)
+            }
     
     def _process_zoom0_tile(self, dataset, endpoint_name, row, col):
         """Process a single zoom 0 tile with model inference"""
@@ -377,11 +363,11 @@ class ModelTileProcessor(BaseMessageProcessor):
         # Scale factor from target zoom to zoom 0
         scale_factor = 2**(-target_zoom)
         
-        # Calculate zoom 0 bounds 
-        zoom0_start_row = target_row * scale_factor
-        zoom0_start_col = target_col * scale_factor  
-        zoom0_end_row = zoom0_start_row + scale_factor
-        zoom0_end_col = zoom0_start_col + scale_factor
+        # Calculate zoom 0 bounds (using integer math to avoid floating point issues)
+        zoom0_start_row = int(target_row * scale_factor)
+        zoom0_start_col = int(target_col * scale_factor)  
+        zoom0_end_row = int(zoom0_start_row + scale_factor)
+        zoom0_end_col = int(zoom0_start_col + scale_factor)
         
         # Generate all zoom 0 tiles in this range
         tiles = []
