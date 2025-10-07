@@ -555,6 +555,47 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Add a named dataset from kernel memory as a layer
+   */
+  public addNamedDataset(datasetName: string): void {
+    if (!datasetName || !this.imageName || !this.deckInstance) {
+      console.warn('Cannot add named dataset: Missing required parameters', {
+        datasetName: !!datasetName,
+        imageName: !!this.imageName,
+        deckInstance: !!this.deckInstance
+      });
+      return;
+    }
+
+    this.statusSignal.emit(`Adding dataset layer: ${datasetName}`);
+    
+    // Create feature tile data function using the real data function
+    // The image name is the current image and overlayName is the dataset name
+    const getFeatureTileData = this.featureTileService.createRealFeatureDataFunction(
+      this.imageName, 
+      datasetName
+    );
+    
+    this.debugLog(`Adding named dataset layer: ${datasetName} for image: ${this.imageName}`);
+    
+    // Create the feature layer using the dataset name as the layer ID
+    const featureLayer = this.createFeatureLayer(datasetName, getFeatureTileData);
+
+    // Store the feature layer using the dataset name as the key
+    this.featureLayers.set(datasetName, featureLayer);
+
+    // Update Deck.gl layers
+    this.updateDeckLayers();
+    
+    // Notify layer control button to update state
+    if (this.layerControlButton) {
+      this.layerControlButton.onLayersChanged();
+    }
+    
+    this.statusSignal.emit(`Added dataset layer: ${datasetName}`);
+  }
+
+  /**
    * Get all feature layers
    */
   private getFeatureLayers(): MultiResolutionFeatureLayer[] {

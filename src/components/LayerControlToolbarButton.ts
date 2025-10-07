@@ -63,7 +63,8 @@ export class LayerControlToolbarButton extends Widget {
         toggleVisibility: (layerId: string) => this._toggleLayerVisibility(layerId, dialogContent),
         updateColor: (layerId: string, color: [number, number, number, number]) => 
           this._updateLayerColor(layerId, color, dialogContent),
-        deleteLayer: (layerId: string) => this._deleteLayer(layerId, dialogContent)
+        deleteLayer: (layerId: string) => this._deleteLayer(layerId, dialogContent),
+        addNamedDataset: (datasetName: string) => this._addNamedDataset(datasetName, dialogContent)
       });
       
       // Show the dialog
@@ -195,6 +196,30 @@ export class LayerControlToolbarButton extends Widget {
       }
     } catch (error) {
       console.error('Error deleting layer:', error);
+    }
+  }
+
+  /**
+   * Add named dataset as layer
+   */
+  private _addNamedDataset(datasetName: string, dialog?: LayerControlDialog): void {
+    try {
+      console.log(`Adding named dataset as layer: ${datasetName}`);
+      
+      // Call method on ImageViewerWidget if it exists
+      if (typeof (this._imageViewerWidget as any).addNamedDataset === 'function') {
+        (this._imageViewerWidget as any).addNamedDataset(datasetName);
+      } else {
+        console.warn('addNamedDataset method not implemented yet');
+      }
+      
+      // Update the dialog with fresh layer data
+      if (dialog) {
+        const updatedLayers = this._getLayerInfo();
+        dialog.updateLayers(updatedLayers);
+      }
+    } catch (error) {
+      console.error('Error adding named dataset:', error);
     }
   }
 

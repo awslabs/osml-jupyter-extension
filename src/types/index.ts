@@ -116,4 +116,5 @@ export interface LayerControlActions {
   toggleVisibility: (layerId: string) => void;
   updateColor: (layerId: string, color: [number, number, number, number]) => void;
   deleteLayer: (layerId: string) => void;
+  addNamedDataset: (datasetName: string) => void;
 }
