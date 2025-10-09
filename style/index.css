@@ -1,5 +1,11 @@
 @import url('base.css');
 
+/* Loading spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Feature popup styles */
 .osml-feature-popup {
   position: absolute;
