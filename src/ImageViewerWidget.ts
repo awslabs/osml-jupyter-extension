@@ -22,7 +22,7 @@ import {
   TileDataFunction,
   FeatureTileDataFunction 
 } from './types';
-import { MultiResolutionFeatureLayer } from './layers';
+import { TiledOverlayLayer } from './layers';
 import { 
   CommService, 
   ImageTileService, 
@@ -40,8 +40,8 @@ export class ImageViewerWidget extends MainAreaWidget {
   private translator: ITranslator;
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
-  private featureLayers: Map<string, MultiResolutionFeatureLayer> = new Map();
-  private modelLayers: Map<string, MultiResolutionFeatureLayer> = new Map();
+  private featureLayers: Map<string, TiledOverlayLayer> = new Map();
+  private modelLayers: Map<string, TiledOverlayLayer> = new Map();
   private comm?: Kernel.IComm;
   private imageName?: string;
   private manager?: ServiceManager.IManager;
@@ -58,6 +58,9 @@ export class ImageViewerWidget extends MainAreaWidget {
   private useMockData: boolean = false; // Set to true for testing with mock tiles
   private useMockFeatureData: boolean = false; // Set to true for testing with mock features
   private enableDebugLogging: boolean = false;
+  
+  // Layer implementation selection (always use TiledOverlayLayer)
+  private useTiledOverlayLayer: boolean = true; // Always true - using TiledOverlayLayer
   
   // Model selection state
   private selectedModel: string = '';
@@ -417,34 +420,43 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Create a MultiResolutionFeatureLayer for overlay data
+   * Create a feature layer for overlay data using TiledOverlayLayer
    */
-  private createFeatureLayer(overlayName: string, getTileData: FeatureTileDataFunction): MultiResolutionFeatureLayer {
+  private createFeatureLayer(overlayName: string, getTileData: FeatureTileDataFunction): TiledOverlayLayer {
     // Get current colors from state
     const customColor = this.layerColors.get(overlayName) ?? [255, 0, 0, 128];
-    const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
     const lineColor = customColor;
     
-    return new MultiResolutionFeatureLayer({
+    console.log(`[ImageViewerWidget] Creating TiledOverlayLayer for ${overlayName}`);
+    return new TiledOverlayLayer({
       id: `features-${overlayName}`,
-      getTileData,
+      data: [], // Required by TileLayer but not used since we provide getTileData
+      getTileData, // This is our custom FeatureTileDataFunction
       tileSize: 512,
       minZoom: -10,
       maxZoom: 10,
-      heatmapZoomThreshold: -3, // Use heatmap for zoom levels <= -3
       maxCacheSize: 100,
       maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
-      heatmapRadiusPixels: 25,
-      heatmapIntensity: 1,
-      featureFillColor: fillColor,
+      debounceTime: 100,
+      // Culling options
+      maxFeaturesPerTile: 10000,
+      minFeatureAreaPixels: 1.0,
+      minFeatureSizePixels: 0.5,
+      // LOD options
+      simplificationTolerance: 0.5,
+      clusterDistance: 20,
+      lodZoomThresholds: [-3, 0, 3],
+      // Rendering options
+      featureFillColor: lineColor, // Use full color for features
       featureLineColor: lineColor,
       featureLineWidth: 1,
-      enableDebugLogging: this.enableDebugLogging
-    });
+      adaptivePointSize: true,
+      enableDebugLogging: true || this.enableDebugLogging
+    } as any); // Type assertion to bypass the prop type conflict
   }
 
   /**
-   * Create a MultiResolutionFeatureLayer for model inference results
+   * Create a TiledOverlayLayer for model inference results
    */
   public createModelFeatureLayer(modelName: string): void {
     if (!this.imageName || !this.deckInstance) {
@@ -470,28 +482,8 @@ export class ImageViewerWidget extends MainAreaWidget {
     
     this.debugLog(`Creating model layer for model: ${modelName}`);
     
-    // Get current colors from state
-    const customColor = this.layerColors.get(modelName) ?? [255, 0, 0, 128];
-    const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
-    const lineColor = customColor;
-    
-    // Create the model feature layer
-    const modelFeatureLayer = new MultiResolutionFeatureLayer({
-      id: `model-${modelName}`,
-      getTileData: getModelFeatureTileData,
-      tileSize: 512,
-      minZoom: -10,
-      maxZoom: 10,
-      heatmapZoomThreshold: -3, // Use heatmap for zoom levels <= -3
-      maxCacheSize: 100,
-      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
-      heatmapRadiusPixels: 25,
-      heatmapIntensity: 1,
-      featureFillColor: fillColor,
-      featureLineColor: lineColor,
-      featureLineWidth: 1,
-      enableDebugLogging: this.enableDebugLogging
-    });
+    // Create the model feature layer using TiledOverlayLayer
+    const modelFeatureLayer = this.createFeatureLayer(modelName, getModelFeatureTileData);
 
     // Store the model layer
     this.modelLayers.set(modelName, modelFeatureLayer);
@@ -536,7 +528,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
     this.debugLog(`Layer path: ${layerDataPath}`);
     
-    // Create the feature layer directly using MultiResolutionFeatureLayer
+    // Create the feature layer using TiledOverlayLayer
     const featureLayer = this.createFeatureLayer(layerDataPath, getFeatureTileData);
 
     // Store the feature layer
@@ -598,22 +590,22 @@ export class ImageViewerWidget extends MainAreaWidget {
   /**
    * Get all feature layers
    */
-  private getFeatureLayers(): MultiResolutionFeatureLayer[] {
+  private getFeatureLayers(): TiledOverlayLayer[] {
     return Array.from(this.featureLayers.values());
   }
 
   /**
    * Get all model layers
    */
-  private getModelLayers(): MultiResolutionFeatureLayer[] {
+  private getModelLayers(): TiledOverlayLayer[] {
     return Array.from(this.modelLayers.values());
   }
 
   /**
    * Get all layers (feature + model layers) that are visible
    */
-  private getAllLayers(): MultiResolutionFeatureLayer[] {
-    const visibleLayers: MultiResolutionFeatureLayer[] = [];
+  private getAllLayers(): TiledOverlayLayer[] {
+    const visibleLayers: TiledOverlayLayer[] = [];
     
     // Add visible feature layers
     for (const [layerId, layer] of this.featureLayers.entries()) {
@@ -788,6 +780,23 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Set whether to use TiledOverlayLayer instead of MultiResolutionFeatureLayer
+   */
+  public setUseTiledOverlayLayer(useTiled: boolean): void {
+    if (this.useTiledOverlayLayer !== useTiled) {
+      this.useTiledOverlayLayer = useTiled;
+      console.log(`[ImageViewerWidget] Switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`);
+      
+      // Clear existing layers to force recreation with new layer type
+      this.featureLayers.clear();
+      this.modelLayers.clear();
+      this.updateDeckLayers();
+      
+      this.statusSignal.emit(`Layer implementation switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`);
+    }
+  }
+
+  /**
    * Get debug information about the current state
    */
   public getDebugInfo(): any {
@@ -795,6 +804,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       useMockData: this.useMockData,
       useMockFeatureData: this.useMockFeatureData,
       enableDebugLogging: this.enableDebugLogging,
+      useTiledOverlayLayer: this.useTiledOverlayLayer,
       featureLayerCount: this.featureLayers.size,
       featureLayerNames: Array.from(this.featureLayers.keys()),
       imageName: this.imageName,
@@ -856,23 +866,8 @@ export class ImageViewerWidget extends MainAreaWidget {
         const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
         const lineColor = customColor;
         
-        // Create new model layer with updated color
-        const newModelLayer = new MultiResolutionFeatureLayer({
-          id: `model-${layerId}`,
-          getTileData,
-          tileSize: 512,
-          minZoom: -10,
-          maxZoom: 10,
-          heatmapZoomThreshold: -3,
-          maxCacheSize: 100,
-          maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
-          heatmapRadiusPixels: 25,
-          heatmapIntensity: 1,
-          featureFillColor: fillColor,
-          featureLineColor: lineColor,
-          featureLineWidth: 1,
-          enableDebugLogging: this.enableDebugLogging
-        });
+        // Create new model layer with updated color using TiledOverlayLayer
+        const newModelLayer = this.createFeatureLayer(layerId, getTileData);
         
         // Replace the layer
         this.modelLayers.set(layerId, newModelLayer);

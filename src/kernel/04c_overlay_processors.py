@@ -7,13 +7,13 @@ class OverlayTileProcessor(BaseMessageProcessor):
     
     # Feature count limits based on zoom level for performance
     ZOOM_FEATURE_LIMITS = {
-        -3: 50,   # Very zoomed out - only show most important features
-        -2: 100,
-        -1: 200,
-        0: 500,   # Base zoom level
-        1: 1000,
-        2: 2000,
-        3: 5000,  # Very zoomed in - show all details
+        -3: 5000,   # Very zoomed out - only show most important features
+        -2: 10000,
+        -1: 20000,
+        0: 50000,   # Base zoom level
+        1: 100000,
+        2: 200000,
+        3: 500000,  # Very zoomed in - show all details
     }
     
     @handle_errors_enhanced('OVERLAY_TILE_RESPONSE', 'overlay_tile')
@@ -58,8 +58,8 @@ class OverlayTileProcessor(BaseMessageProcessor):
             features = tile_factory.find_intersects(bbox)
             
             # Apply zoom-aware feature filtering for performance
-            if features:
-                features = self._filter_features_by_zoom(features, zoom)
+            # if features:
+            #    features = self._filter_features_by_zoom(features, zoom)
             
             feature_count = len(features) if features else 0
             self.logger.debug(f"Found {feature_count} intersecting features for overlay tile at zoom {zoom}")
