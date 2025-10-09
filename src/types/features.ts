@@ -22,16 +22,6 @@ export interface FeatureLayerConfig {
   enableDebugLogging?: boolean;
 }
 
-/**
- * Multi-resolution feature layer properties
- */
-export interface MultiResolutionFeatureLayerConfig extends FeatureLayerConfig {
-  tileSize?: number;
-  minZoom?: number;
-  maxZoom?: number;
-  maxCacheSize?: number;
-  maxCacheByteSize?: number;
-}
 
 /**
  * Feature processing options
