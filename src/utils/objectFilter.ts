@@ -7,6 +7,7 @@ export type FilterableValue = string | number | boolean | null | undefined | Fil
 /**
  * Flattens a nested object into a map of dot-notation keys to values
  * Only includes leaf values, not intermediate object keys
+ * Now handles objects within arrays by using array indices in the key path
  */
 export const flattenObject = (
   obj: { [key: string]: FilterableValue }, 
@@ -16,9 +17,23 @@ export const flattenObject = (
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      // Recurse into objects but don't add the object key itself
-      flattenObject(value as { [key: string]: FilterableValue }, fullKey, flatMap);
+    if (value && typeof value === 'object') {
+      if (Array.isArray(value)) {
+        // Handle arrays - recurse into objects within arrays
+        value.forEach((arrayItem, index) => {
+          const arrayKey = `${fullKey}.${index}`;
+          if (arrayItem && typeof arrayItem === 'object' && !Array.isArray(arrayItem)) {
+            // Recurse into objects within the array
+            flattenObject(arrayItem as { [key: string]: FilterableValue }, arrayKey, flatMap);
+          } else {
+            // Add primitive values in arrays
+            flatMap.set(arrayKey, arrayItem);
+          }
+        });
+      } else {
+        // Recurse into objects but don't add the object key itself
+        flattenObject(value as { [key: string]: FilterableValue }, fullKey, flatMap);
+      }
     } else {
       // Only add leaf values (non-object values)
       flatMap.set(fullKey, value);
@@ -74,16 +89,50 @@ export const filterObjectBySearchTerm = (
     for (const [key, value] of Object.entries(currentObj)) {
       const newPath = currentPath ? `${currentPath}.${key}` : key;
       
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        // Recursively filter nested objects
-        const nestedResult = filterRecursively(value as { [key: string]: FilterableValue }, newPath);
-        if (nestedResult && Object.keys(nestedResult).length > 0) {
-          filtered[key] = nestedResult;
-          hasMatches = true;
-        } else if (shouldIncludePath(newPath)) {
-          // Include the object even if empty if the path matches
-          filtered[key] = value;
-          hasMatches = true;
+      if (value && typeof value === 'object') {
+        if (Array.isArray(value)) {
+          // Handle arrays - filter objects within arrays
+          const filteredArray: FilterableValue[] = [];
+          let arrayHasMatches = false;
+          
+          value.forEach((arrayItem, index) => {
+            const arrayPath = `${newPath}.${index}`;
+            
+            if (arrayItem && typeof arrayItem === 'object' && !Array.isArray(arrayItem)) {
+              // Recursively filter objects within the array
+              const nestedResult = filterRecursively(arrayItem as { [key: string]: FilterableValue }, arrayPath);
+              if (nestedResult && Object.keys(nestedResult).length > 0) {
+                filteredArray[index] = nestedResult;
+                arrayHasMatches = true;
+              } else if (shouldIncludePath(arrayPath)) {
+                // Include the object even if empty if the path matches
+                filteredArray[index] = arrayItem;
+                arrayHasMatches = true;
+              }
+            } else {
+              // For primitive values in arrays, check if the path matches
+              if (shouldIncludePath(arrayPath)) {
+                filteredArray[index] = arrayItem;
+                arrayHasMatches = true;
+              }
+            }
+          });
+          
+          if (arrayHasMatches || shouldIncludePath(newPath)) {
+            filtered[key] = arrayHasMatches ? filteredArray.filter(item => item !== undefined) : value;
+            hasMatches = true;
+          }
+        } else {
+          // Recursively filter nested objects
+          const nestedResult = filterRecursively(value as { [key: string]: FilterableValue }, newPath);
+          if (nestedResult && Object.keys(nestedResult).length > 0) {
+            filtered[key] = nestedResult;
+            hasMatches = true;
+          } else if (shouldIncludePath(newPath)) {
+            // Include the object even if empty if the path matches
+            filtered[key] = value;
+            hasMatches = true;
+          }
         }
       } else {
         // For leaf values, check if the path matches
