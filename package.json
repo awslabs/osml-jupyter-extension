@@ -74,6 +74,7 @@
         "@jupyterlab/settingregistry": "^4.0.0",
         "@jupyterlab/ui-components": "^4.0.0",
         "deck.gl": "^9.1.14",
+        "react-json-view": "^1.21.3",
         "webpack": "^5.90.3"
     },
     "devDependencies": {

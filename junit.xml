@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="1" failures="0" errors="0" time="2.525">
-  <testsuite name="osml-jupyter-extension" errors="0" failures="0" skipped="0" timestamp="2025-10-09T16:41:43" time="1.797" tests="1">
+<testsuites name="jest tests" tests="1" failures="0" errors="0" time="2.612">
+  <testsuite name="osml-jupyter-extension" errors="0" failures="0" skipped="0" timestamp="2025-10-09T18:34:29" time="1.907" tests="1">
     <testcase classname="osml-jupyter-extension should be tested" name="osml-jupyter-extension should be tested" time="0.001">
     </testcase>
   </testsuite>
