@@ -1,48 +1,19 @@
-import { Widget } from '@lumino/widgets';
-import { Message } from '@lumino/messaging';
+import { ToolbarButton } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
+import { listIcon } from '../utils/icons';
 import LayerControlDialog from './LayerControlDialog';
 import { LayerInfo, LayerControlActions } from '../types';
 
 /**
  * A toolbar button widget for controlling overlay layers
  */
-export class LayerControlToolbarButton extends Widget {
-  private _button: HTMLButtonElement;
-
+export class LayerControlToolbarButton extends ToolbarButton {
   constructor(private _imageViewerWidget: ImageViewerWidget) {
-    super();
-    this.addClass('jp-ToolbarButton');
-    this.addClass('jp-mod-styled');
-    
-    // Create the button element
-    this._button = document.createElement('button');
-    this._button.className = 'jp-ToolbarButtonComponent jp-Button jp-mod-minimal jp-LayerControlToolbarButton';
-    this._button.title = 'Manage overlay layers';
-    this._button.setAttribute('data-command', 'layer-control');
-    
-    // Create button content
-    this._updateButtonContent();
-    
-    // Add click handler
-    this._button.addEventListener('click', this._handleClick.bind(this));
-    
-    this.node.appendChild(this._button);
-  }
-
-  /**
-   * Update the button content
-   */
-  private _updateButtonContent(): void {
-    // Clear existing content
-    this._button.innerHTML = '';
-    
-    // Create icon span (using layers/grid icon)
-    const iconSpan = document.createElement('span');
-    iconSpan.className = 'jp-ToolbarButtonComponent-icon';
-    iconSpan.innerHTML = '🗂️'; // Using folder/layers emoji as icon
-       
-    this._button.appendChild(iconSpan);
+    super({
+      icon: listIcon,
+      onClick: () => this._handleClick(),
+      tooltip: 'Manage overlay layers'
+    });
   }
 
   /**
@@ -231,70 +202,16 @@ export class LayerControlToolbarButton extends Widget {
   }
 
   /**
-   * Set button title based on layer availability - button is always enabled
-   */
-  public updateButtonTitle(): void {
-    const layers = this._getLayerInfo();
-    
-    this._button.disabled = false;
-    this._button.classList.remove('jp-mod-disabled');
-    this._button.title = 'Manage overlay layers';
-  }
-
-  /**
    * Update button state when layers change
    */
   public onLayersChanged(): void {
-    this.updateButtonTitle();
+    // Button is always enabled for layer control
   }
 
   /**
-   * Set button enabled/disabled state - kept for backward compatibility but always enables
+   * Set button enabled/disabled state - kept for backward compatibility
    */
   public setEnabled(enabled: boolean): void {
-    // Always keep button enabled regardless of parameter
-    this._button.disabled = false;
-    this._button.classList.remove('jp-mod-disabled');
-    this.updateButtonTitle();
-  }
-
-  /**
-   * Handle dispose
-   */
-  dispose(): void {
-    if (this._button) {
-      this._button.removeEventListener('click', this._handleClick.bind(this));
-    }
-    super.dispose();
-  }
-
-  /**
-   * Handle after attach
-   */
-  protected onAfterAttach(msg: Message): void {
-    super.onAfterAttach(msg);
-    this.node.addEventListener('click', this, true);
-  }
-
-  /**
-   * Handle before detach
-   */
-  protected onBeforeDetach(msg: Message): void {
-    this.node.removeEventListener('click', this, true);
-    super.onBeforeDetach(msg);
-  }
-
-  /**
-   * Handle DOM events
-   */
-  handleEvent(event: Event): void {
-    switch (event.type) {
-      case 'click':
-        // Prevent the double click issue by only handling the direct button click
-        if (event.target === this._button) {
-          this._handleClick();
-        }
-        break;
-    }
+    this.enabled = enabled;
   }
 }
