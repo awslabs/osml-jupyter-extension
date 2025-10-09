@@ -719,14 +719,27 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   renderSubLayers(props: any): Layer | null | LayersList {
     const { data: tileData, tile } = props;
     
+    console.log(`[TiledOverlayLayer] renderSubLayers called for tile ${tile.x}-${tile.y}-${tile.z}`, {
+      hasTileData: !!tileData,
+      featureCount: tileData?.features?.length || 0,
+      tileId: props.id
+    });
+    
     if (!tileData || !tileData.features || tileData.features.length === 0) {
+      console.log(`[TiledOverlayLayer] No features for tile ${tile.x}-${tile.y}-${tile.z}`);
       return null;
     }
 
     // Process features with culling and LOD optimizations
     const processedFeatures = this.processTileFeatures(tileData, tile);
     
+    console.log(`[TiledOverlayLayer] Processed features for tile ${tile.x}-${tile.y}-${tile.z}:`, {
+      originalCount: tileData.features.length,
+      processedCount: processedFeatures.length
+    });
+    
     if (processedFeatures.length === 0) {
+      console.log(`[TiledOverlayLayer] No processed features for tile ${tile.x}-${tile.y}-${tile.z}`);
       return null;
     }
 
@@ -755,6 +768,12 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
       }
     });
 
+    console.log(`[TiledOverlayLayer] Feature type breakdown for tile ${tile.x}-${tile.y}-${tile.z}:`, {
+      points: points.length,
+      lines: lines.length,
+      polygons: polygons.length
+    });
+
     const layers: Layer[] = [];
     const { featureFillColor, featureLineColor, featureLineWidth, adaptivePointSize } = this.typedProps;
     
@@ -765,7 +784,9 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         features: [...polygons, ...lines]
       };
       
-      layers.push(new GeoJsonLayer({
+      console.log(`[TiledOverlayLayer] Creating GeoJsonLayer with ${geoJsonData.features.length} features (tile ${tile.x}-${tile.y}-${tile.z})`);
+      
+      const geoJsonLayer = new GeoJsonLayer({
         ...props,
         id: `${props.id}-geojson`,
         data: geoJsonData,
@@ -776,7 +797,15 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         stroked: true,
         lineWidthMinPixels: 1,
         pickable: true
-      }));
+      });
+      
+      console.log(`[TiledOverlayLayer] GeoJsonLayer created:`, {
+        id: geoJsonLayer.id,
+        pickable: geoJsonLayer.props.pickable,
+        dataLength: geoJsonData.features.length
+      });
+      
+      layers.push(geoJsonLayer);
     }
 
     // Render points with ScatterplotLayer for better performance
@@ -806,7 +835,9 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
       const zoom = this.getCurrentZoom();
       const baseRadius = adaptivePointSize ? Math.max(2, 8 - zoom * 0.5) : 5;
       
-      layers.push(new ScatterplotLayer({
+      console.log(`[TiledOverlayLayer] Creating ScatterplotLayer with ${pointData.length} points (tile ${tile.x}-${tile.y}-${tile.z})`);
+      
+      const scatterplotLayer = new ScatterplotLayer({
         ...props,
         id: `${props.id}-points`,
         data: pointData,
@@ -832,9 +863,19 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         radiusMinPixels: 2,
         radiusMaxPixels: 50,
         pickable: true
-      }));
+      });
+      
+      console.log(`[TiledOverlayLayer] ScatterplotLayer created:`, {
+        id: scatterplotLayer.id,
+        pickable: scatterplotLayer.props.pickable,
+        dataLength: pointData.length,
+        baseRadius
+      });
+      
+      layers.push(scatterplotLayer);
     }
 
+    console.log(`[TiledOverlayLayer] Returning ${layers.length} sub-layers for tile ${tile.x}-${tile.y}-${tile.z}`);
     return layers;
   }
 

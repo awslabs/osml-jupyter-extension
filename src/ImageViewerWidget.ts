@@ -16,7 +16,7 @@ import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
-import { KERNEL_SETUP_CODE } from './utils';
+import { KERNEL_SETUP_CODE, createPropertyTableHTML } from './utils';
 import { 
   ITile, 
   TileDataFunction,
@@ -29,7 +29,9 @@ import {
   FeatureTileService, 
   KernelService 
 } from './services';
-import { LayerControlToolbarButton } from './components';
+import { LayerControlToolbarButton, FeaturePropertiesDialog } from './components';
+import { ReactWidget } from '@jupyterlab/ui-components';
+import React from 'react';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -47,6 +49,10 @@ export class ImageViewerWidget extends MainAreaWidget {
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
+  
+  // Feature properties dialog state
+  private featurePropertiesDialog?: ReactWidget;
+  private featurePropertiesDialogVisible: boolean = false;
   
   // Service instances
   private commService: CommService;
@@ -231,6 +237,96 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Shows the React-based feature properties dialog
+   */
+  private showFeaturePropertiesDialog(feature: any): void {
+    console.log('[ImageViewerWidget] showFeaturePropertiesDialog called with:', feature);
+    
+    if (!feature) {
+      console.log('[ImageViewerWidget] showFeaturePropertiesDialog early return: no feature');
+      return;
+    }
+
+    const properties = feature.properties || {};
+    console.log('[ImageViewerWidget] Feature properties:', properties);
+    
+    // Hide any existing dialog first
+    this.hideFeaturePropertiesDialog();
+    
+    // Create FeaturePropertiesDialog widget directly
+    this.featurePropertiesDialog = new FeaturePropertiesDialog(
+      feature,
+      () => this.hideFeaturePropertiesDialog()
+    );
+    
+    this.featurePropertiesDialog.id = 'feature-properties-dialog';
+    this.featurePropertiesDialog.title.label = 'Feature Properties';
+    
+    // Add to document body for proper modal behavior
+    document.body.appendChild(this.featurePropertiesDialog.node);
+    this.featurePropertiesDialogVisible = true;
+    
+    // Force the widget to render
+    this.featurePropertiesDialog.update();
+    
+    console.log('[ImageViewerWidget] React feature properties dialog created and shown');
+    console.log('[ImageViewerWidget] Dialog node:', this.featurePropertiesDialog.node);
+    console.log('[ImageViewerWidget] Dialog node parent:', this.featurePropertiesDialog.node.parentElement);
+    this.debugLog('Feature properties dialog shown', { feature });
+  }
+
+  /**
+   * Hides the React-based feature properties dialog
+   */
+  private hideFeaturePropertiesDialog(): void {
+    if (this.featurePropertiesDialog && this.featurePropertiesDialogVisible) {
+      this.featurePropertiesDialog.node.remove();
+      this.featurePropertiesDialog.dispose();
+      this.featurePropertiesDialog = undefined;
+      this.featurePropertiesDialogVisible = false;
+      console.log('[ImageViewerWidget] React feature properties dialog hidden');
+      this.debugLog('Feature properties dialog hidden');
+    }
+  }
+
+  /**
+   * Handles click events on the map to show feature properties dialog
+   */
+  private handleMapClick(info: any, event: any): boolean {
+    // Always log click events for debugging
+    console.log('[ImageViewerWidget] Map clicked - Raw info:', info);
+    console.log('[ImageViewerWidget] Map clicked - Event:', event);
+    console.log('[ImageViewerWidget] Map clicked - Has object:', !!info.object);
+    console.log('[ImageViewerWidget] Map clicked - Layer info:', {
+      layer: info.layer?.id,
+      sourceLayer: info.sourceLayer?.id,
+      picked: info.picked,
+      coordinate: info.coordinate,
+      x: info.x,
+      y: info.y
+    });
+    
+    this.debugLog('Map clicked', { info, event });
+    
+    // Hide dialog if clicking on empty area
+    if (!info.object) {
+      console.log('[ImageViewerWidget] No object clicked, hiding dialog');
+      this.hideFeaturePropertiesDialog();
+      return false;
+    }
+    
+    // Show React dialog for picked feature
+    if (info.object && info.x !== undefined && info.y !== undefined) {
+      console.log('[ImageViewerWidget] Feature clicked, showing dialog:', info.object);
+      this.showFeaturePropertiesDialog(info.object);
+      return true; // Mark as handled
+    }
+    
+    console.log('[ImageViewerWidget] Click event not handled');
+    return false;
+  }
+
+  /**
    * Create a TileLayer for the image with swappable getTileData function
    */
   private createImageLayer(imageName: string, getTileData: TileDataFunction): TileLayer {
@@ -412,6 +508,9 @@ export class ImageViewerWidget extends MainAreaWidget {
         this.debugLog('View state changed:', viewState);
         // Use throttled update to prevent excessive layer updates during rapid viewport changes
         this.throttledViewportUpdate();
+      },
+      onClick: (info: any, event: any) => {
+        return this.handleMapClick(info, event);
       }
     }) as any; // Type assertion to work around Deck.gl typing issues
 
@@ -996,6 +1095,9 @@ export class ImageViewerWidget extends MainAreaWidget {
       console.warn('Exception caught cleaning up service resources');
       console.debug(e);
     }
+
+    // Clean up feature properties dialog
+    this.hideFeaturePropertiesDialog();
 
     // Clean up DOM
     if (this.mapDiv) {
