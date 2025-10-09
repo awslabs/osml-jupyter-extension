@@ -67,22 +67,22 @@ export class ImageMetadataToolbarButton extends Widget {
         return;
       }
 
-      // Create the dialog content
-      const dialogContent = new ImageMetadataDialog(imageName, commService);
-      
-      // Show the dialog
-      const result = await showDialog({
-        title: 'Image Metadata',
-        hasClose: true,
-        body: dialogContent,
-        buttons: [
-          Dialog.okButton({ label: 'Close' })
-        ],
-        defaultButton: 0,
-        focusNodeSelector: 'input[type="search"]' // Focus the search input when dialog opens
+      // Show the modal dialog directly without JupyterLab dialog wrapper
+      const dialogWidget = new ImageMetadataDialog(imageName, commService, () => {
+        // Close callback - remove the dialog from DOM
+        if (dialogWidget.node.parentElement) {
+          dialogWidget.node.remove();
+        }
+        dialogWidget.dispose();
       });
+      
+      // Add to document body for proper modal behavior
+      document.body.appendChild(dialogWidget.node);
+      
+      // Force the widget to render
+      dialogWidget.update();
 
-      console.log('Metadata dialog closed');
+      console.log('Metadata dialog opened');
     } catch (error) {
       console.error('Error showing image metadata dialog:', error);
     }

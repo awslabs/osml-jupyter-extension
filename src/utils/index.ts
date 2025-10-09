@@ -6,3 +6,6 @@ export * from './kernelSetupCode';
 
 // Property utilities
 export * from './propertyFlattener';
+
+// Object filtering utilities
+export * from './objectFilter';

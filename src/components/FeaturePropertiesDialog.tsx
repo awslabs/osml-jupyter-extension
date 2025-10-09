@@ -1,7 +1,8 @@
-import React, { FC } from 'react';
+import React, { FC, useState, useMemo } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 // @ts-ignore: react-json-view doesn't have perfect TypeScript support
 import ReactJson from 'react-json-view';
+import { filterObjectBySearchTerm } from '../utils';
 
 interface FeaturePropertiesComponentProps {
   feature: any;
@@ -15,10 +16,17 @@ const FeaturePropertiesComponent: FC<FeaturePropertiesComponentProps> = ({
   feature,
   onClose
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
   const properties = feature?.properties || {};
+  
+  // Filter properties based on search term
+  const filteredProperties = useMemo(() => {
+    return filterObjectBySearchTerm(properties, searchTerm);
+  }, [properties, searchTerm]);
   
   // Check if properties object is empty
   const hasProperties = Object.keys(properties).length > 0;
+  const hasFilteredProperties = Object.keys(filteredProperties).length > 0;
 
   return (
     <div style={{
@@ -49,46 +57,93 @@ const FeaturePropertiesComponent: FC<FeaturePropertiesComponentProps> = ({
           padding: '16px 20px',
           borderBottom: '2px solid #e9ecef',
           backgroundColor: '#f8f9fa',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           flexShrink: 0
         }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: '#333'
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: hasProperties ? '12px' : '0'
           }}>
-            Feature Properties
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0',
-              width: '30px',
-              height: '30px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#666'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#e9ecef';
-              e.currentTarget.style.color = '#000';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#666';
-            }}
-          >
-            ×
-          </button>
+            <h3 style={{
+              margin: 0,
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#333'
+            }}>
+              Feature Properties
+            </h3>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#e9ecef';
+                e.currentTarget.style.color = '#000';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#666';
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Search Input */}
+          {hasProperties && (
+            <div>
+              <input
+                type="text"
+                placeholder="Search properties... (e.g., name, id, coordinates)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+              {searchTerm && (
+                <div style={{
+                  fontSize: '12px',
+                  color: '#666',
+                  marginTop: '6px'
+                }}>
+                  {hasFilteredProperties 
+                    ? `Showing filtered properties matching "${searchTerm}"` 
+                    : `No properties found matching "${searchTerm}"`
+                  }
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -111,12 +166,25 @@ const FeaturePropertiesComponent: FC<FeaturePropertiesComponentProps> = ({
                 This feature doesn't have any associated properties.
               </div>
             </div>
+          ) : searchTerm && !hasFilteredProperties ? (
+            <div style={{
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#666'
+            }}>
+              <div style={{ fontSize: '16px', marginBottom: '8px' }}>
+                No matching properties found
+              </div>
+              <div style={{ fontSize: '14px' }}>
+                Try adjusting your search term or clear the search to see all properties.
+              </div>
+            </div>
           ) : (
             <ReactJson
-              src={properties}
+              src={filteredProperties}
               name="properties"
               theme="rjv-default"
-              collapsed={true}
+              collapsed={searchTerm ? false : true} // Auto-expand when searching
               displayDataTypes={false}
               displayObjectSize={false}
               enableClipboard={true}
@@ -129,6 +197,9 @@ const FeaturePropertiesComponent: FC<FeaturePropertiesComponentProps> = ({
               }}
               collapseStringsAfterLength={100}
               shouldCollapse={(field) => {
+                // When searching, don't auto-collapse to show results
+                if (searchTerm) return false;
+                
                 // Auto-collapse arrays with more than 10 items
                 if (field.type === 'array' && Array.isArray(field.src) && field.src.length > 10) {
                   return true;
