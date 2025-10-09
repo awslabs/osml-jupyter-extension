@@ -1,6 +1,5 @@
 import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
-import { showDialog, Dialog } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
 import LayerControlDialog from './LayerControlDialog';
 import { LayerInfo, LayerControlActions } from '../types';
@@ -58,24 +57,32 @@ export class LayerControlToolbarButton extends Widget {
         console.log('No layers available - showing empty layer dialog');
       }
 
-      // Create the dialog content
-      const dialogContent: LayerControlDialog = new LayerControlDialog(layers, {
-        toggleVisibility: (layerId: string) => this._toggleLayerVisibility(layerId, dialogContent),
-        updateColor: (layerId: string, color: [number, number, number, number]) => 
-          this._updateLayerColor(layerId, color, dialogContent),
-        deleteLayer: (layerId: string) => this._deleteLayer(layerId, dialogContent),
-        addNamedDataset: (datasetName: string) => this._addNamedDataset(datasetName, dialogContent)
-      });
+      // Create the dialog content with close handler
+      const dialogContent: LayerControlDialog = new LayerControlDialog(
+        layers, 
+        {
+          toggleVisibility: (layerId: string) => this._toggleLayerVisibility(layerId, dialogContent),
+          updateColor: (layerId: string, color: [number, number, number, number]) => 
+            this._updateLayerColor(layerId, color, dialogContent),
+          deleteLayer: (layerId: string) => this._deleteLayer(layerId, dialogContent),
+          addNamedDataset: (datasetName: string) => this._addNamedDataset(datasetName, dialogContent)
+        },
+        () => {
+          // Close handler - remove dialog from DOM and dispose it
+          if (dialogContent.node.parentNode) {
+            dialogContent.node.parentNode.removeChild(dialogContent.node);
+          }
+          dialogContent.dispose();
+        }
+      );
       
-      // Show the dialog
-      const result = await showDialog({
-        title: 'Layer Control',
-        hasClose: true,
-        body: dialogContent,
-        buttons: []
-      });
-
-      console.log('Layer control dialog closed');
+      // Add dialog to document body to show as overlay
+      document.body.appendChild(dialogContent.node);
+      
+      // Force the widget to render
+      dialogContent.update();
+      
+      console.log('Layer control dialog opened');
     } catch (error) {
       console.error('Error showing layer control dialog:', error);
     }

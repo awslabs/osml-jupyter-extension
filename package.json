@@ -73,7 +73,9 @@
         "@jupyterlab/launcher": "^4.0.7",
         "@jupyterlab/settingregistry": "^4.0.0",
         "@jupyterlab/ui-components": "^4.0.0",
+        "@types/react-color": "^3.0.13",
         "deck.gl": "^9.1.14",
+        "react-color": "^2.19.3",
         "react-json-view": "^1.21.3",
         "webpack": "^5.90.3"
     },
