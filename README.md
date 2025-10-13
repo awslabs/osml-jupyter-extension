@@ -1,151 +1,116 @@
-# osml_jupyter_extension
+# OSML Jupyter Extension
 
-#### TEMP QUICK START GUIDE!!!
-Note that this project is currently a quick and dirty proof of concept that does
-not conform to any of the build conventions other OversightML projects use. It 
-started from a jupyterlab extension template and was built to provide a proof of
-concept. 
+[![Build Status](https://github.com/awslabs/osml-jupyter-extension/actions/workflows/build.yml/badge.svg)](https://github.com/awslabs/osml-jupyter-extension/actions/workflows/build.yml) [![Python Badge](https://img.shields.io/badge/python-3.9%2C%203.10%2C%203.11%2C%203.12%2C%203.13-blue)](https://img.shields.io/badge/python-3.9%2C%203.10%2C%203.11%2C%203.12%2C%203.13-blue) [![JupyterLab Badge](https://img.shields.io/badge/jupyterlab-4.0+-orange)](https://img.shields.io/badge/jupyterlab-4.0+-orange) [![GitHub License](https://img.shields.io/github/license/awslabs/osml-jupyter-extension?color=blue)](https://img.shields.io/github/license/awslabs/osml-jupyter-extension?color=blue) [![PyPI - Version](https://img.shields.io/pypi/v/osml-jupyter-extension)](https://img.shields.io/pypi/v/osml-jupyter-extension)
 
-See the Development Install section below for ways to run this on a local developer
-machine/jupyter instance for rapid dev iterations.
+A JupyterLab extension that provides interactive satellite imagery visualization and analysis capabilities using the OversightML (OSML) toolkit. This extension enables data scientists, researchers, and engineers to work with satellite imagery directly within the Jupyter Notebook ecosystem without switching to external GIS tools.
 
-To build and install a binary into a SageMaker AI managed Jupyter environment follow
-these instructions:
-1. Build the code and package it as a wheel. The result ends up in the ./dist directory.
-```bash
-pip install build twine hatch
-python3 -m build
-```
-2. Copy the .whl to your Jupyter instance.
-3. Start a terminal on the Jupyter instance and then install the package:
-```bash
-python3 -m pip install osml_jupyter_extension-0.1.0-py3-none-any.whl
-```
-4. Verify that the installation succeeded. You should see a row that says osml-jupyter-extension enabled OK.
-```bash
-jupyter labextension list
-```
-5. Refresh/Reload your Jupyter browser window. This is necessary to download the new UI with the frontend extensions.
+## Key Features
 
-This extension assumes you have a conda based Jupyter kernel available with 
-osml-imagery-toolkit available and installed. To do that:
-1. Upload/create a Conda environment file to your Jupyter instance that has GDAL, Proj, and the osml-imagery-toolkit.
-2. Start a terminal on the Jupyter instance and then create the conda environment:
+The OSML Jupyter Extension is intended to let image scientists and machine learning engineers work with remote sensing imagery.
+These images are large enough to require interactive visualization of a multi-resolution tile pyramid and require implementations of
+robust sensor models to correctly overlay features.  It provides:
+
+- **Interactive Visualization**: Efficient tile-based rendering of large satellite images and feature layers using Deck.gl
+- **Multi-format Support**: Native support for NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
+- **Feature Overlays**: Overlay of geospatial features using either world or image coordinates
+- **Metadata Access**: View and explore image metadata and feature properties
+- **Seamless Integration**: Right-click context menu integration with JupyterLab file browser
+- **OSML Ecosystem**: Built on the OversightML Imagery Toolkit for additional satellite image processing
+
+![Image With Overlays](docs/images/image-viewer-and-open-menu.png)
+
+## Installation
+This extension can be installed in your JupyterLab v4.0 environment. It will also require you to setup a special iPython kernel
+that has GDAL, Proj, and the osml-imagery-toolkit installed. 
+
+### JupyterLab Extension Installation from PyPI
+
+The extension can either be installed from a package distributed on PyPi or directly from source.
+
 ```bash
-conda env create -f osml-kernel-environment.yml
+pip install osml-jupyter-extension
 ```
-3. Register the new Conda environment as a Jupyter Kernel
+
 ```bash
+git clone https://github.com/awslabs/osml-jupyter-extension.git
+cd osml-jupyter-extension
+pip install .
+```
+
+### Kernel Environment Setup
+
+The extension requires a conda environment with GDAL, Proj, Boto3 and the OSML Imagery Toolkit. An example conda environment
+has been provided for reference and can be updated to include additional OpenGIS libraries needed for your work.
+
+
+1. Create the conda environment:
+```bash
+conda env create -f conda/osml-kernel-environment.yml
 conda activate osml-kernel
-python3 -m ipykernel install --user --name=osml-kernel
-```
-4. Refresh/Reload your Jupyter browser window. This is necessary to make sure the new kernel is listed in the web UI.
-
-
-
-[![Github Actions Status](https://github.com/aws-solutions-library-samples/osml-jupyter-extension/workflows/Build/badge.svg)](https://github.com/aws-solutions-library-samples/osml-jupyter-extension/actions/workflows/build.yml)
-A JupyterLab extension to work with satellite imagery using OversightML.
-
-## Requirements
-
-- JupyterLab >= 4.0.0
-
-## Install
-
-To install the extension, execute:
-
-```bash
-pip install osml_jupyter_extension
 ```
 
-## Uninstall
-
-To remove the extension, execute:
-
+2. Register the environment as a Jupyter kernel:
 ```bash
-pip uninstall osml_jupyter_extension
+python -m ipykernel install --user --name=osml-kernel
 ```
 
-## Contributing
+3. Restart JupyterLab to see the new kernel option.
 
-### Development install
+## Using the Extension
+See the [USER_GUIDE](USER_GUIIDE.md) for more information.
 
-Setup development environment in conda. 
-Make sure the gdal and proj dependencies in this environment match the dependencies in your 
-osml-kernel environment
+## Development
+
+### Development Install
+
+For development work, clone the repository and set up the development environment:
+
 ```bash
-conda env create -f environment.yml
+# Create development conda environment
+conda env create -f conda/osml-jupyterlab-ext-dev-environment.yml
 conda activate osml-jupyterlab-ext-dev
-```
 
-Note: You will need NodeJS to build the extension package.
-
-The `jlpm` command is JupyterLab's pinned version of
-[yarn](https://yarnpkg.com/) that is installed with JupyterLab. You may use
-`yarn` or `npm` in lieu of `jlpm` below.
-
-```bash
-# Clone the repo to your local environment
-
-# Install package in development mode
+# Install in development mode
 pip install -e "."
-# Link your development version of the extension with JupyterLab
 jupyter labextension develop . --overwrite
 
-
+# Install dependencies and build
 jlpm install
-
-# Rebuild extension Typescript source after making changes
 jlpm build
 ```
 
-You can watch the source directory and run JupyterLab at the same time in different terminals to watch for changes in the extension's source and automatically rebuild the extension.
+### Development Workflow
 
 ```bash
-# Watch the source directory in one terminal, automatically rebuilding when needed
+# Watch for changes and auto-rebuild
 jlpm watch
+
 # Run JupyterLab in another terminal
 jupyter lab
 ```
 
-With the watch command running, every saved change will immediately be built locally and available in your running JupyterLab. Refresh JupyterLab to load the change in your browser (you may need to wait several seconds for the extension to be rebuilt).
-
-By default, the `jlpm build` command generates the source maps for this extension to make it easier to debug using the browser dev tools. To also generate source maps for the JupyterLab core extensions, you can run the following command:
+### Testing
 
 ```bash
-jupyter lab build --minimize=False
-```
+# Run TypeScript tests
+jlpm test:typescript
 
-### Development uninstall
+# Run Python tests  
+jlpm test:python
 
-```bash
-pip uninstall osml_jupyter_extension
-```
-
-In development mode, you will also need to remove the symlink created by `jupyter labextension develop`
-command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
-folder is located. Then you can remove the symlink named `osml-jupyter-extension` within that folder.
-
-### Testing the extension
-
-#### Frontend tests
-
-This extension is using [Jest](https://jestjs.io/) for JavaScript code testing.
-
-To execute them, execute:
-
-```sh
-jlpm
+# Run all tests
 jlpm test
 ```
 
-#### Integration tests
+## Contributing
 
-This extension uses [Playwright](https://playwright.dev/docs/intro) for the integration tests (aka user level tests).
-More precisely, the JupyterLab helper [Galata](https://github.com/jupyterlab/jupyterlab/tree/master/galata) is used to handle testing the extension in JupyterLab.
+This project welcomes contributions and suggestions. If you would like to submit a pull request, see our
+[Contribution Guide](CONTRIBUTING.md) for more information.
 
-More information are provided within the [ui-tests](./ui-tests/README.md) README.
+## Security
 
-### Packaging the extension
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
-See [RELEASE](RELEASE.md)
+## License
+
+This library is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file.

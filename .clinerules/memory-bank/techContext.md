@@ -6,7 +6,6 @@
 - **TypeScript**: Primary language for extension development
 - **JupyterLab 4.0+**: Extension platform and framework
 - **Deck.gl**: GPU-powered high powered data visualization framework
-- **AWS Cloudscape Design System**: UI component library for consistent AWS-style interface
 - **Lumino**: Widget framework underlying JupyterLab (signals, messaging, widgets)
 
 ### Backend Technologies
@@ -59,7 +58,6 @@ dependencies:
 
 ### Critical Runtime Dependencies
 - **@jupyterlab/application**: Core JupyterLab application framework
-- **@cloudscape-design/components**: AWS UI component library
 - **@deck.gl/core**: Mapping and tile display functionality
 - **osml-imagery-toolkit**: Satellite image processing backend
 
@@ -113,34 +111,3 @@ python3 -m build  # Creates wheel in ./dist
 - **Unit Tests**: Jest for TypeScript components
 - **Integration Tests**: Playwright/Galata for end-to-end testing
 - **Manual Testing**: Requires sample satellite imagery files
-
-## Performance Considerations
-
-### Tile Processing
-- Tile factory caching to avoid reprocessing
-- Overview generation for large images (BuildOverviews with CUBIC resampling)
-- Base64 encoding for tile transport over comm channel
-- 512x512 pixel tile size standard
-
-### Memory Management
-- Proper widget disposal and resource cleanup
-- Session and comm channel cleanup on widget close
-- GDAL dataset caching with factory pattern
-
-## Deployment Targets
-
-### Primary: SageMaker AI Managed Jupyter
-- Wheel-based installation via pip
-- Requires manual kernel environment setup
-- Browser refresh needed after installation
-
-### Secondary: Local Development
-- Development mode installation with live reload
-- Direct conda environment management
-- Faster iteration cycles
-
-## Known Technical Limitations
-- Proof-of-concept status with non-standard build conventions
-- Requires specific conda environment setup
-- Limited to single-image base layer (not full-earth geographic display)
-- Manual kernel selection required on first use

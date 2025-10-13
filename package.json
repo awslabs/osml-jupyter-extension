@@ -11,7 +11,7 @@
     "bugs": {
         "url": "https://github.com/awslabs/osml-jupyter-extension/issues"
     },
-    "license": "BSD-3-Clause",
+    "license": "Apache-2.0",
     "author": {
         "name": "Amazon Web Services",
         "email": "aws-osml-admin@amazon.com"

@@ -14,7 +14,6 @@ mimetype_name: ''
 project_short_description: A JupyterLab extension to work with satellite imagery using
     OversightML.
 python_name: osml_jupyter_extension
-repository: https://github.com/aws-solutions-library-samples/osml-jupyter-extension
+repository: https://github.com/awslabs/osml-jupyter-extension
 test: true
 viewer_name: ''
-
