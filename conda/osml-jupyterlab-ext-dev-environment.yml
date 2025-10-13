@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 name: osml-jupyterlab-ext-dev
 channels:
   - conda-forge
