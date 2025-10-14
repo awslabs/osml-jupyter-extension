@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
 import { showDialog, Dialog } from '@jupyterlab/apputils';

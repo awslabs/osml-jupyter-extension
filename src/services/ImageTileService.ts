@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { ITile, TileDataFunction, TileLoadConfig } from '../types';
 import { CommService } from './CommService';
 

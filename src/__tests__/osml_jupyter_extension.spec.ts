@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 /**
  * Example of [Jest](https://jestjs.io/docs/getting-started) unit tests
  */

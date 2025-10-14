@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { Feature } from 'geojson';
 import { IFeatureTile, FeatureTileData, FeatureTileDataFunction, FeatureCacheEntry } from '../types';
 import { CommService } from './CommService';

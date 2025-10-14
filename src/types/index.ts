@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 // Re-export all types for easy importing
 export * from './tiles';
 export * from './features';

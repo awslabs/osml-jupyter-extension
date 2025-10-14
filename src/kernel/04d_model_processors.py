@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Model processors: Handle endpoint listing and model inference with integrated async optimization
 
 import time

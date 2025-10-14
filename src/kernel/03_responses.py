@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Response building: ResponseBuilder and standardized response creation
 
 from functools import wraps

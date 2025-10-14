@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { ToolbarButton } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
 import { listIcon } from '../utils/icons';

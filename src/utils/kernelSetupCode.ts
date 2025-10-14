@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 /**
  * Python kernel setup code for the OSML Jupyter Extension.
  * 

@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import React, { FC, useState, useMemo } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 // @ts-ignore: react-json-view doesn't have perfect TypeScript support

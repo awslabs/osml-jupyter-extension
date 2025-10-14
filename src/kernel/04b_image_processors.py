@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Image processors: Handle image loading, tiles, metadata, statistics, and unloading
 
 import base64

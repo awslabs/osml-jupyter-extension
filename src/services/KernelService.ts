@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { ServiceManager, KernelMessage } from '@jupyterlab/services';
 import { ISessionContext, SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';

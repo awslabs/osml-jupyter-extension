@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Core infrastructure: Base classes, logging, performance monitoring, and error handling
 
 import time

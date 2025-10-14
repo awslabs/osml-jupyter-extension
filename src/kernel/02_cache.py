@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Cache management: AdvancedCacheManager and caching logic
 
 import time

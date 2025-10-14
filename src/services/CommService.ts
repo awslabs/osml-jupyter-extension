@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { Kernel } from '@jupyterlab/services';
 import { CommMessage, CommMessageType } from '../types';
 

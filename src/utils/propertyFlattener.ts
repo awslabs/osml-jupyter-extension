@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 /**
  * Utility functions for flattening nested objects in GeoJSON feature properties
  */

@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { LabIcon, codeIcon, listIcon } from '@jupyterlab/ui-components';
 
 import COLOR_LOGO from '../../style/icons/logo-color.svg';

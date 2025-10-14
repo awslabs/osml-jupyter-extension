@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Message processor registry: Central registry for mapping message types to processors
 
 import time

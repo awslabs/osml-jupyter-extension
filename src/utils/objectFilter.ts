@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 /**
  * Utility functions for filtering and flattening nested objects for search functionality
  */

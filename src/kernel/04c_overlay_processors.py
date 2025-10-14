@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Overlay processors: Handle overlay loading, tiles, and unloading
 
 import shapely

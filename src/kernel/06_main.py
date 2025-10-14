@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Main initialization: Infrastructure setup and comm channel registration
 
 # Initialize the global infrastructure components

@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates.
+
 # Coordinate processors: Handle image-to-world and world-to-image coordinate transformations
 
 class ImageToWorldProcessor(BaseMessageProcessor):

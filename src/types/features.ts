@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates.
+
 import { Feature, FeatureCollection } from 'geojson';
 
 /**
