@@ -19,7 +19,7 @@ export class ModelSelectionToolbarButton extends Widget {
     
     // Create the button element
     this._button = document.createElement('button');
-    this._button.className = 'jp-ToolbarButtonComponent jp-Button jp-mod-minimal jp-ModelSelectionToolbarButton';
+    this._button.className = 'jp-ToolbarButtonComponent jp-Button jp-mod-minimal jp-model-selection-toolbar-button';
     this._button.title = 'Select model to run on tiles';
     this._button.setAttribute('data-command', 'model-selection');
     
@@ -41,7 +41,7 @@ export class ModelSelectionToolbarButton extends Widget {
     
     // Create icon span (using a generic model icon)
     const iconSpan = document.createElement('span');
-    iconSpan.className = 'jp-ToolbarButtonComponent-icon';
+    iconSpan.className = 'jp-toolbar-button-component-icon';
     iconSpan.innerHTML = '🤖'; // Using emoji for now, could be replaced with proper icon
     
     this._button.appendChild(iconSpan);

@@ -1,18 +1,20 @@
 @import url('base.css');
 
-/* Loading spinner animation */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-/* Feature popup styles */
 .osml-feature-popup {
   position: absolute;
-  background: var(--jp-layout-color1, #ffffff);
+  background: var(--jp-layout-color1, #fff);
   border: 1px solid var(--jp-border-color1, #ccc);
   border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 8px rgb(0 0 0 / 20%);
   max-width: 400px;
   max-height: 500px;
   z-index: 1000;
@@ -54,7 +56,7 @@
 
 .osml-feature-popup .popup-close:hover {
   color: #000;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgb(0 0 0 / 10%);
   border-radius: 50%;
 }
 
@@ -100,7 +102,7 @@
 .osml-feature-popup .popup-table td.property-value {
   max-width: 280px;
   position: relative;
-  background: var(--jp-layout-color1, #ffffff);
+  background: var(--jp-layout-color1, #fff);
 }
 
 /* Standard value content */
@@ -112,7 +114,7 @@
 
 /* Long value content with summary */
 .osml-feature-popup .value-content.long-value {
-  border-left: 3px solid var(--jp-brand-color1, #2196F3);
+  border-left: 3px solid var(--jp-brand-color1, #2196f3);
   padding-left: 8px;
   margin: 2px 0;
 }
@@ -126,7 +128,7 @@
 }
 
 .osml-feature-popup .value-type {
-  background: var(--jp-brand-color1, #2196F3);
+  background: var(--jp-brand-color1, #2196f3);
   color: white;
   padding: 2px 6px;
   border-radius: 3px;
@@ -162,7 +164,7 @@
 
 /* Expand/collapse buttons */
 .osml-feature-popup .expand-btn {
-  background: var(--jp-brand-color1, #2196F3);
+  background: var(--jp-brand-color1, #2196f3);
   color: white;
   border: none;
   padding: 4px 8px;
@@ -174,13 +176,13 @@
 }
 
 .osml-feature-popup .expand-btn:hover {
-  background: var(--jp-brand-color0, #1976D2);
+  background: var(--jp-brand-color0, #1976d2);
 }
 
 .osml-feature-popup .expand-btn-inline {
   background: none;
   border: none;
-  color: var(--jp-brand-color1, #2196F3);
+  color: var(--jp-brand-color1, #2196f3);
   cursor: pointer;
   font-weight: bold;
   padding: 0 4px;
@@ -195,7 +197,13 @@
 
 /* Value type styling */
 .osml-feature-popup .json-value {
-  font-family: var(--jp-code-font-family, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+  font-family: var(
+    --jp-code-font-family,
+    'Monaco',
+    'Menlo',
+    'Ubuntu Mono',
+    monospace
+  );
   background: var(--jp-layout-color0, #f8f9fa);
   padding: 2px 4px;
   border-radius: 3px;
@@ -203,7 +211,7 @@
 }
 
 .osml-feature-popup .url-value {
-  color: var(--jp-brand-color1, #2196F3);
+  color: var(--jp-brand-color1, #2196f3);
   text-decoration: none;
   border-bottom: 1px dotted;
 }
@@ -213,7 +221,13 @@
 }
 
 .osml-feature-popup .coord-value {
-  font-family: var(--jp-code-font-family, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+  font-family: var(
+    --jp-code-font-family,
+    'Monaco',
+    'Menlo',
+    'Ubuntu Mono',
+    monospace
+  );
   background: var(--jp-success-color3, #e8f5e8);
   padding: 2px 4px;
   border-radius: 3px;
@@ -221,7 +235,13 @@
 }
 
 .osml-feature-popup .base64-value {
-  font-family: var(--jp-code-font-family, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+  font-family: var(
+    --jp-code-font-family,
+    'Monaco',
+    'Menlo',
+    'Ubuntu Mono',
+    monospace
+  );
   background: var(--jp-warn-color3, #fff3e0);
   padding: 2px 4px;
   border-radius: 3px;
@@ -230,7 +250,13 @@
 }
 
 .osml-feature-popup .number-value {
-  font-family: var(--jp-code-font-family, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+  font-family: var(
+    --jp-code-font-family,
+    'Monaco',
+    'Menlo',
+    'Ubuntu Mono',
+    monospace
+  );
   color: var(--jp-info-color1, #1976d2);
   font-weight: bold;
 }
