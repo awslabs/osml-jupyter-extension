@@ -57,7 +57,7 @@ python -m ipykernel install --user --name=osml-kernel
 3. Restart JupyterLab to see the new kernel option.
 
 ## Using the Extension
-See the [USER_GUIDE](./docs/USER_GUIIDE.md) for more information.
+See the [USER_GUIDE](./docs/USER_GUIDE.md) for more information.
 
 ## Development
 
