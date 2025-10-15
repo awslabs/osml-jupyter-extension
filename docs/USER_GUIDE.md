@@ -15,17 +15,6 @@ The OSML Jupyter Extension brings satellite imagery visualization capabilities d
 - Access image metadata and feature properties
 - Seamless integration with Jupyter notebooks
 
-## Prerequisites
-
-Before using the OSML Jupyter Extension, ensure you have:
-
-1. **JupyterLab 4.0+** installed
-2. **Conda environment** with the required geospatial libraries:
-   - GDAL 3.8.5+
-   - Proj 9.4.1+
-   - osml-imagery-toolkit 1.4.2+
-3. **osml-kernel environment** properly configured (see installation documentation)
-
 ## Getting Started
 
 ### 1. Opening an Image
@@ -108,7 +97,7 @@ One of the powerful features of the OSML Jupyter Extension is its ability to wor
 
 1. **Open an image** using the extension (this establishes the kernel session)
 2. **Create or open a Jupyter notebook** in the same JupyterLab instance
-3. **Select the same kernel** that's being used by the image viewer (typically `osml-kernel`)
+3. **Select the same kernel** that's being used by the image viewer. There should be a kernel named OversightML Image Viewer in the section for existing python kernels.
 
 ![Notebook kernel selection](images/notebook-kernel-selection.png)
 
