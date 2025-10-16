@@ -16,11 +16,12 @@ jobs:
         fetch-depth: '0'
         lfs: 'true'
 
-    - name: Base Setup
-      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
-
-    - name: Install Dependencies
-      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+    - name: Setup Development Enviornment in Conda 
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: osml-jupyterlab-ext-dev
+        environment-file: conda/osml-jupyterlab-ext-dev-environment.yml
+        auto-activate-base: false
 
     - name: Lint the Extension
       run: |
@@ -28,7 +29,7 @@ jobs:
         jlpm
         jlpm run lint:check
 
-    - name: Check Local Install
+    - name: Test Local Install
       run: |
         set -eux
         python -m pip install .[test]
