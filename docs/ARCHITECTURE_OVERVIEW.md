@@ -102,7 +102,7 @@ The extension uses a standardized message request/response pattern for all commu
 ```mermaid
 sequenceDiagram
     participant User
-    participant DeckGL as Deck.gl TileLayer
+    participant ImageViewerWidget
     participant ImageTileService
     participant Kernel as JupyterLab Managed<br/>Python Kernel
     participant MessageRegistry
@@ -110,8 +110,8 @@ sequenceDiagram
     participant Cache as CacheManager
     participant GDAL as GDAL/OSML Toolkit
 
-    User->>DeckGL: Pan/zoom map
-    DeckGL->>ImageTileService: Request tile at {zoom, row, col}
+    User->>ImageViewerWidget: Pan/zoom map
+    ImageViewerWidget->>ImageTileService: Request tile at {zoom, row, col}
     
     Note over ImageTileService: Set 30s timeout<br/>Send IMAGE_TILE_REQUEST
     ImageTileService->>Kernel: Send via comm channel
@@ -136,12 +136,12 @@ sequenceDiagram
     Kernel->>ImageTileService: Send response via comm
     
     Note over ImageTileService: Clear timeout<br/>Resolve promise
-    ImageTileService-->>DeckGL: Provide tile for rendering
-    DeckGL-->>User: Display updated map
+    ImageTileService-->>ImageViewerWidget: Provide tile for rendering
+    ImageViewerWidget-->>User: Display updated map
     
     Note over User,GDAL: Error Handling (Alternative Flow)
     alt Request timeout or error
-        ImageTileService->>DeckGL: Return error placeholder
-        DeckGL-->>User: Show error tile or retry
+        ImageTileService->>ImageViewerWidget: Return error placeholder
+        ImageViewerWidget-->>User: Show error tile or retry
     end
 ```
