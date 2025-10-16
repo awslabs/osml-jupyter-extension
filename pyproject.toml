@@ -32,7 +32,8 @@ test = [
     "pytest-cov>=4.0",
     "pytest-mock>=3.10",
     "numpy>=1.20.0",
-    "pillow>=8.0.0"
+    "pillow>=8.0.0",
+    "shapely>=2.0.2"
 ]
 
 [tool.hatch.version]
