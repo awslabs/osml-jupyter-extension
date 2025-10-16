@@ -16,15 +16,15 @@ jobs:
         fetch-depth: '0'
         lfs: 'true'
 
-    - name: JupyterLab Base Setup
-      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
-
     - name: Setup Development Enviornment in Conda 
       uses: conda-incubator/setup-miniconda@v3
       with:
         activate-environment: osml-jupyterlab-ext-dev
         environment-file: conda/osml-jupyterlab-ext-dev-environment.yml
         auto-activate-base: false
+
+    - name: JupyterLab Base Setup
+      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
 
     - name: Lint the Extension
       run: |
