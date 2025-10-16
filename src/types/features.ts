@@ -24,7 +24,6 @@ export interface FeatureLayerConfig {
   enableDebugLogging?: boolean;
 }
 
-
 /**
  * Feature processing options
  */

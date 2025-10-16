@@ -49,7 +49,9 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
         }
       } catch (err) {
         console.error('Failed to fetch image metadata:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch metadata');
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch metadata'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -60,7 +62,9 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
 
   // Filter metadata based on search term
   const filteredMetadata = useMemo(() => {
-    if (!metadata) return {};
+    if (!metadata) {
+      return {};
+    }
     return filterObjectBySearchTerm(metadata, searchTerm);
   }, [metadata, searchTerm]);
 
@@ -68,48 +72,58 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
   const hasFilteredMetadata = Object.keys(filteredMetadata).length > 0;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-        maxWidth: '900px',
-        maxHeight: '80vh',
-        width: '90%',
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+          maxWidth: '900px',
+          maxHeight: '80vh',
+          width: '90%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '2px solid #e9ecef',
-          backgroundColor: '#f8f9fa',
-          flexShrink: 0
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: hasMetadata && !isLoading && !error ? '12px' : '0'
-          }}>
-            <h3 style={{
-              margin: 0,
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#333'
-            }}>
+        <div
+          style={{
+            padding: '16px 20px',
+            borderBottom: '2px solid #e9ecef',
+            backgroundColor: '#f8f9fa',
+            flexShrink: 0
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: hasMetadata && !isLoading && !error ? '12px' : '0'
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#333'
+              }}
+            >
               Image Metadata
             </h3>
             <button
@@ -128,11 +142,11 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
                 justifyContent: 'center',
                 color: '#666'
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 e.currentTarget.style.backgroundColor = '#e9ecef';
                 e.currentTarget.style.color = '#000';
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#666';
               }}
@@ -144,18 +158,20 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
           {/* Image Name and Search Input */}
           {hasMetadata && !isLoading && !error && (
             <div>
-              <div style={{
-                fontSize: '14px',
-                color: '#666',
-                marginBottom: '12px'
-              }}>
+              <div
+                style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  marginBottom: '12px'
+                }}
+              >
                 {imageName}
               </div>
               <input
                 type="text"
                 placeholder="Search metadata keys... (e.g., width, projection, bands)"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -167,25 +183,27 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
                   transition: 'border-color 0.2s, box-shadow 0.2s',
                   boxSizing: 'border-box'
                 }}
-                onFocus={(e) => {
+                onFocus={e => {
                   e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  e.currentTarget.style.boxShadow =
+                    '0 0 0 3px rgba(59, 130, 246, 0.1)';
                 }}
-                onBlur={(e) => {
+                onBlur={e => {
                   e.currentTarget.style.borderColor = '#d1d5db';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {searchTerm && (
-                <div style={{
-                  fontSize: '12px',
-                  color: '#666',
-                  marginTop: '6px'
-                }}>
-                  {hasFilteredMetadata 
-                    ? `Showing filtered metadata matching "${searchTerm}"` 
-                    : `No metadata found matching "${searchTerm}"`
-                  }
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#666',
+                    marginTop: '6px'
+                  }}
+                >
+                  {hasFilteredMetadata
+                    ? `Showing filtered metadata matching "${searchTerm}"`
+                    : `No metadata found matching "${searchTerm}"`}
                 </div>
               )}
             </div>
@@ -193,55 +211,69 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
         </div>
 
         {/* Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          backgroundColor: 'white',
-          padding: hasMetadata && !isLoading && !error ? '20px' : '0'
-        }}>
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            backgroundColor: 'white',
+            padding: hasMetadata && !isLoading && !error ? '20px' : '0'
+          }}
+        >
           {isLoading ? (
-            <div style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              color: '#666'
-            }}>
-              <div style={{
-                display: 'inline-block',
-                width: '40px',
-                height: '40px',
-                border: '3px solid #f3f3f3',
-                borderTop: '3px solid #3b82f6',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                marginBottom: '16px'
-              }}></div>
+            <div
+              style={{
+                padding: '60px 20px',
+                textAlign: 'center',
+                color: '#666'
+              }}
+            >
+              <div
+                style={{
+                  display: 'inline-block',
+                  width: '40px',
+                  height: '40px',
+                  border: '3px solid #f3f3f3',
+                  borderTop: '3px solid #3b82f6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: '16px'
+                }}
+              ></div>
               <div style={{ fontSize: '16px' }}>
                 Loading metadata for {imageName}...
               </div>
             </div>
           ) : error ? (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: '#dc2626',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '6px',
-              margin: '20px'
-            }}>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+            <div
+              style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: '#dc2626',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                margin: '20px'
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  marginBottom: '8px'
+                }}
+              >
                 Failed to Load Metadata
               </div>
-              <div style={{ fontSize: '14px' }}>
-                {error}
-              </div>
+              <div style={{ fontSize: '14px' }}>{error}</div>
             </div>
           ) : !hasMetadata ? (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: '#666'
-            }}>
+            <div
+              style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: '#666'
+              }}
+            >
               <div style={{ fontSize: '16px', marginBottom: '8px' }}>
                 No metadata available
               </div>
@@ -250,16 +282,19 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
               </div>
             </div>
           ) : searchTerm && !hasFilteredMetadata ? (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: '#666'
-            }}>
+            <div
+              style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: '#666'
+              }}
+            >
               <div style={{ fontSize: '16px', marginBottom: '8px' }}>
                 No matching metadata found
               </div>
               <div style={{ fontSize: '14px' }}>
-                Try adjusting your search term or clear the search to see all metadata.
+                Try adjusting your search term or clear the search to see all
+                metadata.
               </div>
             </div>
           ) : (
@@ -279,16 +314,28 @@ const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
                 fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, monospace'
               }}
               collapseStringsAfterLength={100}
-              shouldCollapse={(field) => {
+              shouldCollapse={field => {
                 // When searching, don't auto-collapse to show results
-                if (searchTerm) return false;
-                
+                if (searchTerm) {
+                  return false;
+                }
+
                 // Auto-collapse arrays with more than 10 items
-                if (field.type === 'array' && Array.isArray(field.src) && field.src.length > 10) {
+                if (
+                  field.type === 'array' &&
+                  Array.isArray(field.src) &&
+                  field.src.length > 10
+                ) {
                   return true;
                 }
                 // Auto-collapse objects with more than 20 properties
-                if (field.type === 'object' && field.src && typeof field.src === 'object' && !Array.isArray(field.src) && Object.keys(field.src).length > 20) {
+                if (
+                  field.type === 'object' &&
+                  field.src &&
+                  typeof field.src === 'object' &&
+                  !Array.isArray(field.src) &&
+                  Object.keys(field.src).length > 20
+                ) {
                   return true;
                 }
                 return false;

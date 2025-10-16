@@ -8,7 +8,7 @@ A JupyterLab extension that provides interactive satellite imagery visualization
 
 The OSML Jupyter Extension is intended to let image scientists and machine learning engineers work with remote sensing imagery.
 These images are large enough to require interactive visualization of a multi-resolution tile pyramid and require implementations of
-robust sensor models to correctly overlay features.  It provides:
+robust sensor models to correctly overlay features. It provides:
 
 - **Interactive Visualization**: Efficient tile-based rendering of large satellite images and feature layers using Deck.gl
 - **Multi-format Support**: Native support for NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
@@ -20,8 +20,9 @@ robust sensor models to correctly overlay features.  It provides:
 ![Image With Overlays](docs/images/image-viewer-and-open-menu.png)
 
 ## Installation
+
 This extension can be installed in your JupyterLab v4.0 environment. It will also require you to setup a special iPython kernel
-that has GDAL, Proj, and the osml-imagery-toolkit installed. 
+that has GDAL, Proj, and the osml-imagery-toolkit installed.
 
 ### JupyterLab Extension Installation from PyPI
 
@@ -42,14 +43,15 @@ pip install .
 The extension requires a conda environment with GDAL, Proj, Boto3 and the OSML Imagery Toolkit. An example conda environment
 has been provided for reference and can be updated to include additional OpenGIS libraries needed for your work.
 
-
 1. Create the conda environment:
+
 ```bash
 conda env create -f conda/osml-kernel-environment.yml
 conda activate osml-kernel
 ```
 
 2. Register the environment as a Jupyter kernel:
+
 ```bash
 python -m ipykernel install --user --name=osml-kernel
 ```
@@ -57,9 +59,11 @@ python -m ipykernel install --user --name=osml-kernel
 3. Restart JupyterLab to see the new kernel option.
 
 ## Using the Extension
+
 See the [USER_GUIDE](./docs/USER_GUIDE.md) for more information.
 
 ## Development
+
 A summary of the extension's architecture can be found in [ARCHITECTURE_OVERVIEW](./docs/ARCHITECTURE_OVERVIEW.md).
 
 ### Development Install
@@ -96,7 +100,7 @@ jupyter lab
 # Run TypeScript tests
 jlpm test:typescript
 
-# Run Python tests  
+# Run Python tests
 jlpm test:python
 
 # Run all tests

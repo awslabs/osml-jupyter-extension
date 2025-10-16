@@ -47,7 +47,9 @@ export interface FeatureTileData {
 /**
  * Type definition for feature tile data functions
  */
-export type FeatureTileDataFunction = (tile: IFeatureTile) => Promise<FeatureTileData>;
+export type FeatureTileDataFunction = (
+  tile: IFeatureTile
+) => Promise<FeatureTileData>;
 
 /**
  * Configuration options for tile loading

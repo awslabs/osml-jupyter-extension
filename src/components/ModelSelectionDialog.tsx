@@ -30,7 +30,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
   // Use parent state as the single source of truth - controlled component
   const modelName = initialModelName;
   const modelEnabled = initialModelEnabled;
-  
+
   // State for endpoint management
   const [endpointState, setEndpointState] = useState<EndpointLoadingState>({
     isLoading: false,
@@ -64,11 +64,15 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
         throw new Error(response.error || 'Failed to fetch endpoints');
       }
     } catch (error) {
-      console.warn('Failed to fetch endpoints, falling back to manual entry:', error);
+      console.warn(
+        'Failed to fetch endpoints, falling back to manual entry:',
+        error
+      );
       setEndpointState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch endpoints'
+        error:
+          error instanceof Error ? error.message : 'Failed to fetch endpoints'
       }));
       setUseManualEntry(true);
     }
@@ -117,17 +121,18 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
     description: endpoint.instanceType || undefined
   }));
 
-  const selectedEndpointOption = endpointOptions.find(option => option.value === modelName) || null;
+  const selectedEndpointOption =
+    endpointOptions.find(option => option.value === modelName) || null;
 
   return (
     <SpaceBetween direction="vertical" size="l">
       <div>
-        <p style={{ margin: '0', fontSize: '14px' }}>Configure whether to run a model on each tile in the display.</p>
+        <p style={{ margin: '0', fontSize: '14px' }}>
+          Configure whether to run a model on each tile in the display.
+        </p>
       </div>
-      
-      <FormField 
-        label="SageMaker Endpoint Processing" 
-      >
+
+      <FormField label="SageMaker Endpoint Processing">
         <Toggle
           checked={modelEnabled}
           onChange={({ detail }) => handleModelEnabledChange(detail.checked)}
@@ -148,9 +153,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
                   <Button onClick={handleRefresh} iconName="refresh">
                     Retry
                   </Button>
-                  <Button onClick={handleSwitchToManual}>
-                    Manual Entry
-                  </Button>
+                  <Button onClick={handleSwitchToManual}>Manual Entry</Button>
                 </SpaceBetween>
               }
             >
@@ -164,24 +167,25 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
               label="Endpoint Selection"
               description="Select from available SageMaker endpoints in your account"
               secondaryControl={
-                !endpointState.isLoading && endpointState.endpoints.length > 0 ? (
+                !endpointState.isLoading &&
+                endpointState.endpoints.length > 0 ? (
                   <SpaceBetween direction="horizontal" size="xs">
-                    <Button 
-                      onClick={handleRefresh} 
+                    <Button
+                      onClick={handleRefresh}
                       iconName="refresh"
                       loading={endpointState.isLoading}
                     >
                       Refresh
                     </Button>
-                    <Button onClick={handleSwitchToManual}>
-                      Manual Entry
-                    </Button>
+                    <Button onClick={handleSwitchToManual}>Manual Entry</Button>
                   </SpaceBetween>
                 ) : undefined
               }
             >
               {endpointState.isLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
                   <Spinner size="normal" />
                   <span>Loading endpoints...</span>
                 </div>
@@ -191,10 +195,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
                   header="No Endpoints Available"
                   action={
                     <SpaceBetween direction="horizontal" size="xs">
-                      <Button 
-                        onClick={handleRefresh} 
-                        iconName="refresh"
-                      >
+                      <Button onClick={handleRefresh} iconName="refresh">
                         Refresh
                       </Button>
                       <Button onClick={handleSwitchToManual}>
@@ -203,12 +204,15 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
                     </SpaceBetween>
                   }
                 >
-                  No SageMaker endpoints found in your account. You can enter an endpoint name manually.
+                  No SageMaker endpoints found in your account. You can enter an
+                  endpoint name manually.
                 </Alert>
               ) : (
                 <Select
                   selectedOption={selectedEndpointOption}
-                  onChange={({ detail }) => handleEndpointSelect(detail.selectedOption)}
+                  onChange={({ detail }) =>
+                    handleEndpointSelect(detail.selectedOption)
+                  }
                   options={endpointOptions}
                   placeholder="Choose an endpoint"
                   filteringType="auto"
@@ -223,7 +227,11 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
             <FormField
               label="Endpoint Name"
               description="Enter the identifier for the model endpoint you want to use"
-              errorText={!isModelNameValid ? "Model endpoint name cannot be empty when model processing is enabled" : undefined}
+              errorText={
+                !isModelNameValid
+                  ? 'Model endpoint name cannot be empty when model processing is enabled'
+                  : undefined
+              }
               secondaryControl={
                 !endpointState.error && endpointState.endpoints.length > 0 ? (
                   <Button onClick={handleSwitchToSelect}>
@@ -258,7 +266,7 @@ export default class ModelSelectionDialog extends ReactWidget {
   private _modelEnabled: boolean = false;
 
   constructor(
-    private initialModelName?: string, 
+    private initialModelName?: string,
     private initialModelEnabled?: boolean,
     private commService?: CommService
   ) {

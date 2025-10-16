@@ -32,19 +32,23 @@ export class CommService {
   /**
    * Initialize the comm channel
    */
-  public async initialize(targetName: string = 'osml_comm_target'): Promise<void> {
+  public async initialize(
+    targetName: string = 'osml_comm_target'
+  ): Promise<void> {
     if (!this.kernel) {
       throw new Error('Kernel connection not available');
     }
 
     if (this.debug) {
-      console.log(`[CommService] Initializing comm channel with target: ${targetName}`);
+      console.log(
+        `[CommService] Initializing comm channel with target: ${targetName}`
+      );
     }
 
     this.comm = this.kernel.createComm(targetName);
     if (this.comm) {
       this.comm.open('Open comm');
-      
+
       if (this.debug) {
         console.log('[CommService] Comm channel initialized successfully');
       }
@@ -54,22 +58,32 @@ export class CommService {
   /**
    * Send a message through the comm channel
    */
-  public async sendMessage(message: CommMessage, timeoutMs: number = 30000): Promise<any> {
+  public async sendMessage(
+    message: CommMessage,
+    timeoutMs: number = 30000
+  ): Promise<any> {
     if (!this.comm) {
       throw new Error('Comm channel not initialized');
     }
 
     if (this.debug) {
-      console.log('[CommService] Sending message:', JSON.stringify(message, null, 2));
-      console.log(`[CommService] Using timeout: ${timeoutMs}ms for message type: ${message.type}`);
+      console.log(
+        '[CommService] Sending message:',
+        JSON.stringify(message, null, 2)
+      );
+      console.log(
+        `[CommService] Using timeout: ${timeoutMs}ms for message type: ${message.type}`
+      );
     }
 
     return new Promise((resolve, reject) => {
       const commFuture = this.comm!.send(message as any);
-      
+
       const timeoutId = setTimeout(() => {
         if (this.debug) {
-          console.warn(`[CommService] Timeout (${timeoutMs}ms) waiting for response to ${message.type}`);
+          console.warn(
+            `[CommService] Timeout (${timeoutMs}ms) waiting for response to ${message.type}`
+          );
         }
         reject(new Error(`Timeout waiting for response to ${message.type}`));
       }, timeoutMs);
@@ -78,16 +92,22 @@ export class CommService {
         const msgType = msg.header.msg_type;
         if (msgType === 'comm_msg') {
           const responseData = msg.content.data;
-          
+
           if (this.debug) {
-            console.log('[CommService] Received response:', JSON.stringify(responseData, null, 2));
+            console.log(
+              '[CommService] Received response:',
+              JSON.stringify(responseData, null, 2)
+            );
           }
-          
+
           // Always log responses with non-SUCCESS status, even when debug is off
           if (responseData?.status && responseData.status !== 'SUCCESS') {
-            console.error('[CommService] Received response with error status:', JSON.stringify(responseData, null, 2));
+            console.error(
+              '[CommService] Received response with error status:',
+              JSON.stringify(responseData, null, 2)
+            );
           }
-          
+
           clearTimeout(timeoutId);
           resolve(responseData);
         }
@@ -103,7 +123,6 @@ export class CommService {
     });
   }
 
-
   /**
    * Check if comm is available and ready
    */
@@ -118,7 +137,7 @@ export class CommService {
     if (this.debug) {
       console.log('[CommService] Disposing comm service');
     }
-    
+
     if (this.comm && !this.comm.isDisposed) {
       this.comm.close();
       if (this.debug) {

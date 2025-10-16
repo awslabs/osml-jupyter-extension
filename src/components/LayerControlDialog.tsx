@@ -23,7 +23,10 @@ const rgbaToHex = (rgba: [number, number, number, number]): string => {
 /**
  * Utility function to convert hex color to RGBA array
  */
-const hexToRgba = (hex: string, alpha: number = 255): [number, number, number, number] => {
+const hexToRgba = (
+  hex: string,
+  alpha: number = 255
+): [number, number, number, number] => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) {
     return [255, 0, 0, alpha]; // Default to red if parsing fails
@@ -39,11 +42,14 @@ const hexToRgba = (hex: string, alpha: number = 255): [number, number, number, n
 /**
  * Generate a readable layer name from the layer ID
  */
-const generateLayerName = (layerId: string, type: 'feature' | 'model'): string => {
+const generateLayerName = (
+  layerId: string,
+  type: 'feature' | 'model'
+): string => {
   if (type === 'model') {
     return layerId.replace(/^model-/, ''); // Remove model- prefix
   }
-  
+
   // For feature layers, extract filename from path
   const parts = layerId.split('/');
   const filename = parts[parts.length - 1];
@@ -56,7 +62,9 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
   onClose
 }) => {
   const [datasetName, setDatasetName] = useState('');
-  const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
+  const [activeColorPicker, setActiveColorPicker] = useState<string | null>(
+    null
+  );
 
   // Handle visibility toggle
   const handleVisibilityToggle = (layerId: string) => {
@@ -66,8 +74,10 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
   // Handle color change from CompactPicker
   const handleColorChange = (layerId: string, color: any) => {
     const currentLayer = layers.find(layer => layer.id === layerId);
-    if (!currentLayer) return;
-    
+    if (!currentLayer) {
+      return;
+    }
+
     // Preserve the current alpha value
     const currentAlpha = currentLayer.color[3];
     const newRgba = hexToRgba(color.hex, currentAlpha);
@@ -102,7 +112,7 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
   };
 
   return (
-    <div 
+    <div
       style={{
         position: 'fixed',
         top: 0,
@@ -117,35 +127,43 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
       }}
       onClick={handleBackdropClick}
     >
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-        maxWidth: '600px',
-        maxHeight: '80vh',
-        width: '90%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
+      <div
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+          maxWidth: '600px',
+          maxHeight: '80vh',
+          width: '90%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '2px solid #e9ecef',
-          backgroundColor: '#f8f9fa',
-          flexShrink: 0
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <h3 style={{
-              margin: 0,
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#333'
-            }}>
+        <div
+          style={{
+            padding: '16px 20px',
+            borderBottom: '2px solid #e9ecef',
+            backgroundColor: '#f8f9fa',
+            flexShrink: 0
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#333'
+              }}
+            >
               Layer Control
             </h3>
             <button
@@ -164,11 +182,11 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                 justifyContent: 'center',
                 color: '#666'
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 e.currentTarget.style.backgroundColor = '#e9ecef';
                 e.currentTarget.style.color = '#000';
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#666';
               }}
@@ -179,33 +197,41 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
         </div>
 
         {/* Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          backgroundColor: 'white'
-        }}>
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            backgroundColor: 'white'
+          }}
+        >
           {/* Add Named Dataset Section */}
-          <div style={{
-            padding: '20px',
-            borderBottom: '1px solid #e9ecef'
-          }}>
-            <div style={{ 
-              fontWeight: 'bold', 
-              marginBottom: '12px', 
-              fontSize: '16px',
-              color: '#333'
-            }}>
+          <div
+            style={{
+              padding: '20px',
+              borderBottom: '1px solid #e9ecef'
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                marginBottom: '12px',
+                fontSize: '16px',
+                color: '#333'
+              }}
+            >
               Add Dataset Layer
             </div>
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center'
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center'
+              }}
+            >
               <input
                 type="text"
                 value={datasetName}
-                onChange={(e) => setDatasetName(e.target.value)}
+                onChange={e => setDatasetName(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Enter dataset name..."
                 style={{
@@ -219,11 +245,12 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                   transition: 'border-color 0.2s, box-shadow 0.2s',
                   boxSizing: 'border-box'
                 }}
-                onFocus={(e) => {
+                onFocus={e => {
                   e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  e.currentTarget.style.boxShadow =
+                    '0 0 0 3px rgba(59, 130, 246, 0.1)';
                 }}
-                onBlur={(e) => {
+                onBlur={e => {
                   e.currentTarget.style.borderColor = '#d1d5db';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
@@ -242,12 +269,12 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                   fontWeight: 'bold',
                   transition: 'background-color 0.2s'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={e => {
                   if (datasetName.trim()) {
                     e.currentTarget.style.backgroundColor = '#2563eb';
                   }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={e => {
                   if (datasetName.trim()) {
                     e.currentTarget.style.backgroundColor = '#3b82f6';
                   }
@@ -259,33 +286,40 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
           </div>
 
           {/* Active Layers Section */}
-          <div style={{
-            padding: '20px'
-          }}>
-            <div style={{ 
-              fontWeight: 'bold', 
-              marginBottom: '16px', 
-              fontSize: '16px',
-              color: '#333'
-            }}>
+          <div
+            style={{
+              padding: '20px'
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                marginBottom: '16px',
+                fontSize: '16px',
+                color: '#333'
+              }}
+            >
               Active Layers ({layers.length})
             </div>
-            
+
             {layers.length === 0 ? (
-              <div style={{ 
-                padding: '40px 20px',
-                textAlign: 'center',
-                color: '#666'
-              }}>
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: '#666'
+                }}
+              >
                 <div style={{ fontSize: '16px', marginBottom: '8px' }}>
                   No overlay layers
                 </div>
                 <div style={{ fontSize: '14px' }}>
-                  Add dataset layers using the input above or "OversightML: Add Layer" from the file browser context menu.
+                  Add dataset layers using the input above or "OversightML: Add
+                  Layer" from the file browser context menu.
                 </div>
               </div>
             ) : (
-              layers.map((layer) => (
+              layers.map(layer => (
                 <div
                   key={layer.id}
                   style={{
@@ -311,33 +345,43 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                   />
 
                   {/* Layer Name */}
-                  <div style={{ 
-                    flex: 1,
-                    minWidth: 0
-                  }}>
-                    <div style={{ 
-                      fontWeight: '500', 
-                      fontSize: '14px',
-                      color: '#374151',
-                      wordBreak: 'break-word'
-                    }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: '500',
+                        fontSize: '14px',
+                        color: '#374151',
+                        wordBreak: 'break-word'
+                      }}
+                    >
                       {generateLayerName(layer.id, layer.type)}
                     </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280',
-                      marginTop: '2px'
-                    }}>
-                      {layer.type === 'model' ? 'Model Output' : 'Feature Layer'}
+                    <div
+                      style={{
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        marginTop: '2px'
+                      }}
+                    >
+                      {layer.type === 'model'
+                        ? 'Model Output'
+                        : 'Feature Layer'}
                     </div>
                   </div>
 
                   {/* Color Picker */}
                   <div style={{ position: 'relative' }}>
                     <div
-                      onClick={() => setActiveColorPicker(
-                        activeColorPicker === layer.id ? null : layer.id
-                      )}
+                      onClick={() =>
+                        setActiveColorPicker(
+                          activeColorPicker === layer.id ? null : layer.id
+                        )
+                      }
                       style={{
                         width: '32px',
                         height: '32px',
@@ -347,28 +391,30 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                         cursor: 'pointer',
                         transition: 'border-color 0.2s'
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={e => {
                         e.currentTarget.style.borderColor = '#3b82f6';
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={e => {
                         e.currentTarget.style.borderColor = '#e5e7eb';
                       }}
                       title={`Change layer color (current: ${rgbaToHex(layer.color)})`}
                     />
-                    
+
                     {activeColorPicker === layer.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '40px',
-                        right: '0',
-                        zIndex: 1000,
-                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-                        borderRadius: '8px',
-                        overflow: 'hidden'
-                      }}>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '40px',
+                          right: '0',
+                          zIndex: 1000,
+                          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+                          borderRadius: '8px',
+                          overflow: 'hidden'
+                        }}
+                      >
                         <CompactPicker
                           color={rgbaToHex(layer.color)}
-                          onChange={(color) => handleColorChange(layer.id, color)}
+                          onChange={color => handleColorChange(layer.id, color)}
                           onChangeComplete={() => setActiveColorPicker(null)}
                         />
                       </div>
@@ -390,10 +436,10 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
                       justifyContent: 'center',
                       color: '#dc2626'
                     }}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={e => {
                       e.currentTarget.style.backgroundColor = '#fef2f2';
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={e => {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                     title="Delete layer"

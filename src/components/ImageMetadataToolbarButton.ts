@@ -24,7 +24,7 @@ export class ImageMetadataToolbarButton extends ToolbarButton {
     try {
       // Get the current image name from the ImageViewerWidget
       const imageName = this._getImageName();
-      
+
       if (!imageName) {
         console.warn('No image loaded - cannot show metadata');
         // You could show a notification here if needed
@@ -33,24 +33,28 @@ export class ImageMetadataToolbarButton extends ToolbarButton {
 
       // Get CommService from the ImageViewerWidget
       const commService = (this._imageViewerWidget as any).commService;
-      
+
       if (!commService) {
         console.error('CommService not available');
         return;
       }
 
       // Show the modal dialog directly without JupyterLab dialog wrapper
-      const dialogWidget = new ImageMetadataDialog(imageName, commService, () => {
-        // Close callback - remove the dialog from DOM
-        if (dialogWidget.node.parentElement) {
-          dialogWidget.node.remove();
+      const dialogWidget = new ImageMetadataDialog(
+        imageName,
+        commService,
+        () => {
+          // Close callback - remove the dialog from DOM
+          if (dialogWidget.node.parentElement) {
+            dialogWidget.node.remove();
+          }
+          dialogWidget.dispose();
         }
-        dialogWidget.dispose();
-      });
-      
+      );
+
       // Add to document body for proper modal behavior
       document.body.appendChild(dialogWidget.node);
-      
+
       // Force the widget to render
       dialogWidget.update();
 

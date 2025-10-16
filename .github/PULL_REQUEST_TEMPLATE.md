@@ -1,9 +1,9 @@
 ### Notes
 
-
 ### Checklist
 
 Before you submit a pull request, please make sure you have the following:
+
 - [ ] Code changes are compact and well-structured to facilitate easy review
 - [ ] Changes are documented in the README.md and other relevant documentation pages
 - [ ] PR title and description accurately reflect the changes and are detailed enough for historical tracking

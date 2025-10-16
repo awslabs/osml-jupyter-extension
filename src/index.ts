@@ -12,7 +12,10 @@ import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { LOGO_ICON } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
-import { ModelSelectionToolbarButton, ImageMetadataToolbarButton } from './components';
+import {
+  ModelSelectionToolbarButton,
+  ImageMetadataToolbarButton
+} from './components';
 import { Widget } from '@lumino/widgets';
 
 namespace CommandIDs {
@@ -28,7 +31,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
     'A JupyterLab extension to work with satellite imagery using OversightML.',
   autoStart: true,
   requires: [ICommandPalette],
-  optional: [ISettingRegistry, ILauncher, IFileBrowserFactory, IStatusBar, IToolbarWidgetRegistry],
+  optional: [
+    ISettingRegistry,
+    ILauncher,
+    IFileBrowserFactory,
+    IStatusBar,
+    IToolbarWidgetRegistry
+  ],
   activate: activate
 };
 
@@ -49,7 +58,7 @@ async function activate(
   // Register toolbar items if toolbar registry is available
   if (toolbarRegistry) {
     console.log('Registering toolbar items for ImageViewerWidget');
-    
+
     // Register the model selection toolbar button factory
     toolbarRegistry.addFactory<ImageViewerWidget>(
       'ImageViewer',
@@ -91,11 +100,11 @@ async function activate(
           manager,
           selectedFileName
         );
-        
+
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
           console.log('Adding toolbar items to ImageViewerWidget');
-          
+
           // Create and add the model selection button
           //const modelSelectionButton = new ModelSelectionToolbarButton(widget);
           //widget.toolbar.addItem('modelSelection', modelSelectionButton);

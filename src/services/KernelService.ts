@@ -1,7 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { ServiceManager, KernelMessage } from '@jupyterlab/services';
-import { ISessionContext, SessionContext, SessionContextDialogs } from '@jupyterlab/apputils';
+import {
+  ISessionContext,
+  SessionContext,
+  SessionContextDialogs
+} from '@jupyterlab/apputils';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
 /**
@@ -37,7 +41,7 @@ export class KernelService {
     });
 
     await this.sessionContext.initialize();
-    
+
     if (this.sessionContext.session) {
       await this.sessionContextDialogs.selectKernel(this.sessionContext);
       this.isInitialized = true;
@@ -55,12 +59,15 @@ export class KernelService {
     }
 
     return new Promise((resolve, reject) => {
-      const kernelSetupFuture = this.sessionContext!.session!.kernel!.requestExecute({
-        code: code
-      });
+      const kernelSetupFuture =
+        this.sessionContext!.session!.kernel!.requestExecute({
+          code: code
+        });
 
       if (kernelSetupFuture) {
-        kernelSetupFuture.onIOPub = (msg: KernelMessage.IIOPubMessage): void => {
+        kernelSetupFuture.onIOPub = (
+          msg: KernelMessage.IIOPubMessage
+        ): void => {
           const msgType = msg.header.msg_type;
           switch (msgType) {
             case 'execute_result':
@@ -102,9 +109,11 @@ export class KernelService {
    * Check if the kernel service is ready
    */
   public isReady(): boolean {
-    return this.isInitialized && 
-           !!this.sessionContext?.session?.kernel && 
-           !this.sessionContext.session.kernel.isDisposed;
+    return (
+      this.isInitialized &&
+      !!this.sessionContext?.session?.kernel &&
+      !this.sessionContext.session.kernel.isDisposed
+    );
   }
 
   /**
@@ -141,7 +150,10 @@ export class KernelService {
       this.sessionContext = undefined;
       this.isInitialized = false;
     } catch (error) {
-      console.warn('Exception caught cleaning up kernel service resources:', error);
+      console.warn(
+        'Exception caught cleaning up kernel service resources:',
+        error
+      );
     }
   }
 }

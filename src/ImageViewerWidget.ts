@@ -19,19 +19,18 @@ import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
 import { KERNEL_SETUP_CODE, createPropertyTableHTML } from './utils';
-import { 
-  ITile, 
-  TileDataFunction,
-  FeatureTileDataFunction 
-} from './types';
+import { ITile, TileDataFunction, FeatureTileDataFunction } from './types';
 import { TiledOverlayLayer } from './layers';
-import { 
-  CommService, 
-  ImageTileService, 
-  FeatureTileService, 
-  KernelService 
+import {
+  CommService,
+  ImageTileService,
+  FeatureTileService,
+  KernelService
 } from './services';
-import { LayerControlToolbarButton, FeaturePropertiesDialog } from './components';
+import {
+  LayerControlToolbarButton,
+  FeaturePropertiesDialog
+} from './components';
 import { ReactWidget } from '@jupyterlab/ui-components';
 import React from 'react';
 
@@ -51,32 +50,33 @@ export class ImageViewerWidget extends MainAreaWidget {
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
-  
+
   // Feature properties dialog state
   private featurePropertiesDialog?: ReactWidget;
   private featurePropertiesDialogVisible: boolean = false;
-  
+
   // Service instances
   private commService: CommService;
   private imageTileService: ImageTileService;
   private featureTileService: FeatureTileService;
   private kernelService: KernelService;
-  
+
   // Configuration options
   private useMockData: boolean = false; // Set to true for testing with mock tiles
   private useMockFeatureData: boolean = false; // Set to true for testing with mock features
   private enableDebugLogging: boolean = false;
-  
+
   // Layer implementation selection (always use TiledOverlayLayer)
   private useTiledOverlayLayer: boolean = true; // Always true - using TiledOverlayLayer
-  
+
   // Model selection state
   private selectedModel: string = '';
   private selectedModelEnabled: boolean = false;
-  
+
   // Layer management state
   private layerVisibility: Map<string, boolean> = new Map();
-  private layerColors: Map<string, [number, number, number, number]> = new Map();
+  private layerColors: Map<string, [number, number, number, number]> =
+    new Map();
   private layerControlButton?: LayerControlToolbarButton;
 
   /**
@@ -138,7 +138,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.mapDiv.style.height = '100%';
     this.mapDiv.style.backgroundColor = 'black';
     this.content.node.appendChild(this.mapDiv);
-    
+
     // Add layer control button to toolbar
     this.addLayerControlButton();
   }
@@ -187,15 +187,17 @@ export class ImageViewerWidget extends MainAreaWidget {
             if (kernel) {
               this.commService = new CommService(kernel);
               // this.commService.setDebugMode(true);
-              
+
               await this.commService.initialize('osml_comm_target');
-              
+
               // Update services with new CommService
               this.imageTileService = new ImageTileService(this.commService, {
                 enableDebugLogging: this.enableDebugLogging
               });
-              this.featureTileService = new FeatureTileService(this.commService);
-              
+              this.featureTileService = new FeatureTileService(
+                this.commService
+              );
+
               console.log('CommService initialized successfully.');
             }
 
@@ -242,38 +244,50 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Shows the React-based feature properties dialog
    */
   private showFeaturePropertiesDialog(feature: any): void {
-    console.log('[ImageViewerWidget] showFeaturePropertiesDialog called with:', feature);
-    
+    console.log(
+      '[ImageViewerWidget] showFeaturePropertiesDialog called with:',
+      feature
+    );
+
     if (!feature) {
-      console.log('[ImageViewerWidget] showFeaturePropertiesDialog early return: no feature');
+      console.log(
+        '[ImageViewerWidget] showFeaturePropertiesDialog early return: no feature'
+      );
       return;
     }
 
     const properties = feature.properties || {};
     console.log('[ImageViewerWidget] Feature properties:', properties);
-    
+
     // Hide any existing dialog first
     this.hideFeaturePropertiesDialog();
-    
+
     // Create FeaturePropertiesDialog widget directly
-    this.featurePropertiesDialog = new FeaturePropertiesDialog(
-      feature,
-      () => this.hideFeaturePropertiesDialog()
+    this.featurePropertiesDialog = new FeaturePropertiesDialog(feature, () =>
+      this.hideFeaturePropertiesDialog()
     );
-    
+
     this.featurePropertiesDialog.id = 'feature-properties-dialog';
     this.featurePropertiesDialog.title.label = 'Feature Properties';
-    
+
     // Add to document body for proper modal behavior
     document.body.appendChild(this.featurePropertiesDialog.node);
     this.featurePropertiesDialogVisible = true;
-    
+
     // Force the widget to render
     this.featurePropertiesDialog.update();
-    
-    console.log('[ImageViewerWidget] React feature properties dialog created and shown');
-    console.log('[ImageViewerWidget] Dialog node:', this.featurePropertiesDialog.node);
-    console.log('[ImageViewerWidget] Dialog node parent:', this.featurePropertiesDialog.node.parentElement);
+
+    console.log(
+      '[ImageViewerWidget] React feature properties dialog created and shown'
+    );
+    console.log(
+      '[ImageViewerWidget] Dialog node:',
+      this.featurePropertiesDialog.node
+    );
+    console.log(
+      '[ImageViewerWidget] Dialog node parent:',
+      this.featurePropertiesDialog.node.parentElement
+    );
     this.debugLog('Feature properties dialog shown', { feature });
   }
 
@@ -307,23 +321,26 @@ export class ImageViewerWidget extends MainAreaWidget {
       x: info.x,
       y: info.y
     });
-    
+
     this.debugLog('Map clicked', { info, event });
-    
+
     // Hide dialog if clicking on empty area
     if (!info.object) {
       console.log('[ImageViewerWidget] No object clicked, hiding dialog');
       this.hideFeaturePropertiesDialog();
       return false;
     }
-    
+
     // Show React dialog for picked feature
     if (info.object && info.x !== undefined && info.y !== undefined) {
-      console.log('[ImageViewerWidget] Feature clicked, showing dialog:', info.object);
+      console.log(
+        '[ImageViewerWidget] Feature clicked, showing dialog:',
+        info.object
+      );
       this.showFeaturePropertiesDialog(info.object);
       return true; // Mark as handled
     }
-    
+
     console.log('[ImageViewerWidget] Click event not handled');
     return false;
   }
@@ -331,7 +348,10 @@ export class ImageViewerWidget extends MainAreaWidget {
   /**
    * Create a TileLayer for the image with swappable getTileData function
    */
-  private createImageLayer(imageName: string, getTileData: TileDataFunction): TileLayer {
+  private createImageLayer(
+    imageName: string,
+    getTileData: TileDataFunction
+  ): TileLayer {
     return new TileLayer({
       id: `image-${imageName}`,
       data: [], // Required by TileLayer but not used since we provide getTileData
@@ -347,26 +367,26 @@ export class ImageViewerWidget extends MainAreaWidget {
         const x = tileProps.x ?? tileProps.index?.x;
         const y = tileProps.y ?? tileProps.index?.y;
         const z = tileProps.z ?? tileProps.index?.z;
-        
+
         // Convert TileLayer's tile format to our ITile format
         const scale = Math.pow(2, -z);
         const tileSize = 512;
-        const tile: ITile = { 
-          x, 
-          y, 
-          z, 
-          left: x * tileSize * scale, 
-          top: y * tileSize * scale, 
-          right: (x + 1) * tileSize * scale, 
-          bottom: (y + 1) * tileSize * scale 
+        const tile: ITile = {
+          x,
+          y,
+          z,
+          left: x * tileSize * scale,
+          top: y * tileSize * scale,
+          right: (x + 1) * tileSize * scale,
+          bottom: (y + 1) * tileSize * scale
         };
-        
+
         this.debugLog(`Loading tile ${x}-${y}-${z}`, tile);
         return getTileData(tile);
       },
       renderSubLayers: (props: any) => {
         const { tile, data } = props;
-        
+
         if (!data) {
           return null;
         }
@@ -374,7 +394,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         // Extract tile bounds from the tile's bbox
         const { bbox } = tile;
         let bounds: number[];
-        
+
         if ('west' in bbox) {
           // Geographic bounds format
           bounds = [bbox.west, bbox.south, bbox.east, bbox.north];
@@ -428,7 +448,7 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     try {
       this.statusSignal.emit(`Loading ${imageName} ...`);
-      
+
       // Only send load request if using real data
       if (!this.useMockData) {
         const loadStatus = await new Promise<string>((resolve, reject) => {
@@ -468,10 +488,10 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.imageName = imageName;
 
     // Create tile data function - can easily swap between mock and real data
-    const getTileData = this.useMockData 
+    const getTileData = this.useMockData
       ? this.imageTileService.createMockTileDataFunction()
       : this.imageTileService.createRealTileDataFunction(imageName);
-    
+
     // Create the image layer directly using TileLayer
     const imageLayer = this.createImageLayer(imageName, getTileData);
 
@@ -489,8 +509,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       width: '100%',
       height: '100%',
       initialViewState: {
-        target: [0, 0, 0], 
-        zoom: 0,   // Start at full resolution (zoom level 0)
+        target: [0, 0, 0],
+        zoom: 0, // Start at full resolution (zoom level 0)
         minZoom: -10,
         maxZoom: 10
       } as any,
@@ -498,7 +518,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         new OrthographicView({
           id: 'ortho',
           controller: true,
-          flipY: true, // Assign 0,0 to the upper left corner to match image coordinate systems
+          flipY: true // Assign 0,0 to the upper left corner to match image coordinate systems
         })
       ],
       layers: [imageLayer],
@@ -523,12 +543,17 @@ export class ImageViewerWidget extends MainAreaWidget {
   /**
    * Create a feature layer for overlay data using TiledOverlayLayer
    */
-  private createFeatureLayer(overlayName: string, getTileData: FeatureTileDataFunction): TiledOverlayLayer {
+  private createFeatureLayer(
+    overlayName: string,
+    getTileData: FeatureTileDataFunction
+  ): TiledOverlayLayer {
     // Get current colors from state
     const customColor = this.layerColors.get(overlayName) ?? [255, 0, 0, 128];
     const lineColor = customColor;
-    
-    console.log(`[ImageViewerWidget] Creating TiledOverlayLayer for ${overlayName}`);
+
+    console.log(
+      `[ImageViewerWidget] Creating TiledOverlayLayer for ${overlayName}`
+    );
     return new TiledOverlayLayer({
       id: `features-${overlayName}`,
       data: [], // Required by TileLayer but not used since we provide getTileData
@@ -561,7 +586,9 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public createModelFeatureLayer(modelName: string): void {
     if (!this.imageName || !this.deckInstance) {
-      console.warn('Cannot create model feature layer: No image loaded or Deck instance not initialized');
+      console.warn(
+        'Cannot create model feature layer: No image loaded or Deck instance not initialized'
+      );
       return;
     }
 
@@ -571,27 +598,31 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
 
     this.statusSignal.emit(`Creating model feature layer for: ${modelName}`);
-    
+
     // Remove existing model layer if present (only one model at a time)
     this.clearModelLayers();
-    
+
     // Create model feature tile data function
-    const getModelFeatureTileData = this.featureTileService.createModelFeatureDataFunction(
-      this.imageName,
-      modelName
-    );
-    
+    const getModelFeatureTileData =
+      this.featureTileService.createModelFeatureDataFunction(
+        this.imageName,
+        modelName
+      );
+
     this.debugLog(`Creating model layer for model: ${modelName}`);
-    
+
     // Create the model feature layer using TiledOverlayLayer
-    const modelFeatureLayer = this.createFeatureLayer(modelName, getModelFeatureTileData);
+    const modelFeatureLayer = this.createFeatureLayer(
+      modelName,
+      getModelFeatureTileData
+    );
 
     // Store the model layer
     this.modelLayers.set(modelName, modelFeatureLayer);
 
     // Update Deck.gl layers
     this.updateDeckLayers();
-    
+
     this.statusSignal.emit(`Model feature layer created: ${modelName}`);
   }
 
@@ -605,10 +636,10 @@ export class ImageViewerWidget extends MainAreaWidget {
         modelLayer.clearCache();
       }
       this.modelLayers.clear();
-      
+
       // Update Deck.gl layers
       this.updateDeckLayers();
-      
+
       this.debugLog('Model layers cleared');
       this.statusSignal.emit('Model layers cleared');
     }
@@ -620,29 +651,35 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
 
     this.statusSignal.emit(`Adding overlays from ${layerDataPath}`);
-    
+
     // Create feature tile data function - can easily swap between mock and real data
     const getFeatureTileData = this.useMockFeatureData
       ? this.featureTileService.createMockFeatureDataFunction(0.1) // 10% corner square size
-      : this.featureTileService.createRealFeatureDataFunction(this.imageName, layerDataPath);
-    
+      : this.featureTileService.createRealFeatureDataFunction(
+          this.imageName,
+          layerDataPath
+        );
+
     this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
     this.debugLog(`Layer path: ${layerDataPath}`);
-    
+
     // Create the feature layer using TiledOverlayLayer
-    const featureLayer = this.createFeatureLayer(layerDataPath, getFeatureTileData);
+    const featureLayer = this.createFeatureLayer(
+      layerDataPath,
+      getFeatureTileData
+    );
 
     // Store the feature layer
     this.featureLayers.set(layerDataPath, featureLayer);
 
     // Update Deck.gl layers
     this.updateDeckLayers();
-    
+
     // Notify layer control button to update state
     if (this.layerControlButton) {
       this.layerControlButton.onLayersChanged();
     }
-    
+
     this.statusSignal.emit(`Added overlay layer: ${layerDataPath}`);
     return;
   }
@@ -661,30 +698,36 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
 
     this.statusSignal.emit(`Adding dataset layer: ${datasetName}`);
-    
+
     // Create feature tile data function using the real data function
     // The image name is the current image and overlayName is the dataset name
-    const getFeatureTileData = this.featureTileService.createRealFeatureDataFunction(
-      this.imageName, 
-      datasetName
+    const getFeatureTileData =
+      this.featureTileService.createRealFeatureDataFunction(
+        this.imageName,
+        datasetName
+      );
+
+    this.debugLog(
+      `Adding named dataset layer: ${datasetName} for image: ${this.imageName}`
     );
-    
-    this.debugLog(`Adding named dataset layer: ${datasetName} for image: ${this.imageName}`);
-    
+
     // Create the feature layer using the dataset name as the layer ID
-    const featureLayer = this.createFeatureLayer(datasetName, getFeatureTileData);
+    const featureLayer = this.createFeatureLayer(
+      datasetName,
+      getFeatureTileData
+    );
 
     // Store the feature layer using the dataset name as the key
     this.featureLayers.set(datasetName, featureLayer);
 
     // Update Deck.gl layers
     this.updateDeckLayers();
-    
+
     // Notify layer control button to update state
     if (this.layerControlButton) {
       this.layerControlButton.onLayersChanged();
     }
-    
+
     this.statusSignal.emit(`Added dataset layer: ${datasetName}`);
   }
 
@@ -707,7 +750,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   private getAllLayers(): TiledOverlayLayer[] {
     const visibleLayers: TiledOverlayLayer[] = [];
-    
+
     // Add visible feature layers
     for (const [layerId, layer] of this.featureLayers.entries()) {
       const visible = this.layerVisibility.get(layerId) ?? true;
@@ -715,7 +758,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         visibleLayers.push(layer);
       }
     }
-    
+
     // Add visible model layers
     for (const [layerId, layer] of this.modelLayers.entries()) {
       const visible = this.layerVisibility.get(layerId) ?? true;
@@ -723,7 +766,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         visibleLayers.push(layer);
       }
     }
-    
+
     return visibleLayers;
   }
 
@@ -734,14 +777,15 @@ export class ImageViewerWidget extends MainAreaWidget {
   private throttledViewportUpdate(): void {
     const now = Date.now();
     const timeSinceLastUpdate = now - this.lastViewportUpdate;
-    
+
     // Clear any existing timeout
     if (this.viewportUpdateTimeout) {
       clearTimeout(this.viewportUpdateTimeout);
     }
-    
+
     // If enough time has passed since the last update, update immediately
-    if (timeSinceLastUpdate >= 100) { // 100ms throttle
+    if (timeSinceLastUpdate >= 100) {
+      // 100ms throttle
       this.lastViewportUpdate = now;
       this.updateDeckLayers();
     } else {
@@ -762,17 +806,19 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
 
     // Recreate the image layer (this is lightweight since TileLayer handles caching)
-    const getTileData = this.useMockData 
+    const getTileData = this.useMockData
       ? this.imageTileService.createMockTileDataFunction()
       : this.imageTileService.createRealTileDataFunction(this.imageName);
-    
+
     const imageLayer = this.createImageLayer(this.imageName, getTileData);
     const allLayers = this.getAllLayers();
-    
-    this.debugLog(`Updating deck layers: image layer + ${allLayers.length} feature/model layers`);
-    
-    this.deckInstance.setProps({ 
-      layers: [imageLayer, ...allLayers] 
+
+    this.debugLog(
+      `Updating deck layers: image layer + ${allLayers.length} feature/model layers`
+    );
+
+    this.deckInstance.setProps({
+      layers: [imageLayer, ...allLayers]
     });
   }
 
@@ -826,23 +872,27 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public addTestFeatureLayer(): void {
     if (!this.deckInstance) {
-      console.warn('Cannot add test feature layer: Deck instance not initialized');
+      console.warn(
+        'Cannot add test feature layer: Deck instance not initialized'
+      );
       return;
     }
 
     const testLayerName = 'test-features';
-    
+
     // Enable mock feature data and debug logging for testing
     this.useMockFeatureData = true;
     this.enableDebugLogging = true;
-    
+
     console.log('Adding test feature layer with mock data...');
     this.statusSignal.emit('Adding test feature layer with mock squares...');
-    
+
     // Add the test layer
     this.addLayer(testLayerName);
-    
-    console.log('Test feature layer added. You should see squares at tile centers and corners.');
+
+    console.log(
+      'Test feature layer added. You should see squares at tile centers and corners.'
+    );
     console.log('- Zoom >= 0: Individual square features');
     console.log('- Zoom < 0: Heatmap aggregation');
   }
@@ -855,8 +905,10 @@ export class ImageViewerWidget extends MainAreaWidget {
     if (modelEnabled !== undefined) {
       this.selectedModelEnabled = modelEnabled;
     }
-    console.log(`Selected model updated - Name: ${modelName}, Enabled: ${this.selectedModelEnabled}`);
-    
+    console.log(
+      `Selected model updated - Name: ${modelName}, Enabled: ${this.selectedModelEnabled}`
+    );
+
     if (!this.selectedModelEnabled) {
       this.statusSignal.emit('Model processing disabled');
     } else if (modelName) {
@@ -886,14 +938,18 @@ export class ImageViewerWidget extends MainAreaWidget {
   public setUseTiledOverlayLayer(useTiled: boolean): void {
     if (this.useTiledOverlayLayer !== useTiled) {
       this.useTiledOverlayLayer = useTiled;
-      console.log(`[ImageViewerWidget] Switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`);
-      
+      console.log(
+        `[ImageViewerWidget] Switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`
+      );
+
       // Clear existing layers to force recreation with new layer type
       this.featureLayers.clear();
       this.modelLayers.clear();
       this.updateDeckLayers();
-      
-      this.statusSignal.emit(`Layer implementation switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`);
+
+      this.statusSignal.emit(
+        `Layer implementation switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`
+      );
     }
   }
 
@@ -925,21 +981,24 @@ export class ImageViewerWidget extends MainAreaWidget {
   public setLayerVisibility(layerId: string, visible: boolean): void {
     this.layerVisibility.set(layerId, visible);
     this.updateDeckLayers();
-    
+
     // Notify layer control button to update state
     if (this.layerControlButton) {
       this.layerControlButton.onLayersChanged();
     }
-    
+
     this.statusSignal.emit(`Layer ${layerId} ${visible ? 'shown' : 'hidden'}`);
   }
 
   /**
    * Set layer color
    */
-  public setLayerColor(layerId: string, color: [number, number, number, number]): void {
+  public setLayerColor(
+    layerId: string,
+    color: [number, number, number, number]
+  ): void {
     this.layerColors.set(layerId, color);
-    
+
     // Recreate the specific layer with new color
     if (this.featureLayers.has(layerId)) {
       const layer = this.featureLayers.get(layerId);
@@ -947,37 +1006,42 @@ export class ImageViewerWidget extends MainAreaWidget {
         // Get the existing getTileData function
         const existingLayer = layer as any;
         const getTileData = existingLayer.props.getTileData;
-        
+
         // Create new layer with updated color
         const newLayer = this.createFeatureLayer(layerId, getTileData);
-        
+
         // Replace the layer
         this.featureLayers.set(layerId, newLayer);
       }
     }
-    
+
     if (this.modelLayers.has(layerId)) {
       const layer = this.modelLayers.get(layerId);
       if (layer) {
         // For model layers, we need to recreate using the existing pattern
         const existingLayer = layer as any;
         const getTileData = existingLayer.props.getTileData;
-        
+
         const customColor = this.layerColors.get(layerId) ?? [255, 0, 0, 128];
-        const fillColor = [customColor[0], customColor[1], customColor[2], Math.floor(customColor[3] * 0.5)] as [number, number, number, number];
+        const fillColor = [
+          customColor[0],
+          customColor[1],
+          customColor[2],
+          Math.floor(customColor[3] * 0.5)
+        ] as [number, number, number, number];
         const lineColor = customColor;
-        
+
         // Create new model layer with updated color using TiledOverlayLayer
         const newModelLayer = this.createFeatureLayer(layerId, getTileData);
-        
+
         // Replace the layer
         this.modelLayers.set(layerId, newModelLayer);
       }
     }
-    
+
     // Update Deck.gl layers
     this.updateDeckLayers();
-    
+
     this.statusSignal.emit(`Layer ${layerId} color updated`);
   }
 
@@ -993,7 +1057,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       }
       this.featureLayers.delete(layerId);
     }
-    
+
     // Remove from model layers
     if (this.modelLayers.has(layerId)) {
       const layer = this.modelLayers.get(layerId);
@@ -1002,19 +1066,19 @@ export class ImageViewerWidget extends MainAreaWidget {
       }
       this.modelLayers.delete(layerId);
     }
-    
+
     // Clean up layer state
     this.layerVisibility.delete(layerId);
     this.layerColors.delete(layerId);
-    
+
     // Update deck layers
     this.updateDeckLayers();
-    
+
     // Notify layer control button to update state
     if (this.layerControlButton) {
       this.layerControlButton.onLayersChanged();
     }
-    
+
     this.statusSignal.emit(`Layer ${layerId} deleted`);
   }
 
@@ -1023,7 +1087,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public getLayerInfo(): any[] {
     const layers: any[] = [];
-    
+
     // Add feature layers
     for (const [layerId] of this.featureLayers.entries()) {
       layers.push({
@@ -1034,7 +1098,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         type: 'feature'
       });
     }
-    
+
     // Add model layers
     for (const [layerId] of this.modelLayers.entries()) {
       layers.push({
@@ -1045,7 +1109,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         type: 'model'
       });
     }
-    
+
     return layers;
   }
 

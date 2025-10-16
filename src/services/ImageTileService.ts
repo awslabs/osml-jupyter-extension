@@ -46,19 +46,19 @@ export class ImageTileService {
    */
   private async createMockTileData(tile: ITile): Promise<ImageBitmap | null> {
     const tileKey = `${tile.x}-${tile.y}-${tile.z}`;
-    
+
     // Check cache first
     if (this.tileCache.has(tileKey)) {
       this.debugLog(`Using cached mock tile: ${tileKey}`);
       return this.tileCache.get(tileKey)!;
     }
 
-    return new Promise(async (resolve) => {
+    return new Promise(async resolve => {
       const canvas = document.createElement('canvas');
       canvas.width = this.config.tileSize;
       canvas.height = this.config.tileSize;
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         resolve(null);
         return;
@@ -66,35 +66,40 @@ export class ImageTileService {
 
       // Save context state
       ctx.save();
-      
+
       // Fill with gray background
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, this.config.tileSize, this.config.tileSize);
-      
+
       // Add border
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2;
       ctx.strokeRect(1, 1, this.config.tileSize - 2, this.config.tileSize - 2);
-      
+
       // Add coordinates text
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 24px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${tile.x},${tile.y},${tile.z}`, this.config.tileSize / 2, this.config.tileSize / 2);
-      
+      ctx.fillText(
+        `${tile.x},${tile.y},${tile.z}`,
+        this.config.tileSize / 2,
+        this.config.tileSize / 2
+      );
+
       // Restore context
       ctx.restore();
-      
+
       try {
         // Convert canvas to ImageBitmap
         const imageBitmap = await createImageBitmap(canvas);
         // Add byteLength property for Deck.gl compatibility
-        (imageBitmap as any).byteLength = this.config.tileSize * this.config.tileSize * 4; // RGBA bytes
-        
+        (imageBitmap as any).byteLength =
+          this.config.tileSize * this.config.tileSize * 4; // RGBA bytes
+
         // Cache the result
         this.tileCache.set(tileKey, imageBitmap);
-        
+
         this.debugLog(`Created mock tile: ${tileKey}`);
         resolve(imageBitmap);
       } catch (error) {
@@ -107,9 +112,12 @@ export class ImageTileService {
   /**
    * Load real tile data from the kernel via comm service
    */
-  private async loadRealTileData(tile: ITile, imageName: string): Promise<ImageBitmap | null> {
+  private async loadRealTileData(
+    tile: ITile,
+    imageName: string
+  ): Promise<ImageBitmap | null> {
     const tileKey = `${imageName}-${tile.x}-${tile.y}-${tile.z}`;
-    
+
     // Check cache first
     if (this.tileCache.has(tileKey)) {
       this.debugLog(`Using cached real tile: ${tileKey}`);
@@ -123,7 +131,7 @@ export class ImageTileService {
 
     try {
       this.debugLog(`Loading real tile: ${tileKey}`);
-      
+
       const response = await this.commService.sendMessage({
         type: 'IMAGE_TILE_REQUEST',
         dataset: imageName,
@@ -139,19 +147,20 @@ export class ImageTileService {
       }
 
       const dataUrl = `data:image/png;base64,${base64Data}`;
-      
+
       // Convert data URL to ImageBitmap
       const img = new Image();
-      return new Promise((resolve) => {
+      return new Promise(resolve => {
         img.onload = async () => {
           try {
             const imageBitmap = await createImageBitmap(img);
             // Add byteLength property for Deck.gl compatibility
-            (imageBitmap as any).byteLength = imageBitmap.width * imageBitmap.height * 4;
-            
+            (imageBitmap as any).byteLength =
+              imageBitmap.width * imageBitmap.height * 4;
+
             // Cache the result
             this.tileCache.set(tileKey, imageBitmap);
-            
+
             this.debugLog(`Loaded real tile: ${tileKey}`);
             resolve(imageBitmap);
           } catch (error) {
@@ -159,15 +168,14 @@ export class ImageTileService {
             resolve(null);
           }
         };
-        
+
         img.onerror = () => {
           console.error(`Failed to load image for tile ${tileKey}`);
           resolve(null);
         };
-        
+
         img.src = dataUrl;
       });
-
     } catch (error) {
       console.error(`Error loading tile ${tileKey}:`, error);
       return null;

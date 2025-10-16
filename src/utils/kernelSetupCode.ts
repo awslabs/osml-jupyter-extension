@@ -2,7 +2,7 @@
 
 /**
  * Python kernel setup code for the OSML Jupyter Extension.
- * 
+ *
  * This code is injected into the Jupyter kernel to provide:
  * - GDAL-based tile processing for satellite imagery
  * - Comm channel setup for frontend-backend communication

@@ -46,7 +46,7 @@ The **Jupyter Server** acts as the orchestrator, managing kernel sessions and fa
 
 ### Jupyter Messaging Protocol Compliance
 
-The extension uses Jupyter's standard comm (communication) channel system for frontend-backend communication. (see: [Jupyter Messaging](https://jupyter-client.readthedocs.io/en/stable/messaging.html) for additional details). This approach means that usesrs of the extension do not need to deploy any additional web services or authentication infrastructure to access geospatial data available to the kernel. We expect the extension to run within a Jupyter 
+The extension uses Jupyter's standard comm (communication) channel system for frontend-backend communication. (see: [Jupyter Messaging](https://jupyter-client.readthedocs.io/en/stable/messaging.html) for additional details). This approach means that usesrs of the extension do not need to deploy any additional web services or authentication infrastructure to access geospatial data available to the kernel. We expect the extension to run within a Jupyter
 installation that has been properly secured (e.g. in a managed SageMaker environment) which would allow us to inherit the following functions:
 
 - **Authentication**: Leverages Jupyter's session-based authentication
@@ -70,27 +70,27 @@ sequenceDiagram
 
     User->>JupyterLab: Right-click file → "Open with OversightML"
     JupyterLab->>ImageViewerWidget: Create widget instance
-    
+
     ImageViewerWidget->>KernelService: initialize()
     KernelService->>JupyterServer: Request kernel session
     JupyterServer->>PythonKernel: Start/connect to kernel
     PythonKernel-->>KernelService: Kernel ready
-    
+
     KernelService->>PythonKernel: Execute setup code
     Note over PythonKernel: Import osml_jupyter_extension<br/>Initialize message handlers<br/>Register comm target
-    
+
     PythonKernel->>MessageHandler: Register message processors
     MessageHandler->>PythonKernel: Processors registered
     PythonKernel-->>KernelService: Setup complete
-    
+
     ImageViewerWidget->>CommService: initialize(targetName)
     CommService->>PythonKernel: Open comm channel
     PythonKernel->>MessageHandler: Route to comm target
     MessageHandler-->>CommService: Comm channel established
-    
+
     MessageHandler->>CommService: Send KERNEL_COMM_SETUP_COMPLETE
     CommService->>ImageViewerWidget: Initialization complete
-    
+
     Note over ImageViewerWidget: Widget ready for<br/>user interaction
     ImageViewerWidget-->>User: Display viewer interface
 ```
@@ -112,15 +112,15 @@ sequenceDiagram
 
     User->>ImageViewerWidget: Pan/zoom map
     ImageViewerWidget->>ImageTileService: Request tile at {zoom, row, col}
-    
+
     Note over ImageTileService: Set 30s timeout<br/>Send IMAGE_TILE_REQUEST
     ImageTileService->>Kernel: Send via comm channel
-    
+
     Kernel->>MessageRegistry: Receive comm message
     MessageRegistry->>TileProcessor: handle(IMAGE_TILE_REQUEST)
-    
+
     Note over TileProcessor: Validate request parameters<br/>Extract zoom, row, col
-    
+
     TileProcessor->>Cache: Check tile cache
     alt Tile in cache
         Cache-->>TileProcessor: Return cached tile
@@ -129,16 +129,16 @@ sequenceDiagram
         GDAL-->>TileProcessor: Return processed tile
         TileProcessor->>Cache: Store in cache
     end
-    
+
     Note over TileProcessor: Encode tile as base64<br/>Prepare response
-    
+
     TileProcessor->>Kernel: IMAGE_TILE_RESPONSE
     Kernel->>ImageTileService: Send response via comm
-    
+
     Note over ImageTileService: Clear timeout<br/>Resolve promise
     ImageTileService-->>ImageViewerWidget: Provide tile for rendering
     ImageViewerWidget-->>User: Display updated map
-    
+
     Note over User,GDAL: Error Handling (Alternative Flow)
     alt Request timeout or error
         ImageTileService->>ImageViewerWidget: Return error placeholder

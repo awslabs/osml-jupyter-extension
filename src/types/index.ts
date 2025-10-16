@@ -22,7 +22,7 @@ export interface WidgetState {
 /**
  * Communication message types
  */
-export type CommMessageType = 
+export type CommMessageType =
   | 'IMAGE_LOAD_REQUEST'
   | 'IMAGE_LOAD_RESPONSE'
   | 'IMAGE_TILE_REQUEST'
@@ -45,7 +45,7 @@ export interface CommMessage {
   dataset?: string;
   imageName?: string;
   overlayName?: string;
-  endpointName?: string;  // For MODEL_TILE_REQUEST
+  endpointName?: string; // For MODEL_TILE_REQUEST
   zoom?: number;
   row?: number;
   col?: number;
@@ -53,10 +53,10 @@ export interface CommMessage {
   img?: string;
   features?: any[];
   error?: string;
-  imageCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
-  worldCoordinates?: number[][];  // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
-  endpoints?: any[];  // For LIST_AVAILABLE_ENDPOINTS_RESPONSE
-  metadata?: MetadataObject;  // For IMAGE_METADATA_RESPONSE
+  imageCoordinates?: number[][]; // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
+  worldCoordinates?: number[][]; // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
+  endpoints?: any[]; // For LIST_AVAILABLE_ENDPOINTS_RESPONSE
+  metadata?: MetadataObject; // For IMAGE_METADATA_RESPONSE
 }
 
 /**
@@ -66,7 +66,13 @@ export interface MetadataObject {
   [key: string]: MetadataValue;
 }
 
-export type MetadataValue = string | number | boolean | null | MetadataObject | MetadataValue[];
+export type MetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | MetadataObject
+  | MetadataValue[];
 
 /**
  * Debug information interface
@@ -116,7 +122,10 @@ export interface LayerInfo {
 
 export interface LayerControlActions {
   toggleVisibility: (layerId: string) => void;
-  updateColor: (layerId: string, color: [number, number, number, number]) => void;
+  updateColor: (
+    layerId: string,
+    color: [number, number, number, number]
+  ) => void;
   deleteLayer: (layerId: string) => void;
   addNamedDataset: (datasetName: string) => void;
 }

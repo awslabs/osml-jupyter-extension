@@ -1,7 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { Feature } from 'geojson';
-import { IFeatureTile, FeatureTileData, FeatureTileDataFunction, FeatureCacheEntry } from '../types';
+import {
+  IFeatureTile,
+  FeatureTileData,
+  FeatureTileDataFunction,
+  FeatureCacheEntry
+} from '../types';
 import { CommService } from './CommService';
 
 /**
@@ -25,23 +30,25 @@ export class FeatureTileService {
    * Returns cached data immediately or empty data, triggers callback when async data arrives
    */
   public getTileDataAsync(
-    tile: IFeatureTile, 
+    tile: IFeatureTile,
     callback: TileDataCallback,
     dataType: 'mock' | 'real' | 'model' = 'mock',
-    options?: { 
-      imageName?: string; 
-      overlayName?: string; 
-      dataset?: string; 
+    options?: {
+      imageName?: string;
+      overlayName?: string;
+      dataset?: string;
       endpointName?: string;
       squareSize?: number;
     }
   ): FeatureTileData {
     const tileId = this.getTileId(tile, dataType, options);
-    
+
     // Return cached data immediately if available
     if (this.featureCache.has(tileId)) {
       const cached = this.featureCache.get(tileId)!;
-      this.debugLog(`Returning cached data for tile ${tileId}`, { count: cached.features.length });
+      this.debugLog(`Returning cached data for tile ${tileId}`, {
+        count: cached.features.length
+      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
@@ -63,7 +70,9 @@ export class FeatureTileService {
   /**
    * Create a mock feature data function for testing
    */
-  public createMockFeatureDataFunction(squareSize: number = 0.1): FeatureTileDataFunction {
+  public createMockFeatureDataFunction(
+    squareSize: number = 0.1
+  ): FeatureTileDataFunction {
     return async (tile: IFeatureTile): Promise<FeatureTileData> => {
       return this.createMockFeatureData(tile, squareSize);
     };
@@ -96,44 +105,65 @@ export class FeatureTileService {
   /**
    * Generate mock feature data for testing/debugging
    */
-  private async createMockFeatureData(tile: IFeatureTile, squareSize: number): Promise<FeatureTileData> {
+  private async createMockFeatureData(
+    tile: IFeatureTile,
+    squareSize: number
+  ): Promise<FeatureTileData> {
     const tileKey = `mock-${tile.x}-${tile.y}-${tile.z}`;
-    
+
     // Check cache first
     if (this.featureCache.has(tileKey)) {
       const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached mock features for tile ${tileKey}`, { count: cached.features.length });
+      this.debugLog(`Using cached mock features for tile ${tileKey}`, {
+        count: cached.features.length
+      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const features: Feature[] = [];
-      
+
       const tileWidth = tile.right - tile.left;
       const tileHeight = tile.bottom - tile.top;
       const centerX = tile.left + tileWidth / 2;
       const centerY = tile.top + tileHeight / 2;
-      
+
       // Large square at center (20% of tile size)
       const centerSquareSize = Math.min(tileWidth, tileHeight) * 0.2;
       const centerSquare = this.createSquareFeature(
-        centerX, 
-        centerY, 
+        centerX,
+        centerY,
         centerSquareSize,
         `center-${tile.x}-${tile.y}-${tile.z}`,
         { weight: 10, type: 'center' }
       );
       features.push(centerSquare);
-      
+
       // Smaller squares at corners
       const cornerSquareSize = Math.min(tileWidth, tileHeight) * squareSize;
       const cornerOffset = cornerSquareSize / 2;
-      
+
       const corners = [
-        { x: tile.left + cornerOffset, y: tile.top + cornerOffset, pos: 'top-left' },
-        { x: tile.right - cornerOffset, y: tile.top + cornerOffset, pos: 'top-right' },
-        { x: tile.left + cornerOffset, y: tile.bottom - cornerOffset, pos: 'bottom-left' },
-        { x: tile.right - cornerOffset, y: tile.bottom - cornerOffset, pos: 'bottom-right' }
+        {
+          x: tile.left + cornerOffset,
+          y: tile.top + cornerOffset,
+          pos: 'top-left'
+        },
+        {
+          x: tile.right - cornerOffset,
+          y: tile.top + cornerOffset,
+          pos: 'top-right'
+        },
+        {
+          x: tile.left + cornerOffset,
+          y: tile.bottom - cornerOffset,
+          pos: 'bottom-left'
+        },
+        {
+          x: tile.right - cornerOffset,
+          y: tile.bottom - cornerOffset,
+          pos: 'bottom-right'
+        }
       ];
 
       corners.forEach(corner => {
@@ -146,10 +176,10 @@ export class FeatureTileService {
         );
         features.push(cornerSquare);
       });
-      
+
       // Calculate approximate byte length for the features
       const byteLength = this.calculateFeaturesByteLength(features);
-      
+
       // Cache the result
       const cacheEntry: FeatureCacheEntry = {
         features,
@@ -158,9 +188,11 @@ export class FeatureTileService {
         tileKey
       };
       this.featureCache.set(tileKey, cacheEntry);
-      
-      this.debugLog(`Created mock features for tile ${tileKey}`, { count: features.length });
-      
+
+      this.debugLog(`Created mock features for tile ${tileKey}`, {
+        count: features.length
+      });
+
       resolve({ features, byteLength });
     });
   }
@@ -174,11 +206,13 @@ export class FeatureTileService {
     overlayName: string
   ): Promise<FeatureTileData> {
     const tileKey = `${imageName}-${overlayName}-${tile.x}-${tile.y}-${tile.z}`;
-    
+
     // Check cache first
     if (this.featureCache.has(tileKey)) {
       const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached real features for tile ${tileKey}`, { count: cached.features.length });
+      this.debugLog(`Using cached real features for tile ${tileKey}`, {
+        count: cached.features.length
+      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
@@ -189,7 +223,7 @@ export class FeatureTileService {
 
     try {
       this.debugLog(`Loading real features for tile ${tileKey}`);
-      
+
       const response = await this.commService.sendMessage({
         type: 'OVERLAY_TILE_REQUEST',
         imageName: imageName,
@@ -200,7 +234,7 @@ export class FeatureTileService {
       });
 
       const features = response.features || [];
-      
+
       // Process features to ensure they have proper imageGeometry
       const processedFeatures = features.map((feature: Feature) => {
         if (feature.properties?.imageGeometry) {
@@ -212,10 +246,10 @@ export class FeatureTileService {
         }
         return feature;
       });
-      
+
       // Calculate approximate byte length for the features
       const byteLength = this.calculateFeaturesByteLength(processedFeatures);
-      
+
       // Cache the result
       const cacheEntry: FeatureCacheEntry = {
         features: processedFeatures,
@@ -224,11 +258,12 @@ export class FeatureTileService {
         tileKey
       };
       this.featureCache.set(tileKey, cacheEntry);
-      
-      this.debugLog(`Loaded real features for tile ${tileKey}`, { count: processedFeatures.length });
-      
-      return { features: processedFeatures, byteLength };
 
+      this.debugLog(`Loaded real features for tile ${tileKey}`, {
+        count: processedFeatures.length
+      });
+
+      return { features: processedFeatures, byteLength };
     } catch (error) {
       console.error(`Error loading features for tile ${tileKey}:`, error);
       return { features: [], byteLength: 0 };
@@ -244,11 +279,13 @@ export class FeatureTileService {
     endpointName: string
   ): Promise<FeatureTileData> {
     const tileKey = `model-${dataset}-${endpointName}-${tile.x}-${tile.y}-${tile.z}`;
-    
+
     // Check cache first
     if (this.featureCache.has(tileKey)) {
       const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached model features for tile ${tileKey}`, { count: cached.features.length });
+      this.debugLog(`Using cached model features for tile ${tileKey}`, {
+        count: cached.features.length
+      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
@@ -259,18 +296,21 @@ export class FeatureTileService {
 
     try {
       this.debugLog(`Loading model features for tile ${tileKey}`);
-      
-      const response = await this.commService.sendMessage({
-        type: 'MODEL_TILE_REQUEST',
-        dataset: dataset,
-        endpointName: endpointName,
-        zoom: tile.z,
-        row: tile.y,
-        col: tile.x
-      }, 60000); // 60 second timeout for model requests
+
+      const response = await this.commService.sendMessage(
+        {
+          type: 'MODEL_TILE_REQUEST',
+          dataset: dataset,
+          endpointName: endpointName,
+          zoom: tile.z,
+          row: tile.y,
+          col: tile.x
+        },
+        60000
+      ); // 60 second timeout for model requests
 
       const features = response.features || [];
-      
+
       // Process features to ensure they have proper imageGeometry
       const processedFeatures = features.map((feature: Feature) => {
         if (feature.properties?.imageGeometry) {
@@ -282,10 +322,10 @@ export class FeatureTileService {
         }
         return feature;
       });
-      
+
       // Calculate approximate byte length for the features
       const byteLength = this.calculateFeaturesByteLength(processedFeatures);
-      
+
       // Cache the result
       const cacheEntry: FeatureCacheEntry = {
         features: processedFeatures,
@@ -294,11 +334,12 @@ export class FeatureTileService {
         tileKey
       };
       this.featureCache.set(tileKey, cacheEntry);
-      
-      this.debugLog(`Loaded model features for tile ${tileKey}`, { count: processedFeatures.length });
-      
-      return { features: processedFeatures, byteLength };
 
+      this.debugLog(`Loaded model features for tile ${tileKey}`, {
+        count: processedFeatures.length
+      });
+
+      return { features: processedFeatures, byteLength };
     } catch (error) {
       console.error(`Error loading model features for tile ${tileKey}:`, error);
       return { features: [], byteLength: 0 };
@@ -309,28 +350,30 @@ export class FeatureTileService {
    * Helper function to create a square feature
    */
   private createSquareFeature(
-    centerX: number, 
-    centerY: number, 
-    size: number, 
+    centerX: number,
+    centerY: number,
+    size: number,
     id: string,
     properties: any = {}
   ): Feature {
     const halfSize = size / 2;
-    
+
     // Create square coordinates
-    const coordinates = [[
-      [centerX - halfSize, centerY - halfSize], // top-left
-      [centerX + halfSize, centerY - halfSize], // top-right
-      [centerX + halfSize, centerY + halfSize], // bottom-right
-      [centerX - halfSize, centerY + halfSize], // bottom-left
-      [centerX - halfSize, centerY - halfSize]  // close the polygon
-    ]];
-    
+    const coordinates = [
+      [
+        [centerX - halfSize, centerY - halfSize], // top-left
+        [centerX + halfSize, centerY - halfSize], // top-right
+        [centerX + halfSize, centerY + halfSize], // bottom-right
+        [centerX - halfSize, centerY + halfSize], // bottom-left
+        [centerX - halfSize, centerY - halfSize] // close the polygon
+      ]
+    ];
+
     const imageGeometry = {
       type: 'Polygon' as const,
       coordinates: coordinates
     };
-    
+
     return {
       type: 'Feature',
       id: id,
@@ -345,7 +388,6 @@ export class FeatureTileService {
     };
   }
 
-
   /**
    * Calculate approximate byte length for an array of features
    */
@@ -353,10 +395,10 @@ export class FeatureTileService {
     if (!features || features.length === 0) {
       return 0;
     }
-    
+
     try {
       const jsonString = JSON.stringify(features);
-      return jsonString.length * 2 + (features.length * 100); // 100 bytes overhead per feature
+      return jsonString.length * 2 + features.length * 100; // 100 bytes overhead per feature
     } catch (error) {
       // Fallback: estimate based on feature count
       return features.length * 1000; // 1KB per feature as rough estimate
@@ -367,8 +409,8 @@ export class FeatureTileService {
    * Generate a unique tile ID based on tile coordinates and data type
    */
   private getTileId(
-    tile: IFeatureTile, 
-    dataType: string, 
+    tile: IFeatureTile,
+    dataType: string,
     options?: any
   ): string {
     switch (dataType) {
@@ -398,7 +440,10 @@ export class FeatureTileService {
 
     switch (dataType) {
       case 'mock':
-        loadPromise = this.createMockFeatureData(tile, options.squareSize || 0.1);
+        loadPromise = this.createMockFeatureData(
+          tile,
+          options.squareSize || 0.1
+        );
         break;
       case 'real':
         if (!options.imageName || !options.overlayName) {
@@ -406,7 +451,11 @@ export class FeatureTileService {
           this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
           return;
         }
-        loadPromise = this.loadRealFeatureData(tile, options.imageName, options.overlayName);
+        loadPromise = this.loadRealFeatureData(
+          tile,
+          options.imageName,
+          options.overlayName
+        );
         break;
       case 'model':
         if (!options.dataset || !options.endpointName) {
@@ -414,7 +463,11 @@ export class FeatureTileService {
           this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
           return;
         }
-        loadPromise = this.loadModelFeatureData(tile, options.dataset, options.endpointName);
+        loadPromise = this.loadModelFeatureData(
+          tile,
+          options.dataset,
+          options.endpointName
+        );
         break;
       default:
         console.error(`Unknown data type: ${dataType}`);
@@ -425,11 +478,13 @@ export class FeatureTileService {
     this.loadingPromises.set(tileId, loadPromise);
 
     loadPromise
-      .then((data) => {
-        this.debugLog(`Async load completed for tile ${tileId}`, { count: data.features.length });
+      .then(data => {
+        this.debugLog(`Async load completed for tile ${tileId}`, {
+          count: data.features.length
+        });
         this.notifyCallbacks(tileId, data);
       })
-      .catch((error) => {
+      .catch(error => {
         console.error(`Async load failed for tile ${tileId}:`, error);
         this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
       })
@@ -478,12 +533,16 @@ export class FeatureTileService {
   /**
    * Get cache statistics
    */
-  public getCacheStats(): { size: number; keys: string[]; totalFeatures: number } {
+  public getCacheStats(): {
+    size: number;
+    keys: string[];
+    totalFeatures: number;
+  } {
     let totalFeatures = 0;
     for (const entry of this.featureCache.values()) {
       totalFeatures += entry.features.length;
     }
-    
+
     return {
       size: this.featureCache.size,
       keys: Array.from(this.featureCache.keys()),

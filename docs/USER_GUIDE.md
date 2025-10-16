@@ -2,13 +2,14 @@
 
 ## Introduction
 
-Welcome to the OSML Jupyter Extension! This is an **early release** of the extension provided for review and feedback from the community. 
+Welcome to the OSML Jupyter Extension! This is an **early release** of the extension provided for review and feedback from the community.
 
 > **⚠️ Important Notice**: This extension is currently in active development. The APIs and interfaces have not been finalized and may change in future releases. Please provide feedback through our GitHub repository to help shape the final version.
 
 The OSML Jupyter Extension brings satellite imagery visualization capabilities directly into your JupyterLab environment. It allows data scientists, researchers, and engineers to work with complex satellite imagery formats (GeoTIFF, NITF, SICD, SIDD) without leaving their familiar Jupyter workflow.
 
 ### Key Features
+
 - Interactive visualization of satellite imagery formats
 - Overlay multiple geospatial data layers
 - Pan, zoom, and explore large imagery datasets
@@ -70,8 +71,8 @@ This is particularly useful for examining detection types, confidence scores, or
 To access metadata about the loaded satellite image:  
 ![Image metadata dialog](images/image-metadata-tool.png)
 
-1. **Click the metadata tool** in the image viewer toolbar 
-2. The **Image Metadata Dialog** will open, displaying metadata unique to each image. 
+1. **Click the metadata tool** in the image viewer toolbar
+2. The **Image Metadata Dialog** will open, displaying metadata unique to each image.
 
 ### 6. Managing Layers
 
@@ -112,6 +113,7 @@ For a comprehensive example of publishing layers from notebook code, see our com
 📓 **[Publishing Layers Example Notebook](examples/publishing_layers_example.ipynb)**
 
 This notebook includes examples of:
+
 - Object detection results with bounding boxes
 - Road networks using LineString geometries
 - Example regions with Polygon boundaries
@@ -131,10 +133,10 @@ def publish_overlay(image_name, collection_name, fc):
     for f in fc['features']:
         geom = accessor.find_image_geometry(f)
         accessor.set_image_geometry(f, geom)
-            
+
     tile_index = STRFeature2DSpatialIndex(fc, use_image_geometries=True)
     key = f"{image_name}:{collection_name}"
-    global_cache_manager.set_overlay_factory(key, tile_index)    
+    global_cache_manager.set_overlay_factory(key, tile_index)
 
 # Create a simple detection result using pixel coordinates
 detection = geojson.Feature(
@@ -157,7 +159,9 @@ publish_overlay("your_image.tif", "Detections", detection_collection)
 The extension supports two ways to specify feature locations in **pixel coordinates**:
 
 ##### Using `imageBBox` for Rectangular Regions
+
 Perfect for object detection bounding boxes:
+
 ```python
 "properties": {
     "imageBBox": [min_x, min_y, max_x, max_y],  # Pixel coordinates
@@ -167,9 +171,11 @@ Perfect for object detection bounding boxes:
 ```
 
 ##### Using `imageGeometry` for Complex Shapes
+
 For detailed geometries like roads, boundaries, or precise object outlines:
 
 **Point Geometry:**
+
 ```python
 "properties": {
     "imageGeometry": {
@@ -180,6 +186,7 @@ For detailed geometries like roads, boundaries, or precise object outlines:
 ```
 
 **LineString Geometry (for roads, paths):**
+
 ```python
 "properties": {
     "imageGeometry": {
@@ -190,6 +197,7 @@ For detailed geometries like roads, boundaries, or precise object outlines:
 ```
 
 **Polygon Geometry (for areas, boundaries):**
+
 ```python
 "properties": {
     "imageGeometry": {
@@ -219,4 +227,4 @@ publish_overlay("satellite_image.tif", "Analysis_Regions", regions)
 
 ---
 
-*This guide corresponds to OSML Jupyter Extension early release version. For the latest updates and documentation, visit our GitHub repository.*
+_This guide corresponds to OSML Jupyter Extension early release version. For the latest updates and documentation, visit our GitHub repository._

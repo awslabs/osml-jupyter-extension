@@ -4,7 +4,9 @@ import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
 import { showDialog, Dialog } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
-import ModelSelectionDialog, { IModelSelectionResult } from './ModelSelectionDialog';
+import ModelSelectionDialog, {
+  IModelSelectionResult
+} from './ModelSelectionDialog';
 
 /**
  * A toolbar button widget for model selection
@@ -18,19 +20,20 @@ export class ModelSelectionToolbarButton extends Widget {
     super();
     this.addClass('jp-ToolbarButton');
     this.addClass('jp-mod-styled');
-    
+
     // Create the button element
     this._button = document.createElement('button');
-    this._button.className = 'jp-ToolbarButtonComponent jp-Button jp-mod-minimal jp-model-selection-toolbar-button';
+    this._button.className =
+      'jp-ToolbarButtonComponent jp-Button jp-mod-minimal jp-model-selection-toolbar-button';
     this._button.title = 'Select model to run on tiles';
     this._button.setAttribute('data-command', 'model-selection');
-    
+
     // Create button content
     this._updateButtonContent();
-    
+
     // Add click handler
     this._button.addEventListener('click', this._handleClick.bind(this));
-    
+
     this.node.appendChild(this._button);
   }
 
@@ -40,12 +43,12 @@ export class ModelSelectionToolbarButton extends Widget {
   private _updateButtonContent(): void {
     // Clear existing content
     this._button.innerHTML = '';
-    
+
     // Create icon span (using a generic model icon)
     const iconSpan = document.createElement('span');
     iconSpan.className = 'jp-toolbar-button-component-icon';
     iconSpan.innerHTML = '🤖'; // Using emoji for now, could be replaced with proper icon
-    
+
     this._button.appendChild(iconSpan);
   }
 
@@ -56,10 +59,14 @@ export class ModelSelectionToolbarButton extends Widget {
     try {
       // Get CommService from the ImageViewerWidget
       const commService = (this._imageViewerWidget as any).commService;
-      
+
       // Create the dialog content with current state
-      const dialogContent = new ModelSelectionDialog(this._modelName, this._modelEnabled, commService);
-      
+      const dialogContent = new ModelSelectionDialog(
+        this._modelName,
+        this._modelEnabled,
+        commService
+      );
+
       // Show the dialog with proper buttons
       const result = await showDialog({
         title: 'Model Configuration',
@@ -76,12 +83,12 @@ export class ModelSelectionToolbarButton extends Widget {
         // Get values directly from the dialog content
         const modelName = dialogContent.getModelName();
         const modelEnabled = dialogContent.getModelEnabled();
-        
+
         this.setModelConfiguration(modelName, modelEnabled);
-        
+
         // Notify the ImageViewerWidget about the model configuration
         this._imageViewerWidget.setSelectedModel(modelName, modelEnabled);
-        
+
         // Handle model feature layer creation/removal
         if (modelEnabled && modelName) {
           // Create model feature layer
@@ -103,13 +110,14 @@ export class ModelSelectionToolbarButton extends Widget {
     this._modelName = modelName;
     this._modelEnabled = modelEnabled;
     this._updateButtonContent();
-    
+
     if (!modelEnabled) {
       this._button.title = 'Model processing disabled - Click to configure';
     } else if (modelName) {
       this._button.title = `Current model: ${modelName}`;
     } else {
-      this._button.title = 'Model enabled but no name specified - Click to configure';
+      this._button.title =
+        'Model enabled but no name specified - Click to configure';
     }
   }
 

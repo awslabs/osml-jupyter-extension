@@ -10,21 +10,24 @@
  * @param prefix - The prefix for keys (used recursively)
  * @returns Flattened object with string keys and string values
  */
-export function flattenProperties(obj: any, prefix: string = ''): Record<string, string> {
+export function flattenProperties(
+  obj: any,
+  prefix: string = ''
+): Record<string, string> {
   const flattened: Record<string, string> = {};
-  
+
   if (obj === null || obj === undefined) {
     return flattened;
   }
-  
+
   for (const key in obj) {
     if (!obj.hasOwnProperty(key)) {
       continue;
     }
-    
+
     const value = obj[key];
     const newKey = prefix ? `${prefix}.${key}` : key;
-    
+
     if (value === null || value === undefined) {
       flattened[newKey] = 'null';
     } else if (typeof value === 'object') {
@@ -37,9 +40,12 @@ export function flattenProperties(obj: any, prefix: string = ''): Record<string,
           flattened[newKey] = `[${value.join(', ')}]`;
         } else {
           // Complex array - show length and first few items
-          flattened[newKey] = `Array(${value.length}) [${value.slice(0, 3).map(item => 
-            typeof item === 'object' ? JSON.stringify(item) : String(item)
-          ).join(', ')}${value.length > 3 ? '...' : ''}]`;
+          flattened[newKey] = `Array(${value.length}) [${value
+            .slice(0, 3)
+            .map(item =>
+              typeof item === 'object' ? JSON.stringify(item) : String(item)
+            )
+            .join(', ')}${value.length > 3 ? '...' : ''}]`;
         }
       } else {
         // Nested object - recursively flatten
@@ -51,7 +57,7 @@ export function flattenProperties(obj: any, prefix: string = ''): Record<string,
       flattened[newKey] = String(value);
     }
   }
-  
+
   return flattened;
 }
 
@@ -60,7 +66,9 @@ export function flattenProperties(obj: any, prefix: string = ''): Record<string,
  * @param properties - The flattened properties object
  * @returns Array of key-value pairs suitable for table display
  */
-export function formatPropertiesForTable(properties: Record<string, string>): Array<{key: string, value: string}> {
+export function formatPropertiesForTable(
+  properties: Record<string, string>
+): Array<{ key: string; value: string }> {
   return Object.entries(properties)
     .map(([key, value]) => ({ key, value }))
     .sort((a, b) => a.key.localeCompare(b.key));
@@ -74,24 +82,26 @@ export function formatPropertiesForTable(properties: Record<string, string>): Ar
 export function createPropertyTableHTML(properties: any): string {
   const flattened = flattenProperties(properties);
   const formatted = formatPropertiesForTable(flattened);
-  
+
   if (formatted.length === 0) {
     return '<tr><td colspan="2" style="text-align: center; font-style: italic;">No properties available</td></tr>';
   }
-  
-  return formatted.map(({ key, value }, index) => {
-    // Escape HTML in values to prevent XSS
-    const escapedKey = escapeHtml(key);
-    const escapedValue = escapeHtml(value);
-    
-    // Handle long values with truncation and expand functionality
-    const valueContent = createValueContent(escapedValue, index);
-    
-    return `<tr>
+
+  return formatted
+    .map(({ key, value }, index) => {
+      // Escape HTML in values to prevent XSS
+      const escapedKey = escapeHtml(key);
+      const escapedValue = escapeHtml(value);
+
+      // Handle long values with truncation and expand functionality
+      const valueContent = createValueContent(escapedValue, index);
+
+      return `<tr>
       <td class="property-key">${escapedKey}</td>
       <td class="property-value">${valueContent}</td>
     </tr>`;
-  }).join('');
+    })
+    .join('');
 }
 
 /**
@@ -103,17 +113,17 @@ export function createPropertyTableHTML(properties: any): string {
 function createValueContent(value: string, index: number): string {
   const MAX_DISPLAY_LENGTH = 100;
   const LONG_VALUE_THRESHOLD = 200;
-  
+
   if (value.length <= MAX_DISPLAY_LENGTH) {
     // Short value - display normally with type detection
     return `<div class="value-content">${formatValueByType(value)}</div>`;
   }
-  
+
   // Long value - create truncated version with expand/collapse
   const truncated = value.substring(0, MAX_DISPLAY_LENGTH);
   const remaining = value.substring(MAX_DISPLAY_LENGTH);
   const uniqueId = `prop-${index}`;
-  
+
   if (value.length > LONG_VALUE_THRESHOLD) {
     // Very long value - use collapsible with summary
     return `<div class="value-content long-value">
@@ -147,8 +157,10 @@ function createValueContent(value: string, index: number): string {
  */
 function detectValueType(value: string): string {
   // JSON detection
-  if ((value.startsWith('{') && value.endsWith('}')) || 
-      (value.startsWith('[') && value.endsWith(']'))) {
+  if (
+    (value.startsWith('{') && value.endsWith('}')) ||
+    (value.startsWith('[') && value.endsWith(']'))
+  ) {
     try {
       JSON.parse(value);
       return 'JSON';
@@ -156,32 +168,35 @@ function detectValueType(value: string): string {
       // Not valid JSON, continue with other checks
     }
   }
-  
+
   // URL detection
   if (value.match(/^https?:\/\//)) {
     return 'URL';
   }
-  
+
   // Coordinates detection (lat,lon or x,y patterns)
   if (value.match(/^-?\d+\.?\d*,-?\d+\.?\d*$/)) {
     return 'Coordinates';
   }
-  
+
   // Base64 detection
   if (value.length > 50 && value.match(/^[A-Za-z0-9+/]+=*$/)) {
     return 'Base64';
   }
-  
+
   // Number detection
   if (!isNaN(Number(value)) && value.trim() !== '') {
     return 'Number';
   }
-  
+
   // Date detection
-  if (value.match(/^\d{4}-\d{2}-\d{2}/) || value.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+  if (
+    value.match(/^\d{4}-\d{2}-\d{2}/) ||
+    value.match(/^\d{2}\/\d{2}\/\d{4}/)
+  ) {
     return 'Date';
   }
-  
+
   return 'Text';
 }
 
@@ -192,7 +207,7 @@ function detectValueType(value: string): string {
  */
 function formatValueByType(value: string): string {
   const type = detectValueType(value);
-  
+
   switch (type) {
     case 'JSON':
       return `<code class="json-value">${value}</code>`;
@@ -205,7 +220,8 @@ function formatValueByType(value: string): string {
     case 'Number':
       // Format numbers with appropriate precision
       const num = Number(value);
-      const formatted = num % 1 === 0 ? num.toString() : num.toFixed(6).replace(/\.?0+$/, '');
+      const formatted =
+        num % 1 === 0 ? num.toString() : num.toFixed(6).replace(/\.?0+$/, '');
       return `<span class="number-value">${formatted}</span>`;
     case 'Date':
       return `<span class="date-value">${value}</span>`;

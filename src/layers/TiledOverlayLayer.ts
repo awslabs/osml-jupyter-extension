@@ -37,9 +37,9 @@ interface TileLoadProps {
   signal?: AbortSignal;
 }
 
-import { 
-  FeatureTileDataFunction, 
-  IFeatureTile, 
+import {
+  FeatureTileDataFunction,
+  IFeatureTile,
   FeatureTileData
 } from '../types';
 
@@ -51,43 +51,44 @@ type Color = [number, number, number] | [number, number, number, number];
 /**
  * Properties for TiledOverlayLayer
  */
-export interface TiledOverlayLayerProps extends Omit<TileLayerProps<FeatureTileData>, 'data' | 'getTileData'> {
+export interface TiledOverlayLayerProps
+  extends Omit<TileLayerProps<FeatureTileData>, 'data' | 'getTileData'> {
   /** Function to load feature data for tiles */
   getTileData: FeatureTileDataFunction;
-  
+
   // Culling options
   /** Maximum number of features to render per tile (default: 1000) */
   maxFeaturesPerTile?: number;
-  
+
   /** Minimum area in pixels for polygon visibility (default: 1.0) */
   minFeatureAreaPixels?: number;
-  
+
   /** Minimum size in pixels for point visibility (default: 0.5) */
   minFeatureSizePixels?: number;
-  
+
   // LOD options
   /** Geometry simplification tolerance in pixels (default: 0.5) */
   simplificationTolerance?: number;
-  
+
   /** Distance in pixels for point clustering (default: 20) */
   clusterDistance?: number;
-  
+
   /** Zoom levels where LOD transitions occur (default: [-3, 0, 3]) */
   lodZoomThresholds?: number[];
-  
+
   // Rendering options
   /** Feature fill color */
   featureFillColor?: Color;
-  
+
   /** Feature line color */
   featureLineColor?: Color;
-  
+
   /** Feature line width */
   featureLineWidth?: number;
-  
+
   /** Whether to scale point size with zoom (default: true) */
   adaptivePointSize?: boolean;
-  
+
   /** Enable debug logging */
   enableDebugLogging?: boolean;
 }
@@ -112,10 +113,11 @@ const defaultProps: DefaultProps<TiledOverlayLayerProps> = {
   debounceTime: 100
 };
 
-export type TiledOverlayLayerPickingInfo<FeaturePropertiesT = {}> = TileLayerPickingInfo<
-  FeatureTileData,
-  PickingInfo<Feature<Geometry, FeaturePropertiesT>>
->;
+export type TiledOverlayLayerPickingInfo<FeaturePropertiesT = {}> =
+  TileLayerPickingInfo<
+    FeatureTileData,
+    PickingInfo<Feature<Geometry, FeaturePropertiesT>>
+  >;
 
 /**
  * Point cluster for LOD optimization
@@ -173,23 +175,23 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     if (!getTileDataFn) {
       return { features: [], byteLength: 0 };
     }
-    
+
     const { index } = tileProps;
     const { x, y, z } = index;
-    
+
     // Convert TileLayer's tile format to our IFeatureTile format
     const scale = Math.pow(2, -z);
     const tileSize = this.props.tileSize || 512;
-    const tile: IFeatureTile = { 
-      x, 
-      y, 
-      z, 
-      left: x * tileSize * scale, 
-      top: y * tileSize * scale, 
-      right: (x + 1) * tileSize * scale, 
-      bottom: (y + 1) * tileSize * scale 
+    const tile: IFeatureTile = {
+      x,
+      y,
+      z,
+      left: x * tileSize * scale,
+      top: y * tileSize * scale,
+      right: (x + 1) * tileSize * scale,
+      bottom: (y + 1) * tileSize * scale
     };
-    
+
     this.debugLog(`Loading tile data for ${x}-${y}-${z}`, tile);
     return getTileDataFn(tile);
   }
@@ -197,13 +199,21 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   /**
    * Apply spatial culling to remove features outside tile bounds
    */
-  private applySpatialCulling(features: Feature[], tile: Tile2DHeader): Feature[] {
+  private applySpatialCulling(
+    features: Feature[],
+    tile: Tile2DHeader
+  ): Feature[] {
     const { bbox } = tile;
-    
+
     // Handle different bbox formats
     let bounds: { left: number; top: number; right: number; bottom: number };
-    
-    if ('left' in bbox && 'top' in bbox && 'right' in bbox && 'bottom' in bbox) {
+
+    if (
+      'left' in bbox &&
+      'top' in bbox &&
+      'right' in bbox &&
+      'bottom' in bbox
+    ) {
       // Pixel coordinate format
       bounds = {
         left: bbox.left,
@@ -211,7 +221,12 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         right: bbox.right,
         bottom: bbox.bottom
       };
-    } else if ('west' in bbox && 'north' in bbox && 'east' in bbox && 'south' in bbox) {
+    } else if (
+      'west' in bbox &&
+      'north' in bbox &&
+      'east' in bbox &&
+      'south' in bbox
+    ) {
       // Geographic coordinate format - convert to our pixel format naming
       bounds = {
         left: (bbox as any).west,
@@ -237,7 +252,9 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
 
     return features.filter(feature => {
       const geometry = feature.geometry || feature.properties?.imageGeometry;
-      if (!geometry) return false;
+      if (!geometry) {
+        return false;
+      }
 
       return this.isGeometryInBounds(geometry, bounds);
     });
@@ -246,48 +263,81 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   /**
    * Check if geometry intersects with tile bounds
    */
-  private isGeometryInBounds(geometry: Geometry, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
+  private isGeometryInBounds(
+    geometry: Geometry,
+    bounds: { left: number; top: number; right: number; bottom: number }
+  ): boolean {
     switch (geometry.type) {
       case 'Point':
         const [x, y] = geometry.coordinates;
-        return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
-        
+        return (
+          x >= bounds.left &&
+          x <= bounds.right &&
+          y >= bounds.top &&
+          y <= bounds.bottom
+        );
+
       case 'LineString':
         return geometry.coordinates.some(coord => {
           const [x, y] = coord;
-          return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+          return (
+            x >= bounds.left &&
+            x <= bounds.right &&
+            y >= bounds.top &&
+            y <= bounds.bottom
+          );
         });
-        
+
       case 'Polygon':
         // Check if any point of outer ring is in bounds
         const outerRing = geometry.coordinates[0];
         return outerRing.some(coord => {
           const [x, y] = coord;
-          return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+          return (
+            x >= bounds.left &&
+            x <= bounds.right &&
+            y >= bounds.top &&
+            y <= bounds.bottom
+          );
         });
-        
+
       case 'MultiPoint':
         return geometry.coordinates.some(coord => {
           const [x, y] = coord;
-          return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+          return (
+            x >= bounds.left &&
+            x <= bounds.right &&
+            y >= bounds.top &&
+            y <= bounds.bottom
+          );
         });
-        
+
       case 'MultiLineString':
         return geometry.coordinates.some(lineString =>
           lineString.some(coord => {
             const [x, y] = coord;
-            return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+            return (
+              x >= bounds.left &&
+              x <= bounds.right &&
+              y >= bounds.top &&
+              y <= bounds.bottom
+            );
           })
         );
-        
+
       case 'MultiPolygon':
         return geometry.coordinates.some(polygon =>
           polygon[0].some(coord => {
             const [x, y] = coord;
-            return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+            return (
+              x >= bounds.left &&
+              x <= bounds.right &&
+              y >= bounds.top &&
+              y <= bounds.bottom
+            );
           })
         );
-        
+
       default:
         return false;
     }
@@ -302,24 +352,26 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
 
     return features.filter(feature => {
       const geometry = feature.geometry || feature.properties?.imageGeometry;
-      if (!geometry) return false;
+      if (!geometry) {
+        return false;
+      }
 
       switch (geometry.type) {
         case 'Point':
         case 'MultiPoint':
           // Points are always visible if they pass spatial culling
           return true;
-          
+
         case 'LineString':
         case 'MultiLineString':
           const length = this.calculateGeometryLength(geometry);
-          return (length * pixelScale) >= minFeatureSizePixels!;
-          
+          return length * pixelScale >= minFeatureSizePixels!;
+
         case 'Polygon':
         case 'MultiPolygon':
           const area = this.calculateGeometryArea(geometry);
-          return (area * pixelScale * pixelScale) >= minFeatureAreaPixels!;
-          
+          return area * pixelScale * pixelScale >= minFeatureAreaPixels!;
+
         default:
           return true;
       }
@@ -333,11 +385,13 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     switch (geometry.type) {
       case 'Polygon':
         return this.calculatePolygonArea(geometry.coordinates[0]);
-        
+
       case 'MultiPolygon':
-        return geometry.coordinates.reduce((total, polygon) => 
-          total + this.calculatePolygonArea(polygon[0]), 0);
-          
+        return geometry.coordinates.reduce(
+          (total, polygon) => total + this.calculatePolygonArea(polygon[0]),
+          0
+        );
+
       default:
         return 0;
     }
@@ -350,11 +404,14 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     switch (geometry.type) {
       case 'LineString':
         return this.calculateLineStringLength(geometry.coordinates);
-        
+
       case 'MultiLineString':
-        return geometry.coordinates.reduce((total, lineString) => 
-          total + this.calculateLineStringLength(lineString), 0);
-          
+        return geometry.coordinates.reduce(
+          (total, lineString) =>
+            total + this.calculateLineStringLength(lineString),
+          0
+        );
+
       default:
         return 0;
     }
@@ -364,17 +421,19 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    * Calculate polygon area using shoelace formula
    */
   private calculatePolygonArea(coordinates: number[][]): number {
-    if (coordinates.length < 3) return 0;
-    
+    if (coordinates.length < 3) {
+      return 0;
+    }
+
     let area = 0;
     const numPoints = coordinates.length - 1; // Exclude closing point
-    
+
     for (let i = 0; i < numPoints; i++) {
       const j = (i + 1) % numPoints;
       area += coordinates[i][0] * coordinates[j][1];
       area -= coordinates[j][0] * coordinates[i][1];
     }
-    
+
     return Math.abs(area) / 2;
   }
 
@@ -382,15 +441,17 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    * Calculate line string length
    */
   private calculateLineStringLength(coordinates: number[][]): number {
-    if (coordinates.length < 2) return 0;
-    
+    if (coordinates.length < 2) {
+      return 0;
+    }
+
     let length = 0;
     for (let i = 0; i < coordinates.length - 1; i++) {
       const dx = coordinates[i + 1][0] - coordinates[i][0];
       const dy = coordinates[i + 1][1] - coordinates[i][1];
       length += Math.sqrt(dx * dx + dy * dy);
     }
-    
+
     return length;
   }
 
@@ -399,7 +460,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    */
   private applyCountBasedCulling(features: Feature[]): Feature[] {
     const { maxFeaturesPerTile } = this.typedProps;
-    
+
     if (features.length <= maxFeaturesPerTile!) {
       return features;
     }
@@ -411,10 +472,14 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     }));
 
     featuresWithSize.sort((a, b) => b.size - a.size);
-    
-    this.debugLog(`Count-based culling: ${features.length} -> ${maxFeaturesPerTile} features`);
-    
-    return featuresWithSize.slice(0, maxFeaturesPerTile!).map(item => item.feature);
+
+    this.debugLog(
+      `Count-based culling: ${features.length} -> ${maxFeaturesPerTile} features`
+    );
+
+    return featuresWithSize
+      .slice(0, maxFeaturesPerTile!)
+      .map(item => item.feature);
   }
 
   /**
@@ -422,22 +487,24 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    */
   private getFeatureImportanceScore(feature: Feature): number {
     const geometry = feature.geometry || feature.properties?.imageGeometry;
-    if (!geometry) return 0;
+    if (!geometry) {
+      return 0;
+    }
 
     switch (geometry.type) {
       case 'Polygon':
       case 'MultiPolygon':
         return this.calculateGeometryArea(geometry);
-        
+
       case 'LineString':
       case 'MultiLineString':
         return this.calculateGeometryLength(geometry);
-        
+
       case 'Point':
       case 'MultiPoint':
         // Points get constant score, but can be weighted by properties
         return feature.properties?.weight || 1;
-        
+
       default:
         return 1;
     }
@@ -446,58 +513,67 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   /**
    * Simplify polygon geometry by reducing vertex count
    */
-  private simplifyPolygon(coordinates: number[][], tolerance: number): number[][] {
-    if (coordinates.length <= 3) return coordinates;
-    
+  private simplifyPolygon(
+    coordinates: number[][],
+    tolerance: number
+  ): number[][] {
+    if (coordinates.length <= 3) {
+      return coordinates;
+    }
+
     // Douglas-Peucker algorithm simplified version
     const simplified: number[][] = [coordinates[0]]; // Always keep first point
-    
+
     for (let i = 1; i < coordinates.length - 1; i++) {
       const prev = simplified[simplified.length - 1];
       const curr = coordinates[i];
       const next = coordinates[i + 1];
-      
+
       // Calculate perpendicular distance from current point to line prev->next
       const distance = this.perpendicularDistance(curr, prev, next);
-      
+
       if (distance >= tolerance) {
         simplified.push(curr);
       }
     }
-    
+
     // Always keep last point (which should equal first for closed polygons)
     simplified.push(coordinates[coordinates.length - 1]);
-    
+
     return simplified;
   }
 
   /**
    * Calculate perpendicular distance from point to line
    */
-  private perpendicularDistance(point: number[], lineStart: number[], lineEnd: number[]): number {
+  private perpendicularDistance(
+    point: number[],
+    lineStart: number[],
+    lineEnd: number[]
+  ): number {
     const [x0, y0] = point;
     const [x1, y1] = lineStart;
     const [x2, y2] = lineEnd;
-    
+
     const dx = x2 - x1;
     const dy = y2 - y1;
-    
+
     if (dx === 0 && dy === 0) {
       // Line start and end are the same point
       const dx2 = x0 - x1;
       const dy2 = y0 - y1;
       return Math.sqrt(dx2 * dx2 + dy2 * dy2);
     }
-    
+
     const t = ((x0 - x1) * dx + (y0 - y1) * dy) / (dx * dx + dy * dy);
     const clampedT = Math.max(0, Math.min(1, t));
-    
+
     const projX = x1 + clampedT * dx;
     const projY = y1 + clampedT * dy;
-    
+
     const distX = x0 - projX;
     const distY = y0 - projY;
-    
+
     return Math.sqrt(distX * distX + distY * distY);
   }
 
@@ -508,13 +584,15 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     const pixelScale = this.getPixelScale();
     const { simplificationTolerance } = this.typedProps;
     const tolerance = simplificationTolerance! / pixelScale; // Convert to world units
-    
+
     return features.map(feature => {
       const geometry = feature.geometry || feature.properties?.imageGeometry;
-      if (!geometry || tolerance <= 0) return feature;
+      if (!geometry || tolerance <= 0) {
+        return feature;
+      }
 
       const simplifiedGeometry = this.simplifyGeometry(geometry, tolerance);
-      
+
       return {
         ...feature,
         geometry: simplifiedGeometry
@@ -530,11 +608,11 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
       case 'Polygon':
         return {
           ...geometry,
-          coordinates: geometry.coordinates.map(ring => 
+          coordinates: geometry.coordinates.map(ring =>
             this.simplifyPolygon(ring, tolerance)
           )
         };
-        
+
       case 'MultiPolygon':
         return {
           ...geometry,
@@ -542,13 +620,13 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
             polygon.map(ring => this.simplifyPolygon(ring, tolerance))
           )
         };
-        
+
       case 'LineString':
         return {
           ...geometry,
           coordinates: this.simplifyPolygon(geometry.coordinates, tolerance)
         };
-        
+
       case 'MultiLineString':
         return {
           ...geometry,
@@ -556,7 +634,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
             this.simplifyPolygon(lineString, tolerance)
           )
         };
-        
+
       default:
         return geometry; // Points don't need simplification
     }
@@ -568,7 +646,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   private clusterPoints(features: Feature[]): Feature[] {
     const zoom = this.getCurrentZoom();
     const { clusterDistance, lodZoomThresholds } = this.typedProps;
-    
+
     // Only cluster at low zoom levels
     if (zoom > lodZoomThresholds![1]) {
       return features;
@@ -576,7 +654,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
 
     const points: Feature<Point>[] = [];
     const nonPoints: Feature[] = [];
-    
+
     // Separate points from other geometries
     features.forEach(feature => {
       const geometry = feature.geometry || feature.properties?.imageGeometry;
@@ -594,7 +672,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     // Cluster points
     const clusters = this.createPointClusters(points, clusterDistance!);
     const clusteredFeatures: Feature[] = [];
-    
+
     clusters.forEach(cluster => {
       if (cluster.count === 1) {
         // Single point, keep as-is
@@ -611,64 +689,85 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
             ...cluster.features[0].properties,
             cluster: true,
             point_count: cluster.count,
-            point_count_abbreviated: cluster.count > 1000 ? `${Math.round(cluster.count / 100) / 10}k` : cluster.count
+            point_count_abbreviated:
+              cluster.count > 1000
+                ? `${Math.round(cluster.count / 100) / 10}k`
+                : cluster.count
           }
         };
         clusteredFeatures.push(clusterFeature);
       }
     });
 
-    this.debugLog(`Point clustering: ${points.length} -> ${clusteredFeatures.length} points`);
-    
+    this.debugLog(
+      `Point clustering: ${points.length} -> ${clusteredFeatures.length} points`
+    );
+
     return [...nonPoints, ...clusteredFeatures];
   }
 
   /**
    * Create point clusters using simple distance-based clustering
    */
-  private createPointClusters(points: Feature<Point>[], clusterDistance: number): PointCluster[] {
+  private createPointClusters(
+    points: Feature<Point>[],
+    clusterDistance: number
+  ): PointCluster[] {
     const pixelScale = this.getPixelScale();
     const distance = clusterDistance / pixelScale; // Convert to world units
     const clusters: PointCluster[] = [];
     const used = new Set<number>();
 
     for (let i = 0; i < points.length; i++) {
-      if (used.has(i)) continue;
-      
+      if (used.has(i)) {
+        continue;
+      }
+
       const point = points[i];
       const [x, y] = point.geometry.coordinates;
-      
+
       const cluster: PointCluster = {
         position: [x, y],
         count: 1,
         features: [point]
       };
-      
+
       used.add(i);
-      
+
       // Find nearby points to add to cluster
       for (let j = i + 1; j < points.length; j++) {
-        if (used.has(j)) continue;
-        
+        if (used.has(j)) {
+          continue;
+        }
+
         const otherPoint = points[j];
         const [ox, oy] = otherPoint.geometry.coordinates;
-        
+
         const dx = x - ox;
         const dy = y - oy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (dist <= distance) {
           cluster.features.push(otherPoint);
           cluster.count++;
           used.add(j);
-          
+
           // Update cluster position to centroid
-          const totalX = cluster.features.reduce((sum, f) => sum + f.geometry.coordinates[0], 0);
-          const totalY = cluster.features.reduce((sum, f) => sum + f.geometry.coordinates[1], 0);
-          cluster.position = [totalX / cluster.features.length, totalY / cluster.features.length];
+          const totalX = cluster.features.reduce(
+            (sum, f) => sum + f.geometry.coordinates[0],
+            0
+          );
+          const totalY = cluster.features.reduce(
+            (sum, f) => sum + f.geometry.coordinates[1],
+            0
+          );
+          cluster.position = [
+            totalX / cluster.features.length,
+            totalY / cluster.features.length
+          ];
         }
       }
-      
+
       clusters.push(cluster);
     }
 
@@ -678,40 +777,46 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
   /**
    * Apply all LOD optimizations to features
    */
-  private applyLODOptimizations(features: Feature[], tile: Tile2DHeader): Feature[] {
+  private applyLODOptimizations(
+    features: Feature[],
+    tile: Tile2DHeader
+  ): Feature[] {
     // 1. Apply geometry simplification
     let optimizedFeatures = this.applyGeometrySimplification(features);
-    
+
     // 2. Apply point clustering
     optimizedFeatures = this.clusterPoints(optimizedFeatures);
-    
+
     return optimizedFeatures;
   }
 
   /**
    * Process features for a tile with all optimizations
    */
-  private processTileFeatures(tileData: FeatureTileData, tile: Tile2DHeader): Feature[] {
+  private processTileFeatures(
+    tileData: FeatureTileData,
+    tile: Tile2DHeader
+  ): Feature[] {
     let features = [...tileData.features]; // Copy to avoid mutation
-    
+
     this.debugLog(`Processing ${features.length} features for tile ${tile.id}`);
-    
+
     // 1. Spatial culling
     features = this.applySpatialCulling(features, tile);
     this.debugLog(`After spatial culling: ${features.length} features`);
-    
+
     // 2. Zoom-based culling
     features = this.applyZoomBasedCulling(features);
     this.debugLog(`After zoom-based culling: ${features.length} features`);
-    
+
     // 3. LOD optimizations
     features = this.applyLODOptimizations(features, tile);
     this.debugLog(`After LOD optimizations: ${features.length} features`);
-    
+
     // 4. Count-based culling (last, to ensure we don't exceed limits)
     //features = this.applyCountBasedCulling(features);
     //this.debugLog(`After count-based culling: ${features.length} features`);
-    
+
     return features;
   }
 
@@ -720,28 +825,38 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    */
   renderSubLayers(props: any): Layer | null | LayersList {
     const { data: tileData, tile } = props;
-    
-    console.log(`[TiledOverlayLayer] renderSubLayers called for tile ${tile.x}-${tile.y}-${tile.z}`, {
-      hasTileData: !!tileData,
-      featureCount: tileData?.features?.length || 0,
-      tileId: props.id
-    });
-    
+
+    console.log(
+      `[TiledOverlayLayer] renderSubLayers called for tile ${tile.x}-${tile.y}-${tile.z}`,
+      {
+        hasTileData: !!tileData,
+        featureCount: tileData?.features?.length || 0,
+        tileId: props.id
+      }
+    );
+
     if (!tileData || !tileData.features || tileData.features.length === 0) {
-      console.log(`[TiledOverlayLayer] No features for tile ${tile.x}-${tile.y}-${tile.z}`);
+      console.log(
+        `[TiledOverlayLayer] No features for tile ${tile.x}-${tile.y}-${tile.z}`
+      );
       return null;
     }
 
     // Process features with culling and LOD optimizations
     const processedFeatures = this.processTileFeatures(tileData, tile);
-    
-    console.log(`[TiledOverlayLayer] Processed features for tile ${tile.x}-${tile.y}-${tile.z}:`, {
-      originalCount: tileData.features.length,
-      processedCount: processedFeatures.length
-    });
-    
+
+    console.log(
+      `[TiledOverlayLayer] Processed features for tile ${tile.x}-${tile.y}-${tile.z}:`,
+      {
+        originalCount: tileData.features.length,
+        processedCount: processedFeatures.length
+      }
+    );
+
     if (processedFeatures.length === 0) {
-      console.log(`[TiledOverlayLayer] No processed features for tile ${tile.x}-${tile.y}-${tile.z}`);
+      console.log(
+        `[TiledOverlayLayer] No processed features for tile ${tile.x}-${tile.y}-${tile.z}`
+      );
       return null;
     }
 
@@ -749,11 +864,13 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     const points: Feature[] = [];
     const lines: Feature[] = [];
     const polygons: Feature[] = [];
-    
+
     processedFeatures.forEach(feature => {
       const geometry = feature.geometry || feature.properties?.imageGeometry;
-      if (!geometry) return;
-      
+      if (!geometry) {
+        return;
+      }
+
       switch (geometry.type) {
         case 'Point':
         case 'MultiPoint':
@@ -770,24 +887,34 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
       }
     });
 
-    console.log(`[TiledOverlayLayer] Feature type breakdown for tile ${tile.x}-${tile.y}-${tile.z}:`, {
-      points: points.length,
-      lines: lines.length,
-      polygons: polygons.length
-    });
+    console.log(
+      `[TiledOverlayLayer] Feature type breakdown for tile ${tile.x}-${tile.y}-${tile.z}:`,
+      {
+        points: points.length,
+        lines: lines.length,
+        polygons: polygons.length
+      }
+    );
 
     const layers: Layer[] = [];
-    const { featureFillColor, featureLineColor, featureLineWidth, adaptivePointSize } = this.typedProps;
-    
+    const {
+      featureFillColor,
+      featureLineColor,
+      featureLineWidth,
+      adaptivePointSize
+    } = this.typedProps;
+
     // Render polygons and lines with GeoJsonLayer
     if (polygons.length > 0 || lines.length > 0) {
       const geoJsonData = {
         type: 'FeatureCollection' as const,
         features: [...polygons, ...lines]
       };
-      
-      console.log(`[TiledOverlayLayer] Creating GeoJsonLayer with ${geoJsonData.features.length} features (tile ${tile.x}-${tile.y}-${tile.z})`);
-      
+
+      console.log(
+        `[TiledOverlayLayer] Creating GeoJsonLayer with ${geoJsonData.features.length} features (tile ${tile.x}-${tile.y}-${tile.z})`
+      );
+
       const geoJsonLayer = new GeoJsonLayer({
         ...props,
         id: `${props.id}-geojson`,
@@ -800,13 +927,13 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         lineWidthMinPixels: 1,
         pickable: true
       });
-      
-      console.log(`[TiledOverlayLayer] GeoJsonLayer created:`, {
+
+      console.log('[TiledOverlayLayer] GeoJsonLayer created:', {
         id: geoJsonLayer.id,
         pickable: geoJsonLayer.props.pickable,
         dataLength: geoJsonData.features.length
       });
-      
+
       layers.push(geoJsonLayer);
     }
 
@@ -816,7 +943,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         const geometry = feature.geometry || feature.properties?.imageGeometry;
         const isCluster = feature.properties?.cluster;
         const pointCount = feature.properties?.point_count || 1;
-        
+
         let coordinates: number[];
         if (geometry?.type === 'Point') {
           coordinates = geometry.coordinates;
@@ -825,7 +952,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         } else {
           coordinates = [0, 0]; // Fallback
         }
-        
+
         return {
           position: coordinates,
           feature,
@@ -833,12 +960,14 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
           pointCount
         };
       });
-      
+
       const zoom = this.getCurrentZoom();
       const baseRadius = adaptivePointSize ? Math.max(2, 8 - zoom * 0.5) : 5;
-      
-      console.log(`[TiledOverlayLayer] Creating ScatterplotLayer with ${pointData.length} points (tile ${tile.x}-${tile.y}-${tile.z})`);
-      
+
+      console.log(
+        `[TiledOverlayLayer] Creating ScatterplotLayer with ${pointData.length} points (tile ${tile.x}-${tile.y}-${tile.z})`
+      );
+
       const scatterplotLayer = new ScatterplotLayer({
         ...props,
         id: `${props.id}-points`,
@@ -866,18 +995,20 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
         radiusMaxPixels: 50,
         pickable: true
       });
-      
-      console.log(`[TiledOverlayLayer] ScatterplotLayer created:`, {
+
+      console.log('[TiledOverlayLayer] ScatterplotLayer created:', {
         id: scatterplotLayer.id,
         pickable: scatterplotLayer.props.pickable,
         dataLength: pointData.length,
         baseRadius
       });
-      
+
       layers.push(scatterplotLayer);
     }
 
-    console.log(`[TiledOverlayLayer] Returning ${layers.length} sub-layers for tile ${tile.x}-${tile.y}-${tile.z}`);
+    console.log(
+      `[TiledOverlayLayer] Returning ${layers.length} sub-layers for tile ${tile.x}-${tile.y}-${tile.z}`
+    );
     return layers;
   }
 
@@ -886,10 +1017,10 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
    */
   getPickingInfo(params: GetPickingInfoParams): TiledOverlayLayerPickingInfo {
     const info = super.getPickingInfo(params) as TiledOverlayLayerPickingInfo;
-    
+
     // The tile information is already available in info.tile
     // No need to add redundant properties
-    
+
     return info;
   }
 
