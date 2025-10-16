@@ -1,0 +1,39 @@
+name: jlpm
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    
+permissions:
+  contents: read
+
+jobs:
+  checkout:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: '0'
+        lfs: 'true'
+
+    - name: JupyterLab Base Setup
+      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+
+    - name: Install Dependencies
+      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+
+    - name: Lint the Extension
+      run: |
+        set -eux
+        jlpm
+        jlpm run lint:check
+
+    - name: Test Local Install
+      run: |
+        set -eux
+        python -m pip install .[test]
+        jlpm run test
+        jupyter labextension list
+        jupyter labextension list 2>&1 | grep -ie "osml-jupyter-extension.*OK"
+        python -m jupyterlab.browser_check
+        

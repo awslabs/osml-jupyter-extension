@@ -1,202 +1,117 @@
-# Guidance Title (required)
+# OSML Jupyter Extension
 
-The Guidance title should be consistent with the title established first in Alchemy.
+[![Build Status](https://github.com/awslabs/osml-jupyter-extension/actions/workflows/build.yml/badge.svg)](https://github.com/awslabs/osml-jupyter-extension/actions/workflows/build.yml) [![Python Badge](https://img.shields.io/badge/python-3.9%2C%203.10%2C%203.11%2C%203.12%2C%203.13-blue)](https://img.shields.io/badge/python-3.9%2C%203.10%2C%203.11%2C%203.12%2C%203.13-blue) [![JupyterLab Badge](https://img.shields.io/badge/jupyterlab-4.0+-orange)](https://img.shields.io/badge/jupyterlab-4.0+-orange) [![GitHub License](https://img.shields.io/github/license/awslabs/osml-jupyter-extension?color=blue)](https://img.shields.io/github/license/awslabs/osml-jupyter-extension?color=blue) [![PyPI - Version](https://img.shields.io/pypi/v/osml-jupyter-extension)](https://img.shields.io/pypi/v/osml-jupyter-extension)
 
-**Example:** *Guidance for Product Substitutions on AWS*
+A JupyterLab extension that provides interactive satellite imagery visualization and analysis capabilities using the OversightML (OSML) toolkit. This extension enables data scientists, researchers, and engineers to work with satellite imagery directly within the Jupyter Notebook ecosystem without switching to external GIS tools.
 
-This title correlates exactly to the Guidance it’s linked to, including its corresponding sample code repository. 
+## Key Features
 
+The OSML Jupyter Extension is intended to let image scientists and machine learning engineers work with remote sensing imagery.
+These images are large enough to require interactive visualization of a multi-resolution tile pyramid and require implementations of
+robust sensor models to correctly overlay features. It provides:
 
-## Table of Content (required)
+- **Interactive Visualization**: Efficient tile-based rendering of large satellite images and feature layers using Deck.gl
+- **Multi-format Support**: Native support for NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
+- **Feature Overlays**: Overlay of geospatial features using either world or image coordinates
+- **Metadata Access**: View and explore image metadata and feature properties
+- **Seamless Integration**: Right-click context menu integration with JupyterLab file browser
+- **OSML Ecosystem**: Built on the OversightML Imagery Toolkit for additional satellite image processing
 
-List the top-level sections of the README template, along with a hyperlink to the specific section.
+![Image With Overlays](docs/images/image-viewer-and-open-menu.png)
 
-### Required
+## Installation
 
-1. [Overview](#overview-required)
-    - [Cost](#cost)
-2. [Prerequisites](#prerequisites-required)
-    - [Operating System](#operating-system-required)
-3. [Deployment Steps](#deployment-steps-required)
-4. [Deployment Validation](#deployment-validation-required)
-5. [Running the Guidance](#running-the-guidance-required)
-6. [Next Steps](#next-steps-required)
-7. [Cleanup](#cleanup-required)
+This extension can be installed in your JupyterLab v4.0 environment. It will also require you to setup a special iPython kernel
+that has GDAL, Proj, and the osml-imagery-toolkit installed.
 
-***Optional***
+### JupyterLab Extension Installation from PyPI
 
-8. [FAQ, known issues, additional considerations, and limitations](#faq-known-issues-additional-considerations-and-limitations-optional)
-9. [Revisions](#revisions-optional)
-10. [Notices](#notices-optional)
-11. [Authors](#authors-optional)
+The extension can either be installed from a package distributed on PyPi or directly from source.
 
-## Overview (required)
+```bash
+pip install osml-jupyter-extension
+```
 
-1. Provide a brief overview explaining the what, why, or how of your Guidance. You can answer any one of the following to help you write this:
+```bash
+git clone https://github.com/awslabs/osml-jupyter-extension.git
+cd osml-jupyter-extension
+pip install .
+```
 
-    - **Why did you build this Guidance?**
-    - **What problem does this Guidance solve?**
+### Kernel Environment Setup
 
-2. Include the architecture diagram image, as well as the steps explaining the high-level overview and flow of the architecture. 
-    - To add a screenshot, create an ‘assets/images’ folder in your repository and upload your screenshot to it. Then, using the relative file path, add it to your README. 
+The extension requires a conda environment with GDAL, Proj, Boto3 and the OSML Imagery Toolkit. An example conda environment
+has been provided for reference and can be updated to include additional OpenGIS libraries needed for your work.
 
-### Cost
+1. Create the conda environment:
 
-This section is for a high-level cost estimate. Think of a likely straightforward scenario with reasonable assumptions based on the problem the Guidance is trying to solve. If applicable, provide an in-depth cost breakdown table in this section.
+```bash
+conda env create -f conda/osml-kernel-environment.yml
+conda activate osml-kernel
+```
 
-Start this section with the following boilerplate text:
+2. Register the environment as a Jupyter kernel:
 
-_You are responsible for the cost of the AWS services used while running this Guidance. As of <month> <year>, the cost for running this Guidance with the default settings in the <Default AWS Region (Most likely will be US East (N. Virginia)) > is approximately $<n.nn> per month for processing ( <nnnnn> records )._
+```bash
+python -m ipykernel install --user --name=osml-kernel
+```
 
-Replace this amount with the approximate cost for running your Guidance in the default Region. This estimate should be per month and for processing/serving resonable number of requests/entities.
+3. Restart JupyterLab to see the new kernel option.
 
+## Using the Extension
 
-## Prerequisites (required)
+See the [USER_GUIDE](./docs/USER_GUIDE.md) for more information.
 
-### Operating System (required)
+## Development
 
-- Talk about the base Operating System (OS) and environment that can be used to run or deploy this Guidance, such as *Mac, Linux, or Windows*. Include all installable packages or modules required for the deployment. 
-- By default, assume Amazon Linux 2/Amazon Linux 2023 AMI as the base environment. All packages that are not available by default in AMI must be listed out.  Include the specific version number of the package or module.
+A summary of the extension's architecture can be found in [ARCHITECTURE_OVERVIEW](./docs/ARCHITECTURE_OVERVIEW.md).
 
-**Example:**
-“These deployment instructions are optimized to best work on **<Amazon Linux 2 AMI>**.  Deployment in another OS may require additional steps.”
+### Development Install
 
-- Include install commands for packages, if applicable.
+For development work, clone the repository and set up the development environment:
 
+```bash
+# Create development conda environment
+conda env create -f conda/osml-jupyterlab-ext-dev-environment.yml
+conda activate osml-jupyterlab-ext-dev
 
-### Third-party tools (If applicable)
+# Install in development mode
+pip install -e "."
+jupyter labextension develop . --overwrite
 
-*List any installable third-party tools required for deployment.*
+# Install dependencies and build
+jlpm install
+jlpm build
+```
 
+### Development Workflow
 
-### AWS account requirements (If applicable)
+```bash
+# Watch for changes and auto-rebuild
+jlpm watch
 
-*List out pre-requisites required on the AWS account if applicable, this includes enabling AWS regions, requiring ACM certificate.*
+# Run JupyterLab in another terminal
+jupyter lab
+```
 
-**Example:** “This deployment requires you have public ACM certificate available in your AWS account”
+### Testing
 
-**Example resources:**
-- ACM certificate 
-- DNS record
-- S3 bucket
-- VPC
-- IAM role with specific permissions
-- Enabling a Region or service etc.
+```bash
+# Run TypeScript tests
+jlpm test:typescript
 
+# Run Python tests
+jlpm test:python
 
-### aws cdk bootstrap (if sample code has aws-cdk)
+# Run all tests
+jlpm test
+```
 
-<If using aws-cdk, include steps for account bootstrap for new cdk users.>
+## Contributing
 
-**Example blurb:** “This Guidance uses aws-cdk. If you are using aws-cdk for first time, please perform the below bootstrapping....”
+This project welcomes contributions and suggestions. If you would like to submit a pull request, see our
+[Contribution Guide](CONTRIBUTING.md) for more information. We kindly ask that you **do not** open a public GitHub issue to report security concerns. Instead follow reporting mechanisims described in [SECURITY](SECURITY.md).
 
-### Service limits  (if applicable)
+## License
 
-<Talk about any critical service limits that affect the regular functioning of the Guidance. If the Guidance requires service limit increase, include the service name, limit name and link to the service quotas page.>
-
-### Supported Regions (if applicable)
-
-<If the Guidance is built for specific AWS Regions, or if the services used in the Guidance do not support all Regions, please specify the Region this Guidance is best suited for>
-
-
-## Deployment Steps (required)
-
-Deployment steps must be numbered, comprehensive, and usable to customers at any level of AWS expertise. The steps must include the precise commands to run, and describe the action it performs.
-
-* All steps must be numbered.
-* If the step requires manual actions from the AWS console, include a screenshot if possible.
-* The steps must start with the following command to clone the repo. ```git clone xxxxxxx```
-* If applicable, provide instructions to create the Python virtual environment, and installing the packages using ```requirement.txt```.
-* If applicable, provide instructions to capture the deployed resource ARN or ID using the CLI command (recommended), or console action.
-
- 
-**Example:**
-
-1. Clone the repo using command ```git clone xxxxxxxxxx```
-2. cd to the repo folder ```cd <repo-name>```
-3. Install packages in requirements using command ```pip install requirement.txt```
-4. Edit content of **file-name** and replace **s3-bucket** with the bucket name in your account.
-5. Run this command to deploy the stack ```cdk deploy``` 
-6. Capture the domain name created by running this CLI command ```aws apigateway ............```
-
-
-
-## Deployment Validation  (required)
-
-<Provide steps to validate a successful deployment, such as terminal output, verifying that the resource is created, status of the CloudFormation template, etc.>
-
-
-**Examples:**
-
-* Open CloudFormation console and verify the status of the template with the name starting with xxxxxx.
-* If deployment is successful, you should see an active database instance with the name starting with <xxxxx> in        the RDS console.
-*  Run the following CLI command to validate the deployment: ```aws cloudformation describe xxxxxxxxxxxxx```
-
-
-
-## Running the Guidance (required)
-
-<Provide instructions to run the Guidance with the sample data or input provided, and interpret the output received.> 
-
-This section should include:
-
-* Guidance inputs
-* Commands to run
-* Expected output (provide screenshot if possible)
-* Output description
-
-
-
-## Next Steps (required)
-
-Provide suggestions and recommendations about how customers can modify the parameters and the components of the Guidance to further enhance it according to their requirements.
-
-
-## Cleanup (required)
-
-- Include detailed instructions, commands, and console actions to delete the deployed Guidance.
-- If the Guidance requires manual deletion of resources, such as the content of an S3 bucket, please specify.
-
-
-
-## FAQ, known issues, additional considerations, and limitations (optional)
-
-
-**Known issues (optional)**
-
-<If there are common known issues, or errors that can occur during the Guidance deployment, describe the issue and resolution steps here>
-
-
-**Additional considerations (if applicable)**
-
-<Include considerations the customer must know while using the Guidance, such as anti-patterns, or billing considerations.>
-
-**Examples:**
-
-- “This Guidance creates a public AWS bucket required for the use-case.”
-- “This Guidance created an Amazon SageMaker notebook that is billed per hour irrespective of usage.”
-- “This Guidance creates unauthenticated public API endpoints.”
-
-
-Provide a link to the *GitHub issues page* for users to provide feedback.
-
-
-**Example:** *“For any feedback, questions, or suggestions, please use the issues tab under this repo.”*
-
-## Revisions (optional)
-
-Document all notable changes to this project.
-
-Consider formatting this section based on Keep a Changelog, and adhering to Semantic Versioning.
-
-## Notices (optional)
-
-Include a legal disclaimer
-
-**Example:**
-*Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.*
-
-
-## Authors (optional)
-
-Name of code contributors
+This library is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file.

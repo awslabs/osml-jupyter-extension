@@ -1,0 +1,15 @@
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  jlpm:
+    uses: ./.github/workflows/jlpm.yml
+    secrets: inherit
+  publish:
+    needs: [jlpm]
+    uses: ./.github/workflows/pypi.yml
+    secrets: inherit

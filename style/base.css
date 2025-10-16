@@ -1,0 +1,50 @@
+/*
+    See the JupyterLab Developer Guide for useful CSS Patterns:
+
+    https://jupyterlab.readthedocs.io/en/stable/developer/css.html
+*/
+
+.deck-container {
+  height: 100vh;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.deck-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Model Selection Toolbar Button Styles */
+.jp-model-selection-toolbar-button {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  min-height: 28px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: var(--jp-border-radius);
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  font-size: var(--jp-ui-font-size1);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.jp-model-selection-toolbar-button:hover {
+  background: var(--jp-layout-color2);
+  border-color: var(--jp-border-color2);
+}
+
+.jp-model-selection-toolbar-button:active {
+  background: var(--jp-layout-color3);
+}
+
+.jp-model-selection-toolbar-button .jp-toolbar-button-component-icon {
+  margin-right: 4px;
+  font-size: 16px;
+}
