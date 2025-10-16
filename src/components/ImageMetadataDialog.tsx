@@ -5,21 +5,21 @@ import { ReactWidget } from '@jupyterlab/apputils';
 // @ts-ignore: react-json-view doesn't have perfect TypeScript support
 import ReactJson from 'react-json-view';
 import { CommService } from '../services';
-import { MetadataObject, MetadataValue } from '../types';
+import { IMetadataObject } from '../types';
 import { filterObjectBySearchTerm } from '../utils';
 
-interface ImageMetadataComponentProps {
+interface IImageMetadataComponentProps {
   imageName: string;
   commService?: CommService;
   onClose: () => void;
 }
 
-const ImageMetadataComponent: FC<ImageMetadataComponentProps> = ({
+const ImageMetadataComponent: FC<IImageMetadataComponentProps> = ({
   imageName,
   commService,
   onClose
 }) => {
-  const [metadata, setMetadata] = useState<MetadataObject | null>(null);
+  const [metadata, setMetadata] = useState<IMetadataObject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
   const [searchTerm, setSearchTerm] = useState('');

@@ -4,7 +4,7 @@ import { ToolbarButton } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
 import { listIcon } from '../utils/icons';
 import LayerControlDialog from './LayerControlDialog';
-import { LayerInfo, LayerControlActions } from '../types';
+import { ILayerInfo } from '../types';
 
 /**
  * A toolbar button widget for controlling overlay layers
@@ -69,19 +69,19 @@ export class LayerControlToolbarButton extends ToolbarButton {
   /**
    * Get layer information from the ImageViewerWidget
    */
-  private _getLayerInfo(): LayerInfo[] {
+  private _getLayerInfo(): ILayerInfo[] {
     // Use the ImageViewerWidget's getLayerInfo method to get actual layer state
     if (typeof (this._imageViewerWidget as any).getLayerInfo === 'function') {
       return (this._imageViewerWidget as any).getLayerInfo();
     }
 
     // Fallback to manual construction if method doesn't exist
-    const layers: LayerInfo[] = [];
+    const layers: ILayerInfo[] = [];
 
     // Get feature layers
     const featureLayers = (this._imageViewerWidget as any).featureLayers;
     if (featureLayers && featureLayers instanceof Map) {
-      for (const [layerId, layer] of featureLayers.entries()) {
+      for (const [layerId] of featureLayers.entries()) {
         layers.push({
           id: layerId,
           name: layerId,
@@ -95,7 +95,7 @@ export class LayerControlToolbarButton extends ToolbarButton {
     // Get model layers
     const modelLayers = (this._imageViewerWidget as any).modelLayers;
     if (modelLayers && modelLayers instanceof Map) {
-      for (const [layerId, layer] of modelLayers.entries()) {
+      for (const [layerId] of modelLayers.entries()) {
         layers.push({
           id: layerId,
           name: layerId,

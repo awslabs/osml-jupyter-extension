@@ -18,7 +18,7 @@ import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
-import { KERNEL_SETUP_CODE, createPropertyTableHTML } from './utils';
+import { KERNEL_SETUP_CODE } from './utils';
 import { ITile, TileDataFunction, FeatureTileDataFunction } from './types';
 import { TiledOverlayLayer } from './layers';
 import {
@@ -32,7 +32,6 @@ import {
   FeaturePropertiesDialog
 } from './components';
 import { ReactWidget } from '@jupyterlab/ui-components';
-import React from 'react';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -1021,15 +1020,6 @@ export class ImageViewerWidget extends MainAreaWidget {
         // For model layers, we need to recreate using the existing pattern
         const existingLayer = layer as any;
         const getTileData = existingLayer.props.getTileData;
-
-        const customColor = this.layerColors.get(layerId) ?? [255, 0, 0, 128];
-        const fillColor = [
-          customColor[0],
-          customColor[1],
-          customColor[2],
-          Math.floor(customColor[3] * 0.5)
-        ] as [number, number, number, number];
-        const lineColor = customColor;
 
         // Create new model layer with updated color using TiledOverlayLayer
         const newModelLayer = this.createFeatureLayer(layerId, getTileData);

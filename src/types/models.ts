@@ -12,7 +12,7 @@ export interface IModelSelectionResult {
 /**
  * Model configuration
  */
-export interface ModelConfig {
+export interface IModelConfig {
   name: string;
   enabled: boolean;
   endpoint?: string;
@@ -22,7 +22,7 @@ export interface ModelConfig {
 /**
  * Model processing status
  */
-export interface ModelProcessingStatus {
+export interface IModelProcessingStatus {
   isProcessing: boolean;
   progress?: number;
   message?: string;
@@ -32,7 +32,7 @@ export interface ModelProcessingStatus {
 /**
  * Model selection dialog props
  */
-export interface ModelSelectionDialogProps {
+export interface IModelSelectionDialogProps {
   initialModelName?: string;
   initialModelEnabled?: boolean;
   onUpdate: (modelName: string, modelEnabled: boolean) => void;
@@ -41,7 +41,7 @@ export interface ModelSelectionDialogProps {
 /**
  * SageMaker endpoint information
  */
-export interface EndpointInfo {
+export interface IEndpointInfo {
   name: string;
   status: string;
   creationTime?: string;
@@ -52,19 +52,19 @@ export interface EndpointInfo {
 /**
  * Response from LIST_AVAILABLE_ENDPOINTS request
  */
-export interface EndpointsResponse {
+export interface IEndpointsResponse {
   type: 'LIST_AVAILABLE_ENDPOINTS_RESPONSE';
   status: 'SUCCESS' | 'ERROR';
-  endpoints?: EndpointInfo[];
+  endpoints?: IEndpointInfo[];
   error?: string;
 }
 
 /**
  * Endpoint loading state
  */
-export interface EndpointLoadingState {
+export interface IEndpointLoadingState {
   isLoading: boolean;
   error?: string;
-  endpoints: EndpointInfo[];
+  endpoints: IEndpointInfo[];
   lastFetched?: Date;
 }

@@ -21,7 +21,7 @@ export function flattenProperties(
   }
 
   for (const key in obj) {
-    if (!obj.hasOwnProperty(key)) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) {
       continue;
     }
 
@@ -217,12 +217,13 @@ function formatValueByType(value: string): string {
       return `<span class="coord-value">${value}</span>`;
     case 'Base64':
       return `<span class="base64-value" title="Base64 encoded data">${value}</span>`;
-    case 'Number':
+    case 'Number': {
       // Format numbers with appropriate precision
       const num = Number(value);
       const formatted =
         num % 1 === 0 ? num.toString() : num.toFixed(6).replace(/\.?0+$/, '');
       return `<span class="number-value">${formatted}</span>`;
+    }
     case 'Date':
       return `<span class="date-value">${value}</span>`;
     default:

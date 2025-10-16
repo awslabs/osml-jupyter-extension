@@ -2,7 +2,6 @@
 
 import React, { FC, useState, useEffect } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
-import { Widget } from '@lumino/widgets';
 import FormField from '@cloudscape-design/components/form-field';
 import Input from '@cloudscape-design/components/input';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -12,16 +11,16 @@ import Button from '@cloudscape-design/components/button';
 import Alert from '@cloudscape-design/components/alert';
 import Spinner from '@cloudscape-design/components/spinner';
 import { CommService } from '../services';
-import { EndpointInfo, EndpointLoadingState } from '../types/models';
+import { IEndpointLoadingState } from '../types/models';
 
-interface ModelSelectionComponentProps {
+interface IModelSelectionComponentProps {
   initialModelName?: string;
   initialModelEnabled?: boolean;
   onUpdate: (modelName: string, modelEnabled: boolean) => void;
   commService?: CommService;
 }
 
-const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
+const ModelSelectionComponent: FC<IModelSelectionComponentProps> = ({
   initialModelName = '',
   initialModelEnabled = false,
   onUpdate,
@@ -32,7 +31,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
   const modelEnabled = initialModelEnabled;
 
   // State for endpoint management
-  const [endpointState, setEndpointState] = useState<EndpointLoadingState>({
+  const [endpointState, setEndpointState] = useState<IEndpointLoadingState>({
     isLoading: false,
     error: undefined,
     endpoints: []
@@ -45,7 +44,11 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
       return;
     }
 
-    setEndpointState(prev => ({ ...prev, isLoading: true, error: undefined }));
+    setEndpointState((prev: IEndpointLoadingState) => ({
+      ...prev,
+      isLoading: true,
+      error: undefined
+    }));
 
     try {
       const response = await commService.sendMessage({
@@ -68,7 +71,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
         'Failed to fetch endpoints, falling back to manual entry:',
         error
       );
-      setEndpointState(prev => ({
+      setEndpointState((prev: IEndpointLoadingState) => ({
         ...prev,
         isLoading: false,
         error:
@@ -83,7 +86,7 @@ const ModelSelectionComponent: FC<ModelSelectionComponentProps> = ({
     if (commService && commService.isReady()) {
       fetchEndpoints();
     }
-  }, [commService]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [commService, fetchEndpoints]);
 
   const handleModelNameChange = (value: string) => {
     onUpdate(value, modelEnabled);

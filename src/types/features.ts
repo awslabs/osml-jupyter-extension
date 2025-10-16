@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature } from 'geojson';
 
 /**
  * Heatmap point data structure
  */
-export interface HeatmapPoint {
+export interface IHeatmapPoint {
   position: [number, number];
   weight: number;
 }
@@ -13,7 +13,7 @@ export interface HeatmapPoint {
 /**
  * Feature layer configuration
  */
-export interface FeatureLayerConfig {
+export interface IFeatureLayerConfig {
   id: string;
   heatmapZoomThreshold?: number;
   heatmapRadiusPixels?: number;
@@ -27,7 +27,7 @@ export interface FeatureLayerConfig {
 /**
  * Feature processing options
  */
-export interface FeatureProcessingOptions {
+export interface IFeatureProcessingOptions {
   extractCentroid?: boolean;
   calculateBounds?: boolean;
   validateGeometry?: boolean;
@@ -36,7 +36,7 @@ export interface FeatureProcessingOptions {
 /**
  * Feature cache entry
  */
-export interface FeatureCacheEntry {
+export interface IFeatureCacheEntry {
   features: Feature[];
   byteLength: number;
   timestamp: number;

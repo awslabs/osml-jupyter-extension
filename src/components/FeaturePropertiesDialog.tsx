@@ -6,7 +6,7 @@ import { ReactWidget } from '@jupyterlab/apputils';
 import ReactJson from 'react-json-view';
 import { filterObjectBySearchTerm } from '../utils';
 
-interface FeaturePropertiesComponentProps {
+interface IFeaturePropertiesComponentProps {
   feature: any;
   onClose: () => void;
 }
@@ -14,7 +14,7 @@ interface FeaturePropertiesComponentProps {
 /**
  * Main Feature Properties Component with Interactive JSON View
  */
-const FeaturePropertiesComponent: FC<FeaturePropertiesComponentProps> = ({
+const FeaturePropertiesComponent: FC<IFeaturePropertiesComponentProps> = ({
   feature,
   onClose
 }) => {

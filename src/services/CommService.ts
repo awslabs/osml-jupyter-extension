@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { Kernel } from '@jupyterlab/services';
-import { CommMessage, CommMessageType } from '../types';
+import { ICommMessage } from '../types';
 
 /**
  * Service for managing Jupyter comm channel communication
@@ -59,7 +59,7 @@ export class CommService {
    * Send a message through the comm channel
    */
   public async sendMessage(
-    message: CommMessage,
+    message: ICommMessage,
     timeoutMs: number = 30000
   ): Promise<any> {
     if (!this.comm) {

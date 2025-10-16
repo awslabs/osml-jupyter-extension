@@ -12,7 +12,7 @@ export * from './models';
 /**
  * Widget state interface
  */
-export interface WidgetState {
+export interface IWidgetState {
   isInitialized: boolean;
   isLoading: boolean;
   error?: string;
@@ -40,7 +40,7 @@ export type CommMessageType =
 /**
  * Communication message interface
  */
-export interface CommMessage {
+export interface ICommMessage {
   type: CommMessageType;
   dataset?: string;
   imageName?: string;
@@ -56,13 +56,13 @@ export interface CommMessage {
   imageCoordinates?: number[][]; // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
   worldCoordinates?: number[][]; // For IMAGE_TO_WORLD and WORLD_TO_IMAGE
   endpoints?: any[]; // For LIST_AVAILABLE_ENDPOINTS_RESPONSE
-  metadata?: MetadataObject; // For IMAGE_METADATA_RESPONSE
+  metadata?: IMetadataObject; // For IMAGE_METADATA_RESPONSE
 }
 
 /**
  * Metadata type definitions for flexible hierarchical data
  */
-export interface MetadataObject {
+export interface IMetadataObject {
   [key: string]: MetadataValue;
 }
 
@@ -71,13 +71,13 @@ export type MetadataValue =
   | number
   | boolean
   | null
-  | MetadataObject
+  | IMetadataObject
   | MetadataValue[];
 
 /**
  * Debug information interface
  */
-export interface DebugInfo {
+export interface IDebugInfo {
   useMockData: boolean;
   useMockFeatureData: boolean;
   enableDebugLogging: boolean;
@@ -92,7 +92,7 @@ export interface DebugInfo {
 /**
  * Layer configuration base interface
  */
-export interface LayerConfigBase {
+export interface ILayerConfigBase {
   id: string;
   visible?: boolean;
   opacity?: number;
@@ -102,7 +102,7 @@ export interface LayerConfigBase {
 /**
  * Viewport state interface
  */
-export interface ViewportState {
+export interface IViewportState {
   target: [number, number, number];
   zoom: number;
   minZoom?: number;
@@ -112,7 +112,7 @@ export interface ViewportState {
 /**
  * Layer management types
  */
-export interface LayerInfo {
+export interface ILayerInfo {
   id: string;
   name: string;
   visible: boolean;
@@ -120,7 +120,7 @@ export interface LayerInfo {
   type: 'feature' | 'model';
 }
 
-export interface LayerControlActions {
+export interface ILayerControlActions {
   toggleVisibility: (layerId: string) => void;
   updateColor: (
     layerId: string,

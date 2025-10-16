@@ -1889,7 +1889,7 @@ initialize_message_processors()
 # Global comm reference for debugging and diagnostics
 osml_comm = None
 
-def create_new_recv(comm):
+def create_router_function(comm):
     """New message handler that uses the message registry"""
     def _recv(msg):
         try:
@@ -1927,11 +1927,7 @@ def osml_comm_target_func(comm, msg):
     osml_comm = comm
     
     # Register handler for later messages using new registry-based system
-    comm.on_msg(create_new_recv(comm))
-    
-    # Also register legacy handler for backward compatibility (fallback)
-    # This allows gradual migration and testing
-    # comm.on_msg(create_recv(comm))  # Commented out to use new system
+    comm.on_msg(create_router_function(comm))
 
     # Send data to the frontend
     comm.send({'type': "KERNEL_COMM_SETUP_COMPLETE"})

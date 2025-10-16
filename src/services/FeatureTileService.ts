@@ -3,23 +3,23 @@
 import { Feature } from 'geojson';
 import {
   IFeatureTile,
-  FeatureTileData,
+  IFeatureTileData,
   FeatureTileDataFunction,
-  FeatureCacheEntry
+  IFeatureCacheEntry
 } from '../types';
 import { CommService } from './CommService';
 
 /**
  * Callback function for when async tile data is loaded
  */
-export type TileDataCallback = (tileId: string, data: FeatureTileData) => void;
+export type TileDataCallback = (tileId: string, data: IFeatureTileData) => void;
 
 /**
  * Service for managing feature tile data loading and processing
  */
 export class FeatureTileService {
-  private featureCache: Map<string, FeatureCacheEntry> = new Map();
-  private loadingPromises: Map<string, Promise<FeatureTileData>> = new Map();
+  private featureCache: Map<string, IFeatureCacheEntry> = new Map();
+  private loadingPromises: Map<string, Promise<IFeatureTileData>> = new Map();
   private dataChangeCallbacks: Map<string, Set<TileDataCallback>> = new Map();
   private enableDebugLogging: boolean = true;
 
@@ -40,7 +40,7 @@ export class FeatureTileService {
       endpointName?: string;
       squareSize?: number;
     }
-  ): FeatureTileData {
+  ): IFeatureTileData {
     const tileId = this.getTileId(tile, dataType, options);
 
     // Return cached data immediately if available
@@ -73,7 +73,7 @@ export class FeatureTileService {
   public createMockFeatureDataFunction(
     squareSize: number = 0.1
   ): FeatureTileDataFunction {
-    return async (tile: IFeatureTile): Promise<FeatureTileData> => {
+    return async (tile: IFeatureTile): Promise<IFeatureTileData> => {
       return this.createMockFeatureData(tile, squareSize);
     };
   }
@@ -85,7 +85,7 @@ export class FeatureTileService {
     imageName: string,
     overlayName: string
   ): FeatureTileDataFunction {
-    return async (tile: IFeatureTile): Promise<FeatureTileData> => {
+    return async (tile: IFeatureTile): Promise<IFeatureTileData> => {
       return this.loadRealFeatureData(tile, imageName, overlayName);
     };
   }
@@ -97,7 +97,7 @@ export class FeatureTileService {
     dataset: string,
     endpointName: string
   ): FeatureTileDataFunction {
-    return async (tile: IFeatureTile): Promise<FeatureTileData> => {
+    return async (tile: IFeatureTile): Promise<IFeatureTileData> => {
       return this.loadModelFeatureData(tile, dataset, endpointName);
     };
   }
@@ -108,7 +108,7 @@ export class FeatureTileService {
   private async createMockFeatureData(
     tile: IFeatureTile,
     squareSize: number
-  ): Promise<FeatureTileData> {
+  ): Promise<IFeatureTileData> {
     const tileKey = `mock-${tile.x}-${tile.y}-${tile.z}`;
 
     // Check cache first
@@ -181,7 +181,7 @@ export class FeatureTileService {
       const byteLength = this.calculateFeaturesByteLength(features);
 
       // Cache the result
-      const cacheEntry: FeatureCacheEntry = {
+      const cacheEntry: IFeatureCacheEntry = {
         features,
         byteLength,
         timestamp: Date.now(),
@@ -204,7 +204,7 @@ export class FeatureTileService {
     tile: IFeatureTile,
     imageName: string,
     overlayName: string
-  ): Promise<FeatureTileData> {
+  ): Promise<IFeatureTileData> {
     const tileKey = `${imageName}-${overlayName}-${tile.x}-${tile.y}-${tile.z}`;
 
     // Check cache first
@@ -251,7 +251,7 @@ export class FeatureTileService {
       const byteLength = this.calculateFeaturesByteLength(processedFeatures);
 
       // Cache the result
-      const cacheEntry: FeatureCacheEntry = {
+      const cacheEntry: IFeatureCacheEntry = {
         features: processedFeatures,
         byteLength,
         timestamp: Date.now(),
@@ -277,7 +277,7 @@ export class FeatureTileService {
     tile: IFeatureTile,
     dataset: string,
     endpointName: string
-  ): Promise<FeatureTileData> {
+  ): Promise<IFeatureTileData> {
     const tileKey = `model-${dataset}-${endpointName}-${tile.x}-${tile.y}-${tile.z}`;
 
     // Check cache first
@@ -327,7 +327,7 @@ export class FeatureTileService {
       const byteLength = this.calculateFeaturesByteLength(processedFeatures);
 
       // Cache the result
-      const cacheEntry: FeatureCacheEntry = {
+      const cacheEntry: IFeatureCacheEntry = {
         features: processedFeatures,
         byteLength,
         timestamp: Date.now(),
@@ -436,7 +436,7 @@ export class FeatureTileService {
   ): void {
     this.debugLog(`Starting async load for tile ${tileId}`);
 
-    let loadPromise: Promise<FeatureTileData>;
+    let loadPromise: Promise<IFeatureTileData>;
 
     switch (dataType) {
       case 'mock':
@@ -498,7 +498,7 @@ export class FeatureTileService {
   /**
    * Notify all callbacks for a tile that data has arrived
    */
-  private notifyCallbacks(tileId: string, data: FeatureTileData): void {
+  private notifyCallbacks(tileId: string, data: IFeatureTileData): void {
     const callbacks = this.dataChangeCallbacks.get(tileId);
     if (callbacks) {
       callbacks.forEach(callback => {

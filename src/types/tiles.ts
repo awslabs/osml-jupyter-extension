@@ -39,7 +39,7 @@ export type TileDataFunction = (tile: ITile) => Promise<ImageBitmap | null>;
 /**
  * Wrapper for feature tile data that includes byteLength for Deck.gl compatibility
  */
-export interface FeatureTileData {
+export interface IFeatureTileData {
   features: Feature[];
   byteLength: number;
 }
@@ -49,12 +49,12 @@ export interface FeatureTileData {
  */
 export type FeatureTileDataFunction = (
   tile: IFeatureTile
-) => Promise<FeatureTileData>;
+) => Promise<IFeatureTileData>;
 
 /**
  * Configuration options for tile loading
  */
-export interface TileLoadConfig {
+export interface ITileLoadConfig {
   tileSize?: number;
   timeout?: number;
   maxRetries?: number;
@@ -64,7 +64,7 @@ export interface TileLoadConfig {
 /**
  * Tile cache configuration
  */
-export interface TileCacheConfig {
+export interface ITileCacheConfig {
   maxCacheSize?: number;
   maxCacheByteSize?: number;
   enableCache?: boolean;

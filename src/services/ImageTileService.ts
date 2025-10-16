@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import { ITile, TileDataFunction, TileLoadConfig } from '../types';
+import { ITile, TileDataFunction, ITileLoadConfig } from '../types';
 import { CommService } from './CommService';
 
 /**
@@ -8,11 +8,11 @@ import { CommService } from './CommService';
  */
 export class ImageTileService {
   private tileCache: Map<string, ImageBitmap> = new Map();
-  private config: Required<TileLoadConfig>;
+  private config: Required<ITileLoadConfig>;
 
   constructor(
     private commService: CommService,
-    config: TileLoadConfig = {}
+    config: ITileLoadConfig = {}
   ) {
     this.config = {
       tileSize: 512,
@@ -53,60 +53,57 @@ export class ImageTileService {
       return this.tileCache.get(tileKey)!;
     }
 
-    return new Promise(async resolve => {
-      const canvas = document.createElement('canvas');
-      canvas.width = this.config.tileSize;
-      canvas.height = this.config.tileSize;
-      const ctx = canvas.getContext('2d');
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.tileSize;
+    canvas.height = this.config.tileSize;
+    const ctx = canvas.getContext('2d');
 
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
+    if (!ctx) {
+      return null;
+    }
 
-      // Save context state
-      ctx.save();
+    // Save context state
+    ctx.save();
 
-      // Fill with gray background
-      ctx.fillStyle = '#808080';
-      ctx.fillRect(0, 0, this.config.tileSize, this.config.tileSize);
+    // Fill with gray background
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, this.config.tileSize, this.config.tileSize);
 
-      // Add border
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, this.config.tileSize - 2, this.config.tileSize - 2);
+    // Add border
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, this.config.tileSize - 2, this.config.tileSize - 2);
 
-      // Add coordinates text
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 24px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(
-        `${tile.x},${tile.y},${tile.z}`,
-        this.config.tileSize / 2,
-        this.config.tileSize / 2
-      );
+    // Add coordinates text
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      `${tile.x},${tile.y},${tile.z}`,
+      this.config.tileSize / 2,
+      this.config.tileSize / 2
+    );
 
-      // Restore context
-      ctx.restore();
+    // Restore context
+    ctx.restore();
 
-      try {
-        // Convert canvas to ImageBitmap
-        const imageBitmap = await createImageBitmap(canvas);
-        // Add byteLength property for Deck.gl compatibility
-        (imageBitmap as any).byteLength =
-          this.config.tileSize * this.config.tileSize * 4; // RGBA bytes
+    try {
+      // Convert canvas to ImageBitmap
+      const imageBitmap = await createImageBitmap(canvas);
+      // Add byteLength property for Deck.gl compatibility
+      (imageBitmap as any).byteLength =
+        this.config.tileSize * this.config.tileSize * 4; // RGBA bytes
 
-        // Cache the result
-        this.tileCache.set(tileKey, imageBitmap);
+      // Cache the result
+      this.tileCache.set(tileKey, imageBitmap);
 
-        this.debugLog(`Created mock tile: ${tileKey}`);
-        resolve(imageBitmap);
-      } catch (error) {
-        console.error('Error creating mock tile ImageBitmap:', error);
-        resolve(null);
-      }
-    });
+      this.debugLog(`Created mock tile: ${tileKey}`);
+      return imageBitmap;
+    } catch (error) {
+      console.error('Error creating mock tile ImageBitmap:', error);
+      return null;
+    }
   }
 
   /**
@@ -209,7 +206,7 @@ export class ImageTileService {
   /**
    * Update configuration
    */
-  public updateConfig(config: Partial<TileLoadConfig>): void {
+  public updateConfig(config: Partial<ITileLoadConfig>): void {
     this.config = { ...this.config, ...config };
   }
 

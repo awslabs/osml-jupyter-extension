@@ -3,21 +3,19 @@
 import {
   Layer,
   LayersList,
-  UpdateParameters,
   GetPickingInfoParams,
   PickingInfo,
-  COORDINATE_SYSTEM,
   DefaultProps
 } from '@deck.gl/core';
 import { GeoJsonLayer } from '@deck.gl/layers';
 import { ScatterplotLayer } from '@deck.gl/layers';
-import { Feature, Geometry, Point, LineString, Polygon } from 'geojson';
+import { Feature, Geometry, Point } from 'geojson';
 
 import { TileLayer } from '@deck.gl/geo-layers';
 import type { TileLayerProps, TileLayerPickingInfo } from '@deck.gl/geo-layers';
 
 // Define our own types since internal types aren't exported
-interface Tile2DHeader<T = any> {
+interface ITile2DHeader<T = any> {
   id: string;
   x: number;
   y: number;
@@ -28,19 +26,10 @@ interface Tile2DHeader<T = any> {
   layers?: any[];
 }
 
-interface TileLoadProps {
-  x: number;
-  y: number;
-  z: number;
-  index: { x: number; y: number; z: number };
-  bbox: any;
-  signal?: AbortSignal;
-}
-
 import {
   FeatureTileDataFunction,
   IFeatureTile,
-  FeatureTileData
+  IFeatureTileData
 } from '../types';
 
 /**
@@ -51,8 +40,8 @@ type Color = [number, number, number] | [number, number, number, number];
 /**
  * Properties for TiledOverlayLayer
  */
-export interface TiledOverlayLayerProps
-  extends Omit<TileLayerProps<FeatureTileData>, 'data' | 'getTileData'> {
+export interface ITiledOverlayLayerProps
+  extends Omit<TileLayerProps<IFeatureTileData>, 'data' | 'getTileData'> {
   /** Function to load feature data for tiles */
   getTileData: FeatureTileDataFunction;
 
@@ -93,7 +82,7 @@ export interface TiledOverlayLayerProps
   enableDebugLogging?: boolean;
 }
 
-const defaultProps: DefaultProps<TiledOverlayLayerProps> = {
+const defaultProps: DefaultProps<ITiledOverlayLayerProps> = {
   maxFeaturesPerTile: 1000,
   minFeatureAreaPixels: 1.0,
   minFeatureSizePixels: 0.5,
@@ -113,33 +102,39 @@ const defaultProps: DefaultProps<TiledOverlayLayerProps> = {
   debounceTime: 100
 };
 
-export type TiledOverlayLayerPickingInfo<FeaturePropertiesT = {}> =
-  TileLayerPickingInfo<
-    FeatureTileData,
-    PickingInfo<Feature<Geometry, FeaturePropertiesT>>
-  >;
+export type TiledOverlayLayerPickingInfo<
+  FeaturePropertiesT = Record<string, never>
+> = TileLayerPickingInfo<
+  IFeatureTileData,
+  PickingInfo<Feature<Geometry, FeaturePropertiesT>>
+>;
 
 /**
  * Point cluster for LOD optimization
  */
-interface PointCluster {
+interface IPointCluster {
   position: [number, number];
   count: number;
   features: Feature<Point>[];
 }
 
+// Type alias to match usage in the code
+type Tile2DHeader = ITile2DHeader;
+type FeatureTileData = IFeatureTileData;
+type PointCluster = IPointCluster;
+
 /**
  * A tile-based overlay layer optimized for rendering large numbers of features
  * with automatic culling and level-of-detail optimizations.
  */
-export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
+export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
   static layerName = 'TiledOverlayLayer';
   static defaultProps = defaultProps;
 
   /**
    * Get typed props helper
    */
-  private get typedProps(): TiledOverlayLayerProps {
+  private get typedProps(): ITiledOverlayLayerProps {
     return this.props as any;
   }
 
@@ -268,7 +263,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
     bounds: { left: number; top: number; right: number; bottom: number }
   ): boolean {
     switch (geometry.type) {
-      case 'Point':
+      case 'Point': {
         const [x, y] = geometry.coordinates;
         return (
           x >= bounds.left &&
@@ -276,6 +271,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
           y >= bounds.top &&
           y <= bounds.bottom
         );
+      }
 
       case 'LineString':
         return geometry.coordinates.some(coord => {
@@ -288,7 +284,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
           );
         });
 
-      case 'Polygon':
+      case 'Polygon': {
         // Check if any point of outer ring is in bounds
         const outerRing = geometry.coordinates[0];
         return outerRing.some(coord => {
@@ -300,6 +296,7 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
             y <= bounds.bottom
           );
         });
+      }
 
       case 'MultiPoint':
         return geometry.coordinates.some(coord => {
@@ -363,14 +360,16 @@ export class TiledOverlayLayer extends TileLayer<FeatureTileData> {
           return true;
 
         case 'LineString':
-        case 'MultiLineString':
+        case 'MultiLineString': {
           const length = this.calculateGeometryLength(geometry);
           return length * pixelScale >= minFeatureSizePixels!;
+        }
 
         case 'Polygon':
-        case 'MultiPolygon':
+        case 'MultiPolygon': {
           const area = this.calculateGeometryArea(geometry);
           return area * pixelScale * pixelScale >= minFeatureAreaPixels!;
+        }
 
         default:
           return true;

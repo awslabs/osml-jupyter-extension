@@ -98,7 +98,6 @@ export const filterObjectBySearchTerm = (
   }
 
   const searchLower = searchTerm.toLowerCase();
-  const result: { [key: string]: FilterableValue } = {};
 
   const shouldIncludePath = (path: string): boolean => {
     return path.toLowerCase().includes(searchLower);

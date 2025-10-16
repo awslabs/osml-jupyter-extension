@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 // @ts-ignore: react-color doesn't have perfect TypeScript support
 import { CompactPicker } from 'react-color';
-import { LayerInfo, LayerControlActions } from '../types';
+import { ILayerInfo, ILayerControlActions } from '../types';
 
-interface LayerControlComponentProps {
-  layers: LayerInfo[];
-  actions: LayerControlActions;
+interface ILayerControlComponentProps {
+  layers: ILayerInfo[];
+  actions: ILayerControlActions;
   onClose: () => void;
 }
 
@@ -56,7 +56,7 @@ const generateLayerName = (
   return filename || layerId;
 };
 
-const LayerControlComponent: FC<LayerControlComponentProps> = ({
+const LayerControlComponent: FC<ILayerControlComponentProps> = ({
   layers,
   actions,
   onClose
@@ -458,8 +458,8 @@ const LayerControlComponent: FC<LayerControlComponentProps> = ({
 
 export default class LayerControlDialog extends ReactWidget {
   constructor(
-    private layers: LayerInfo[],
-    private actions: LayerControlActions,
+    private layers: ILayerInfo[],
+    private actions: ILayerControlActions,
     private onClose: () => void = () => {}
   ) {
     super();
@@ -469,7 +469,7 @@ export default class LayerControlDialog extends ReactWidget {
   /**
    * Update the layers and force a re-render
    */
-  updateLayers(newLayers: LayerInfo[]): void {
+  updateLayers(newLayers: ILayerInfo[]): void {
     this.layers = newLayers;
     this.update();
   }

@@ -4,9 +4,7 @@ import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
 import { showDialog, Dialog } from '@jupyterlab/apputils';
 import { ImageViewerWidget } from '../ImageViewerWidget';
-import ModelSelectionDialog, {
-  IModelSelectionResult
-} from './ModelSelectionDialog';
+import ModelSelectionDialog from './ModelSelectionDialog';
 
 /**
  * A toolbar button widget for model selection
