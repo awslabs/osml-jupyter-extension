@@ -60,6 +60,7 @@ python -m ipykernel install --user --name=osml-kernel
 See the [USER_GUIDE](./docs/USER_GUIDE.md) for more information.
 
 ## Development
+A summary of the extension's architecture can be found in [ARCHITECTURE_OVERVIEW](./docs/ARCHITECTURE_OVERVIEW.md).
 
 ### Development Install
 
