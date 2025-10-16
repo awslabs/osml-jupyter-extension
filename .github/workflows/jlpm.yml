@@ -28,15 +28,11 @@ jobs:
         jlpm
         jlpm run lint:check
 
-    - name: Test the Extension
-      run: |
-        set -eux
-        jlpm run test
-
     - name: Check Local Install
       run: |
         set -eux
         python -m pip install .[test]
+        jlpm run test
         jupyter labextension list
         jupyter labextension list 2>&1 | grep -ie "osml-jupyter-extension.*OK"
         python -m jupyterlab.browser_check
