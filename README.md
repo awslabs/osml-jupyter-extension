@@ -106,7 +106,7 @@ jlpm test
 ## Contributing
 
 This project welcomes contributions and suggestions. If you would like to submit a pull request, see our
-[Contribution Guide](CONTRIBUTING.md) for more information.
+[Contribution Guide](CONTRIBUTING.md) for more information. We kindly ask that you **do not** open a public GitHub issue to report security concerns. Instead follow reporting mechanisims described in [SECURITY](SECURITY.md).
 
 ## Security
 
