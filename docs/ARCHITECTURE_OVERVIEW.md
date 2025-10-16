@@ -29,7 +29,7 @@ The layers component provides the visualization foundation through Deck.gl-based
 **Components (`/components`)**
 The components library provides the interactive user interface elements that enable users to control and explore their satellite imagery data. These components include reusable toolbar items for layer management, model selection, and metadata viewing, as well as modal dialog interfaces for displaying detailed image metadata, feature properties, and layer control settings. The component system is designed to provide a cohesive user experience that integrates seamlessly with JupyterLab's existing interface patterns.
 
-#### Python Kernel Backend Components
+#### Python Kernel Backend Components (`/kernel`)
 
 **MessageHandler**
 The MessageHandler serves as the central communication hub within the Python kernel, managing all incoming requests from the frontend through a registered comm target that receives and routes messages appropriately. This system employs dedicated message processors that handle different types of requests including image loading, tile requests, overlay processing, and model inference operations. Each processor is specialized for specific message types, ensuring efficient handling and proper validation of incoming requests while maintaining clean separation of concerns in the backend architecture.
@@ -145,3 +145,15 @@ sequenceDiagram
         ImageViewerWidget-->>User: Show error tile or retry
     end
 ```
+
+## Alternatives Considered
+
+During the design phase of the OSML Jupyter Extension, several architectural approaches were evaluated before settling on the current frontend-only extension with direct kernel communication pattern. Two primary alternatives were considered and ultimately rejected in favor of the current approach.
+
+### Jupyter Frontend + Server Extension
+
+A Jupyter Frontend + Server extension approach would have involved creating both a frontend component and a corresponding server extension that adds custom REST API endpoints to the JupyterLab server. This approach would have enabled the extension to define specialized HTTP endpoints for satellite imagery processing, tile serving, and geospatial operations, potentially providing more traditional web service patterns and better separation between the user interface and data processing layers. However, this approach was rejected because the team wanted to interact directly with a running kernel rather than through an intermediate server layer. The OSML Jupyter Extension is conceptually designed as an imagery and geospatial view on top of the information and processing capabilities already available within a kernel environment, not as a standalone service. This kernel-centric approach ensures that users can leverage their existing Python environments, installed packages, and data access patterns without requiring additional server infrastructure or administrative setup beyond what JupyterLab already provides.
+
+### Jupyter Document / MIME Type Extension
+
+A Jupyter Document / MIME type extension approach would have implemented the satellite imagery viewer as a specialized document renderer that could display specific file types (such as GeoTIFF, NITF, or other satellite imagery formats) directly within JupyterLab's document system, similar to how the built-in PDF viewer or JSON viewer operates. This approach seemed initially attractive due to its simplicity and direct integration with JupyterLab's file browser, allowing users to simply double-click on satellite imagery files to view them. However, this approach was ultimately deemed too restrictive for the full extent of interactions and functionality planned for the OSML Jupyter Extension. The extension's roadmap includes capabilities that extend far beyond single document viewing, such as rendering and analyzing multiple documents simultaneously, providing direct integration with SageMaker model endpoints for inference and analysis, supporting complex geospatial workflows that involve multiple data sources and processing steps, and enabling programmatic interaction with the viewer from notebook cells. All of these planned capabilities fall outside the document viewer model and are more appropriately implemented as a general frontend widget that can interact with multiple data sources, manage complex state, and integrate with external services and APIs.
