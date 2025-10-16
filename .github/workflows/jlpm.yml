@@ -16,6 +16,9 @@ jobs:
         fetch-depth: '0'
         lfs: 'true'
 
+    - name: JupyterLab Base Setup
+      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+
     - name: Setup Development Enviornment in Conda 
       uses: conda-incubator/setup-miniconda@v3
       with:
