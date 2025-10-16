@@ -51,7 +51,7 @@
         "prettier:check": "jlpm prettier:base --check",
         "stylelint": "jlpm stylelint:check --fix",
         "stylelint:check": "stylelint --cache \"style/**/*.css\"",
-        "test": "jlpm build:lib && jest --coverage && jlpm test:python",
+        "test": "jlpm build:lib && jlpm test:typescript",
         "test:typescript": "jest --coverage",
         "test:python": "python -m pytest tests/python/ -v --tb=short --cov=lib/kernel",
         "test:python:watch": "python -m pytest tests/python/ -v -f --tb=short",
