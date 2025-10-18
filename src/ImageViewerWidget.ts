@@ -477,6 +477,14 @@ export class ImageViewerWidget extends MainAreaWidget {
           });
         });
 
+        // Check if the image load was successful
+        if (loadStatus !== 'SUCCESS') {
+          this.statusSignal.emit(
+            `Error: ${imageName} could not be loaded as an image`
+          );
+          return; // Exit early - don't proceed with deck.gl setup
+        }
+
         this.statusSignal.emit(`Loading ${imageName} ... ${loadStatus}`);
       }
     } catch (error: any) {
@@ -536,7 +544,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     }) as any; // Type assertion to work around Deck.gl typing issues
 
     this.statusSignal.emit(`${imageName} loaded successfully`);
-    return;
   }
 
   /**
@@ -644,12 +651,83 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
   }
 
-  public addLayer(layerDataPath: string | null) {
-    if (!layerDataPath || !this.imageName || !this.deckInstance) {
+  public async addLayer(layerDataPath: string | null) {
+    if (!layerDataPath) {
+      this.statusSignal.emit('Error: No layer file selected');
       return;
     }
 
-    this.statusSignal.emit(`Adding overlays from ${layerDataPath}`);
+    if (!this.imageName) {
+      this.statusSignal.emit(
+        'Error: No image loaded. Please open an image first before adding layers.'
+      );
+      return;
+    }
+
+    if (!this.deckInstance) {
+      this.statusSignal.emit('Error: Map viewer not initialized');
+      return;
+    }
+
+    if (!this.comm && !this.useMockFeatureData) {
+      this.statusSignal.emit(
+        `Unable to load overlay ${layerDataPath} because plugin setup failed.`
+      );
+      return;
+    }
+
+    try {
+      this.statusSignal.emit(`Loading overlay from ${layerDataPath}...`);
+
+      // Only send overlay load request if using real data
+      if (!this.useMockFeatureData) {
+        const loadStatus = await new Promise<string>((resolve, reject) => {
+          const commFuture = this.comm!.send({
+            type: 'OVERLAY_LOAD_REQUEST',
+            imageName: this.imageName!,
+            overlayName: layerDataPath
+          });
+
+          // Set a timeout to reject the promise if we don't get a response
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Timeout waiting for overlay load response'));
+          }, 30000); // 30 second timeout
+
+          commFuture.onIOPub = (msg: any): void => {
+            const msgType = msg.header.msg_type;
+            if (msgType === 'comm_msg') {
+              console.log('Received overlay load response from comm!!!');
+              clearTimeout(timeoutId);
+              resolve(msg.content.data.status);
+            }
+          };
+
+          // Handle comm future done with error
+          commFuture.done.catch(error => {
+            clearTimeout(timeoutId);
+            reject(error);
+          });
+        });
+
+        // Check if the overlay load was successful
+        if (loadStatus !== 'SUCCESS') {
+          this.statusSignal.emit(
+            `Error: ${layerDataPath} could not be loaded as an overlay layer`
+          );
+          return; // Exit early - don't proceed with layer creation
+        }
+
+        this.statusSignal.emit(
+          `Loading overlay from ${layerDataPath}... ${loadStatus}`
+        );
+      }
+    } catch (error: any) {
+      console.error('Error loading overlay:', error);
+      this.statusSignal.emit(
+        `Error loading overlay ${layerDataPath}: ${error.message}`
+      );
+      return;
+    }
 
     // Create feature tile data function - can easily swap between mock and real data
     const getFeatureTileData = this.useMockFeatureData

@@ -161,16 +161,58 @@ async function activate(
         selectedFileName = String(firstSelectedItem.value?.path);
       }
 
-      // Regenerate the widget if disposed
+      // Create the widget if it doesn't exist or is disposed
       if (!widget || widget.isDisposed) {
-        console.log('No ImageViewerWidget. Exiting!');
-        return;
-      } else {
-        console.log(
-          `OSML ImageViewerWidget Exists. Opening ${selectedFileName}`
+        console.log('Creating new OSML ImageViewerWidget for layer addition');
+        widget = await ImageViewerWidget.createForImage(
+          manager,
+          null // No image - widget will handle this in addLayer
         );
-        widget.addLayer(selectedFileName);
+
+        // Add toolbar items if toolbar registry is available
+        if (toolbarRegistry && widget.toolbar) {
+          console.log('Adding toolbar items to ImageViewerWidget');
+
+          // Create and add the image metadata button
+          const imageMetadataButton = new ImageMetadataToolbarButton(widget);
+          widget.toolbar.addItem('imageMetadata', imageMetadataButton);
+        }
+        if (statusBar) {
+          console.log('StatusBar found. Setting up status widget.');
+          const statusWidget = new Widget();
+          statusWidget.node.textContent = 'OSML Image Viewer Starting...';
+          const statusItem = statusBar.registerStatusItem(
+            'osml-jupyter-extension:plugin',
+            {
+              align: 'middle',
+              item: statusWidget
+            }
+          );
+          widget.statusSignal.connect((source, msg) => {
+            console.log('StatusWidget handler:');
+            console.log(msg);
+            statusWidget.node.textContent = msg;
+          });
+          widget.disposed.connect(() => {
+            statusItem.dispose();
+          });
+        }
       }
+
+      // Always try to add the layer - let the widget handle the error if no image is loaded
+      console.log(
+        `OSML ImageViewerWidget available. Adding layer ${selectedFileName}`
+      );
+      await widget.addLayer(selectedFileName);
+
+      if (!widget.isAttached) {
+        // Attach the widget to the main work area if it's not there already
+        console.log('Attaching OSML ImageViewerWidget to main');
+        app.shell.add(widget, 'main');
+      }
+      // Activate the widget
+      console.log('Activating OSML ImageViewerWidget');
+      app.shell.activateById(widget.id);
     }
   });
 
