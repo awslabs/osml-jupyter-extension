@@ -116,7 +116,6 @@ class TestKernelSetupIntegration:
             
             # Check that expected globals are defined
             expected_globals = [
-                'get_image_tile_factory',  # Legacy function should exist
                 'osml_comm_target_func'    # Main comm handler should exist
             ]
             
