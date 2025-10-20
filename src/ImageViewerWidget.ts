@@ -697,6 +697,18 @@ export class ImageViewerWidget extends MainAreaWidget {
             const msgType = msg.header.msg_type;
             if (msgType === 'comm_msg') {
               console.log('Received overlay load response from comm!!!');
+              console.log(
+                'Full response message:',
+                JSON.stringify(msg, null, 2)
+              );
+              console.log('Response content:', msg.content);
+              console.log('Response data:', msg.content?.data);
+              console.log('Response status:', msg.content?.data?.status);
+              console.log('Response error (if any):', msg.content?.data?.error);
+              console.log(
+                'Response details (if any):',
+                msg.content?.data?.details
+              );
               clearTimeout(timeoutId);
               resolve(msg.content.data.status);
             }
@@ -711,9 +723,17 @@ export class ImageViewerWidget extends MainAreaWidget {
 
         // Check if the overlay load was successful
         if (loadStatus !== 'SUCCESS') {
-          this.statusSignal.emit(
-            `Error: ${layerDataPath} could not be loaded as an overlay layer`
-          );
+          console.log(`Overlay load failed for ${layerDataPath}`);
+          console.log('Load status received:', loadStatus);
+          console.log('Expected status: SUCCESS');
+
+          // Try to provide more specific error information
+          let errorMessage = `Error: ${layerDataPath} could not be loaded as an overlay layer`;
+          if (loadStatus) {
+            errorMessage += ` (Status: ${loadStatus})`;
+          }
+
+          this.statusSignal.emit(errorMessage);
           return; // Exit early - don't proceed with layer creation
         }
 
