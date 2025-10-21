@@ -445,12 +445,20 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
+    // Initialize image dimensions for centering
+    let imageWidth = 0;
+    let imageHeight = 0;
+
     try {
       this.statusSignal.emit(`Loading ${imageName} ...`);
 
       // Only send load request if using real data
       if (!this.useMockData) {
-        const loadStatus = await new Promise<string>((resolve, reject) => {
+        const loadResponse = await new Promise<{
+          status: string;
+          width?: number;
+          height?: number;
+        }>((resolve, reject) => {
           const commFuture = this.comm!.send({
             type: 'IMAGE_LOAD_REQUEST',
             dataset: imageName
@@ -466,7 +474,11 @@ export class ImageViewerWidget extends MainAreaWidget {
             if (msgType === 'comm_msg') {
               console.log('Received image load response from comm!!!');
               clearTimeout(timeoutId);
-              resolve(msg.content.data.status);
+              resolve({
+                status: msg.content.data.status,
+                width: msg.content.data.width,
+                height: msg.content.data.height
+              });
             }
           };
 
@@ -478,14 +490,23 @@ export class ImageViewerWidget extends MainAreaWidget {
         });
 
         // Check if the image load was successful
-        if (loadStatus !== 'SUCCESS') {
+        if (loadResponse.status !== 'SUCCESS') {
           this.statusSignal.emit(
             `Error: ${imageName} could not be loaded as an image`
           );
           return; // Exit early - don't proceed with deck.gl setup
         }
 
-        this.statusSignal.emit(`Loading ${imageName} ... ${loadStatus}`);
+        // Extract image dimensions for centering
+        if (loadResponse.width && loadResponse.height) {
+          imageWidth = loadResponse.width;
+          imageHeight = loadResponse.height;
+          console.log(`Image dimensions: ${imageWidth}x${imageHeight}`);
+        }
+
+        this.statusSignal.emit(
+          `Loading ${imageName} ... ${loadResponse.status}`
+        );
       }
     } catch (error: any) {
       console.error('Error loading image:', error);
@@ -510,13 +531,17 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.mapDiv.appendChild(canvas);
 
     // Create Deck.gl instance with OrthographicView
-    // Position the view to show the image starting from coordinate (0,0) at full resolution
+    // Position the view to show the image centered at (width/2, height/2)
+    const centerX = imageWidth / 2;
+    const centerY = imageHeight / 2;
+    console.log(`Centering view at: [${centerX}, ${centerY}, 0]`);
+
     this.deckInstance = new Deck({
       canvas: canvas,
       width: '100%',
       height: '100%',
       initialViewState: {
-        target: [0, 0, 0],
+        target: [centerX, centerY, 0],
         zoom: 0, // Start at full resolution (zoom level 0)
         minZoom: -10,
         maxZoom: 10

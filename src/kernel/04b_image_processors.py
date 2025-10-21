@@ -22,10 +22,21 @@ class ImageLoadProcessor(BaseMessageProcessor):
             
             self.logger.info(f"Image load {'successful' if status == 'SUCCESS' else 'failed'} for dataset: {dataset}")
             
+            # Extract width and height if load was successful
+            width = None
+            height = None
+            if status == "SUCCESS" and tile_factory is not None:
+                ds = tile_factory.raster_dataset
+                width = ds.RasterXSize
+                height = ds.RasterYSize
+                self.logger.debug(f"Image dimensions for {dataset}: {width}x{height}")
+            
             # Send successful response
             response = ResponseBuilder.success_response('IMAGE_LOAD_RESPONSE', {
                 'dataset': dataset,
-                'status': status
+                'status': status,
+                'width': width,
+                'height': height
             })
             comm.send(response)
             
