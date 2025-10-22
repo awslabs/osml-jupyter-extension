@@ -1,14 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import {
-  ISessionContext,
-  SessionContext,
-  SessionContextDialogs
-} from '@jupyterlab/apputils';
+import { ISessionContext } from '@jupyterlab/apputils';
 
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
-import { Kernel, KernelMessage, ServiceManager } from '@jupyterlab/services';
+import { Kernel, ServiceManager } from '@jupyterlab/services';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
@@ -18,7 +14,6 @@ import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
-import { KERNEL_SETUP_CODE } from './utils';
 import { ITile, TileDataFunction, FeatureTileDataFunction } from './types';
 import { TiledOverlayLayer } from './layers';
 import {
@@ -37,9 +32,6 @@ import { ReactWidget } from '@jupyterlab/ui-components';
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
  */
 export class ImageViewerWidget extends MainAreaWidget {
-  private imageSessionContext?: SessionContext;
-  private sessionContextDialogs: SessionContextDialogs;
-  private translator: ITranslator;
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
   private featureLayers: Map<string, TiledOverlayLayer> = new Map();
@@ -107,8 +99,6 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     this.manager = manager;
 
-    this.translator = nullTranslator;
-
     // Initialize services (will be properly initialized after kernel setup)
     this.commService = new CommService();
     this.imageTileService = new ImageTileService(this.commService, {
@@ -116,18 +106,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     });
     this.featureTileService = new FeatureTileService(this.commService);
     this.kernelService = new KernelService(this.manager);
-
-    // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
-    this.imageSessionContext = new SessionContext({
-      sessionManager: this.manager.sessions,
-      specsManager: this.manager.kernelspecs,
-      name: 'OversightML Image Viewer',
-      kernelPreference: { name: 'ipython' }
-    });
-
-    this.sessionContextDialogs = new SessionContextDialogs({
-      translator: this.translator
-    });
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -143,89 +121,49 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   private async initialize(selectedFileName: string | null) {
-    if (!this.imageSessionContext) {
-      return;
-    }
+    try {
+      // Use KernelService to handle kernel initialization
+      await this.kernelService.initialize();
 
-    this.imageSessionContext
-      .initialize()
-      .then(async value => {
-        if (value) {
-          if (this.imageSessionContext) {
-            await this.sessionContextDialogs.selectKernel(
-              this.imageSessionContext
-            );
+      // Get kernel using accessor method
+      const kernel = this.kernelService.getKernel();
+      if (!kernel) {
+        throw new Error('Kernel not available after initialization');
+      }
 
-            // Install the code on the Jupyter session needed to create tiles and setup the server side of the comm
-            // channel.
-            const kernelSetupFuture =
-              this.imageSessionContext.session?.kernel?.requestExecute({
-                code: KERNEL_SETUP_CODE
-              });
-            if (kernelSetupFuture) {
-              kernelSetupFuture.onIOPub = function (
-                msg: KernelMessage.IIOPubMessage
-              ): void {
-                const msgType = msg.header.msg_type;
-                switch (msgType) {
-                  case 'execute_result':
-                    console.log('Completed kernel setup for JupyterImageLayer');
-                    break;
-                  case 'error':
-                    console.error(
-                      'Unable to setup kernel for JupyterImageLayer'
-                    );
-                    console.error(msg);
-                    break;
-                }
-              };
-            }
+      // Initialize CommService with kernel connection
+      this.commService = new CommService(kernel);
+      await this.commService.initialize('osml_comm_target');
 
-            // Initialize CommService with kernel connection
-            const kernel = this.imageSessionContext.session?.kernel;
-            if (kernel) {
-              this.commService = new CommService(kernel);
-              // this.commService.setDebugMode(true);
-
-              await this.commService.initialize('osml_comm_target');
-
-              // Update services with new CommService
-              this.imageTileService = new ImageTileService(this.commService, {
-                enableDebugLogging: this.enableDebugLogging
-              });
-              this.featureTileService = new FeatureTileService(
-                this.commService
-              );
-
-              console.log('CommService initialized successfully.');
-            }
-
-            // Create the client side of the comm channel (legacy support).
-            console.log('Setting up new comm!');
-            this.comm =
-              this.imageSessionContext.session?.kernel?.createComm(
-                'osml_comm_target'
-              );
-            if (this.comm) {
-              this.comm.open('Open comm');
-            }
-            console.log('Comm setup completed.');
-          }
-
-          // Once the session is initialized we can ask the user to select an image for display.
-          // This widget is not a general full-earth geographic display so a single image must be
-          // selected as the base layer.
-
-          if (selectedFileName) {
-            await this.openImage(selectedFileName);
-          }
-        }
-      })
-      .catch(reason => {
-        console.error(
-          `Failed to initialize the session in OSML Image Viewer.\n${reason}`
-        );
+      // Create services with the new CommService
+      this.imageTileService = new ImageTileService(this.commService, {
+        enableDebugLogging: this.enableDebugLogging
       });
+      this.featureTileService = new FeatureTileService(this.commService);
+
+      console.log('CommService initialized successfully.');
+
+      // Create the client side of the comm channel (legacy support)
+      console.log('Setting up new comm!');
+      this.comm = kernel.createComm('osml_comm_target');
+      if (!this.comm) {
+        throw new Error('Failed to create legacy comm');
+      }
+
+      this.comm.open('Open comm');
+      console.log('Comm setup completed.');
+
+      // Once the session is initialized we can ask the user to select an image for display.
+      // This widget is not a general full-earth geographic display so a single image must be
+      // selected as the base layer.
+      if (selectedFileName) {
+        await this.openImage(selectedFileName);
+      }
+    } catch (reason) {
+      console.error(
+        `Failed to initialize the session in OSML Image Viewer.\n${reason}`
+      );
+    }
   }
 
   public statusSignal: Signal<any, any> = new Signal<any, any>(this);
@@ -963,7 +901,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Returns the current kernel session providing access to image tiles.
    */
   get session(): ISessionContext | undefined {
-    return this.imageSessionContext;
+    return this.kernelService.getSessionContext();
   }
 
   /**
@@ -1283,14 +1221,11 @@ export class ImageViewerWidget extends MainAreaWidget {
       this.mapDiv.innerHTML = '';
     }
 
-    console.log('Shutting down session and comm as part of dispose()');
+    console.log('Shutting down comm as part of dispose()');
     try {
       this.comm?.close();
-      this.imageSessionContext?.session?.shutdown();
-      this.imageSessionContext?.dispose();
-      this.imageSessionContext = undefined;
     } catch (e) {
-      console.warn('Exception caught cleaning up session and comm resources');
+      console.warn('Exception caught cleaning up comm resources');
       console.debug(e);
     }
 

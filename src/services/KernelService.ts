@@ -8,6 +8,8 @@ import {
 } from '@jupyterlab/apputils';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
+import { KERNEL_SETUP_CODE } from '../utils';
+
 /**
  * Service for managing Jupyter kernel setup and lifecycle
  */
@@ -15,79 +17,11 @@ export class KernelService {
   private sessionContext?: SessionContext;
   private sessionContextDialogs: SessionContextDialogs;
   private translator: ITranslator;
-  private isInitialized: boolean = false;
 
   constructor(private manager: ServiceManager.IManager) {
     this.translator = nullTranslator;
     this.sessionContextDialogs = new SessionContextDialogs({
       translator: this.translator
-    });
-  }
-
-  /**
-   * Initialize the kernel session
-   */
-  public async initialize(): Promise<void> {
-    if (this.isInitialized) {
-      return;
-    }
-
-    // Create a new session to connect to the Jupyter Kernel
-    this.sessionContext = new SessionContext({
-      sessionManager: this.manager.sessions,
-      specsManager: this.manager.kernelspecs,
-      name: 'OversightML Image Viewer',
-      kernelPreference: { name: 'ipython' }
-    });
-
-    await this.sessionContext.initialize();
-
-    if (this.sessionContext.session) {
-      await this.sessionContextDialogs.selectKernel(this.sessionContext);
-      this.isInitialized = true;
-    } else {
-      throw new Error('Failed to initialize kernel session');
-    }
-  }
-
-  /**
-   * Execute kernel setup code
-   */
-  public async executeSetupCode(code: string): Promise<void> {
-    if (!this.sessionContext?.session?.kernel) {
-      throw new Error('Kernel session not available');
-    }
-
-    return new Promise((resolve, reject) => {
-      const kernelSetupFuture =
-        this.sessionContext!.session!.kernel!.requestExecute({
-          code: code
-        });
-
-      if (kernelSetupFuture) {
-        kernelSetupFuture.onIOPub = (
-          msg: KernelMessage.IIOPubMessage
-        ): void => {
-          const msgType = msg.header.msg_type;
-          switch (msgType) {
-            case 'execute_result':
-              console.log('Completed kernel setup for OSML Image Viewer');
-              resolve();
-              break;
-            case 'error':
-              console.error('Unable to setup kernel for OSML Image Viewer');
-              console.error(msg);
-              reject(new Error('Kernel setup failed'));
-              break;
-          }
-        };
-
-        kernelSetupFuture.done.catch(error => {
-          reject(error);
-        });
-      } else {
-        reject(new Error('Failed to create kernel setup future'));
-      }
     });
   }
 
@@ -110,7 +44,6 @@ export class KernelService {
    */
   public isReady(): boolean {
     return (
-      this.isInitialized &&
       !!this.sessionContext?.session?.kernel &&
       !this.sessionContext.session.kernel.isDisposed
     );
@@ -125,7 +58,6 @@ export class KernelService {
     }
 
     await this.sessionContext.session?.kernel?.restart();
-    this.isInitialized = false;
   }
 
   /**
@@ -135,7 +67,93 @@ export class KernelService {
     if (this.sessionContext?.session) {
       await this.sessionContext.session.shutdown();
     }
-    this.isInitialized = false;
+  }
+
+  /**
+   * Create and initialize session context
+   */
+  private async createAndInitializeSession(): Promise<void> {
+    // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
+    this.sessionContext = new SessionContext({
+      sessionManager: this.manager.sessions,
+      specsManager: this.manager.kernelspecs,
+      name: 'OversightML Image Viewer',
+      kernelPreference: { name: 'ipython' }
+    });
+
+    // Initialize the session context
+    const initializeResult = await this.sessionContext.initialize();
+    if (!initializeResult) {
+      throw new Error('Failed to initialize session context');
+    }
+  }
+
+  /**
+   * Select kernel using dialog
+   */
+  private async selectKernel(): Promise<void> {
+    if (!this.sessionContext) {
+      throw new Error('Session context not available');
+    }
+    await this.sessionContextDialogs.selectKernel(this.sessionContext);
+  }
+
+  /**
+   * Execute kernel setup code with proper promise handling
+   */
+  private async executeKernelSetupCode(): Promise<void> {
+    // Install the code on the Jupyter session needed to create tiles and setup the server side of the comm channel.
+    const kernelSetupFuture =
+      this.sessionContext?.session?.kernel?.requestExecute({
+        code: KERNEL_SETUP_CODE
+      });
+
+    if (kernelSetupFuture) {
+      await new Promise<void>((resolve, reject) => {
+        kernelSetupFuture.onIOPub = function (
+          msg: KernelMessage.IIOPubMessage
+        ): void {
+          const msgType = msg.header.msg_type;
+          switch (msgType) {
+            case 'execute_result':
+              console.log('Completed kernel setup for JupyterImageLayer');
+              resolve();
+              break;
+            case 'error':
+              console.error('Unable to setup kernel for JupyterImageLayer');
+              console.error(msg);
+              reject(new Error('Kernel setup failed'));
+              break;
+          }
+        };
+
+        kernelSetupFuture.done.catch(error => {
+          reject(error);
+        });
+      });
+    }
+  }
+
+  /**
+   * Initialize the kernel session and setup code
+   */
+  public async initialize(): Promise<void> {
+    // Create and initialize session context
+    await this.createAndInitializeSession();
+
+    // Select kernel using dialog
+    await this.selectKernel();
+
+    // Execute kernel setup code
+    await this.executeKernelSetupCode();
+
+    // Verify kernel is available after initialization
+    const kernel = this.sessionContext!.session?.kernel;
+    if (!kernel) {
+      throw new Error('Kernel not available after initialization');
+    }
+
+    console.log('Kernel service initialized successfully.');
   }
 
   /**
@@ -148,7 +166,6 @@ export class KernelService {
       }
       this.sessionContext?.dispose();
       this.sessionContext = undefined;
-      this.isInitialized = false;
     } catch (error) {
       console.warn(
         'Exception caught cleaning up kernel service resources:',
