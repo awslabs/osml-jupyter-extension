@@ -2,8 +2,6 @@
 
 import { ISessionContext } from '@jupyterlab/apputils';
 
-import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-
 import { Kernel, ServiceManager } from '@jupyterlab/services';
 
 import { Message } from '@lumino/messaging';
@@ -20,7 +18,8 @@ import {
   CommService,
   ImageTileService,
   FeatureTileService,
-  KernelService
+  KernelService,
+  IImageLoadResponse
 } from './services';
 import {
   LayerControlToolbarButton,
@@ -392,45 +391,13 @@ export class ImageViewerWidget extends MainAreaWidget {
 
       // Only send load request if using real data
       if (!this.useMockData) {
-        const loadResponse = await new Promise<{
-          status: string;
-          width?: number;
-          height?: number;
-        }>((resolve, reject) => {
-          const commFuture = this.comm!.send({
-            type: 'IMAGE_LOAD_REQUEST',
-            dataset: imageName
-          });
-
-          // Set a timeout to reject the promise if we don't get a response
-          const timeoutId = setTimeout(() => {
-            reject(new Error('Timeout waiting for image load response'));
-          }, 30000); // 30 second timeout
-
-          commFuture.onIOPub = (msg: any): void => {
-            const msgType = msg.header.msg_type;
-            if (msgType === 'comm_msg') {
-              console.log('Received image load response from comm!!!');
-              clearTimeout(timeoutId);
-              resolve({
-                status: msg.content.data.status,
-                width: msg.content.data.width,
-                height: msg.content.data.height
-              });
-            }
-          };
-
-          // Handle comm future done with error
-          commFuture.done.catch(error => {
-            clearTimeout(timeoutId);
-            reject(error);
-          });
-        });
+        const loadResponse: IImageLoadResponse =
+          await this.imageTileService.loadImage(imageName);
 
         // Check if the image load was successful
-        if (loadResponse.status !== 'SUCCESS') {
+        if (!loadResponse.success) {
           this.statusSignal.emit(
-            `Error: ${imageName} could not be loaded as an image`
+            `Error: ${imageName} could not be loaded as an image${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
           );
           return; // Exit early - don't proceed with deck.gl setup
         }
