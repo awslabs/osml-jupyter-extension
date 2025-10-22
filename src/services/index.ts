@@ -5,3 +5,4 @@ export * from './CommService';
 export * from './ImageTileService';
 export * from './FeatureTileService';
 export * from './KernelService';
+export * from './LayerManager';

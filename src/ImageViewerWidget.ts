@@ -1,32 +1,29 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import { ISessionContext } from '@jupyterlab/apputils';
-
 import { ServiceManager } from '@jupyterlab/services';
+import { MainAreaWidget, Toolbar, ISessionContext } from '@jupyterlab/apputils';
+import { ReactWidget } from '@jupyterlab/ui-components';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
-import { MainAreaWidget, Toolbar } from '@jupyterlab/apputils';
+
 import { Deck, OrthographicView } from '@deck.gl/core';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
-import { ITile, TileDataFunction, FeatureTileDataFunction } from './types';
+import { ITile, TileDataFunction } from './types';
 import { TiledOverlayLayer } from './layers';
 import {
   CommService,
   ImageTileService,
   FeatureTileService,
   KernelService,
+  LayerManager,
   IImageLoadResponse,
   IOverlayLoadResponse
 } from './services';
-import {
-  LayerControlToolbarButton,
-  FeaturePropertiesDialog
-} from './components';
-import { ReactWidget } from '@jupyterlab/ui-components';
+import { FeaturePropertiesDialog } from './components';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -34,8 +31,6 @@ import { ReactWidget } from '@jupyterlab/ui-components';
 export class ImageViewerWidget extends MainAreaWidget {
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
-  private featureLayers: Map<string, TiledOverlayLayer> = new Map();
-  private modelLayers: Map<string, TiledOverlayLayer> = new Map();
   private imageName?: string;
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
@@ -50,24 +45,16 @@ export class ImageViewerWidget extends MainAreaWidget {
   private imageTileService: ImageTileService;
   private featureTileService: FeatureTileService;
   private kernelService: KernelService;
+  private layerManager: LayerManager;
 
   // Configuration options
   private useMockData: boolean = false; // Set to true for testing with mock tiles
   private useMockFeatureData: boolean = false; // Set to true for testing with mock features
   private enableDebugLogging: boolean = false;
 
-  // Layer implementation selection (always use TiledOverlayLayer)
-  private useTiledOverlayLayer: boolean = true; // Always true - using TiledOverlayLayer
-
   // Model selection state
   private selectedModel: string = '';
   private selectedModelEnabled: boolean = false;
-
-  // Layer management state
-  private layerVisibility: Map<string, boolean> = new Map();
-  private layerColors: Map<string, [number, number, number, number]> =
-    new Map();
-  private layerControlButton?: LayerControlToolbarButton;
 
   /**
    * Static Factory Method for the ImageViewerWidget.
@@ -105,6 +92,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     });
     this.featureTileService = new FeatureTileService(this.commService);
     this.kernelService = new KernelService(this.manager);
+    this.layerManager = new LayerManager(this.enableDebugLogging);
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -114,9 +102,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.mapDiv.style.height = '100%';
     this.mapDiv.style.backgroundColor = 'black';
     this.content.node.appendChild(this.mapDiv);
-
-    // Add layer control button to toolbar
-    this.addLayerControlButton();
   }
 
   private async initialize(selectedFileName: string | null) {
@@ -139,6 +124,11 @@ export class ImageViewerWidget extends MainAreaWidget {
         enableDebugLogging: this.enableDebugLogging
       });
       this.featureTileService = new FeatureTileService(this.commService);
+
+      // Connect LayerManager signals
+      this.layerManager.layersChanged.connect(() => {
+        this.updateDeckLayers();
+      });
 
       console.log('CommService initialized successfully.');
 
@@ -467,47 +457,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Create a feature layer for overlay data using TiledOverlayLayer
-   */
-  private createFeatureLayer(
-    overlayName: string,
-    getTileData: FeatureTileDataFunction
-  ): TiledOverlayLayer {
-    // Get current colors from state
-    const customColor = this.layerColors.get(overlayName) ?? [255, 0, 0, 128];
-    const lineColor = customColor;
-
-    console.log(
-      `[ImageViewerWidget] Creating TiledOverlayLayer for ${overlayName}`
-    );
-    return new TiledOverlayLayer({
-      id: `features-${overlayName}`,
-      data: [], // Required by TileLayer but not used since we provide getTileData
-      getTileData, // This is our custom FeatureTileDataFunction
-      tileSize: 512,
-      minZoom: -10,
-      maxZoom: 10,
-      maxCacheSize: 100,
-      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
-      debounceTime: 100,
-      // Culling options
-      maxFeaturesPerTile: 10000,
-      minFeatureAreaPixels: 1.0,
-      minFeatureSizePixels: 0.5,
-      // LOD options
-      simplificationTolerance: 0.5,
-      clusterDistance: 20,
-      lodZoomThresholds: [-3, 0, 3],
-      // Rendering options
-      featureFillColor: lineColor, // Use full color for features
-      featureLineColor: lineColor,
-      featureLineWidth: 1,
-      adaptivePointSize: true,
-      enableDebugLogging: true || this.enableDebugLogging
-    } as any); // Type assertion to bypass the prop type conflict
-  }
-
-  /**
    * Create a TiledOverlayLayer for model inference results
    */
   public createModelFeatureLayer(modelName: string): void {
@@ -525,9 +474,6 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     this.statusSignal.emit(`Creating model feature layer for: ${modelName}`);
 
-    // Remove existing model layer if present (only one model at a time)
-    this.clearModelLayers();
-
     // Create model feature tile data function
     const getModelFeatureTileData =
       this.featureTileService.createModelFeatureDataFunction(
@@ -537,17 +483,8 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     this.debugLog(`Creating model layer for model: ${modelName}`);
 
-    // Create the model feature layer using TiledOverlayLayer
-    const modelFeatureLayer = this.createFeatureLayer(
-      modelName,
-      getModelFeatureTileData
-    );
-
-    // Store the model layer
-    this.modelLayers.set(modelName, modelFeatureLayer);
-
-    // Update Deck.gl layers
-    this.updateDeckLayers();
+    // Add the model feature layer via LayerManager
+    this.layerManager.addModelFeatureLayer(modelName, getModelFeatureTileData);
 
     this.statusSignal.emit(`Model feature layer created: ${modelName}`);
   }
@@ -556,19 +493,9 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Clear all model feature layers
    */
   public clearModelLayers(): void {
-    if (this.modelLayers.size > 0) {
-      // Clear caches and dispose of layers
-      for (const modelLayer of this.modelLayers.values()) {
-        modelLayer.clearCache();
-      }
-      this.modelLayers.clear();
-
-      // Update Deck.gl layers
-      this.updateDeckLayers();
-
-      this.debugLog('Model layers cleared');
-      this.statusSignal.emit('Model layers cleared');
-    }
+    this.layerManager.clearModelLayers();
+    this.debugLog('Model layers cleared');
+    this.statusSignal.emit('Model layers cleared');
   }
 
   public async addLayer(layerDataPath: string | null) {
@@ -638,22 +565,8 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
     this.debugLog(`Layer path: ${layerDataPath}`);
 
-    // Create the feature layer using TiledOverlayLayer
-    const featureLayer = this.createFeatureLayer(
-      layerDataPath,
-      getFeatureTileData
-    );
-
-    // Store the feature layer
-    this.featureLayers.set(layerDataPath, featureLayer);
-
-    // Update Deck.gl layers
-    this.updateDeckLayers();
-
-    // Notify layer control button to update state
-    if (this.layerControlButton) {
-      this.layerControlButton.onLayersChanged();
-    }
+    // Add the feature layer via LayerManager
+    this.layerManager.addFeatureLayer(layerDataPath, getFeatureTileData);
 
     this.statusSignal.emit(`Added overlay layer: ${layerDataPath}`);
     return;
@@ -686,63 +599,17 @@ export class ImageViewerWidget extends MainAreaWidget {
       `Adding named dataset layer: ${datasetName} for image: ${this.imageName}`
     );
 
-    // Create the feature layer using the dataset name as the layer ID
-    const featureLayer = this.createFeatureLayer(
-      datasetName,
-      getFeatureTileData
-    );
-
-    // Store the feature layer using the dataset name as the key
-    this.featureLayers.set(datasetName, featureLayer);
-
-    // Update Deck.gl layers
-    this.updateDeckLayers();
-
-    // Notify layer control button to update state
-    if (this.layerControlButton) {
-      this.layerControlButton.onLayersChanged();
-    }
+    // Add the feature layer via LayerManager
+    this.layerManager.addFeatureLayer(datasetName, getFeatureTileData);
 
     this.statusSignal.emit(`Added dataset layer: ${datasetName}`);
-  }
-
-  /**
-   * Get all feature layers
-   */
-  private getFeatureLayers(): TiledOverlayLayer[] {
-    return Array.from(this.featureLayers.values());
-  }
-
-  /**
-   * Get all model layers
-   */
-  private getModelLayers(): TiledOverlayLayer[] {
-    return Array.from(this.modelLayers.values());
   }
 
   /**
    * Get all layers (feature + model layers) that are visible
    */
   private getAllLayers(): TiledOverlayLayer[] {
-    const visibleLayers: TiledOverlayLayer[] = [];
-
-    // Add visible feature layers
-    for (const [layerId, layer] of this.featureLayers.entries()) {
-      const visible = this.layerVisibility.get(layerId) ?? true;
-      if (visible) {
-        visibleLayers.push(layer);
-      }
-    }
-
-    // Add visible model layers
-    for (const [layerId, layer] of this.modelLayers.entries()) {
-      const visible = this.layerVisibility.get(layerId) ?? true;
-      if (visible) {
-        visibleLayers.push(layer);
-      }
-    }
-
-    return visibleLayers;
+    return this.layerManager.getAllVisibleLayers();
   }
 
   /**
@@ -837,9 +704,8 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public setUseMockFeatureData(useMock: boolean): void {
     this.useMockFeatureData = useMock;
-    // Clear existing feature layers and recreate them with new data source
-    this.featureLayers.clear();
-    this.updateDeckLayers();
+    // Note: Existing layers will continue to use their original data source
+    // New layers added after this call will use the updated mock setting
   }
 
   /**
@@ -908,37 +774,17 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Set whether to use TiledOverlayLayer instead of MultiResolutionFeatureLayer
-   */
-  public setUseTiledOverlayLayer(useTiled: boolean): void {
-    if (this.useTiledOverlayLayer !== useTiled) {
-      this.useTiledOverlayLayer = useTiled;
-      console.log(
-        `[ImageViewerWidget] Switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`
-      );
-
-      // Clear existing layers to force recreation with new layer type
-      this.featureLayers.clear();
-      this.modelLayers.clear();
-      this.updateDeckLayers();
-
-      this.statusSignal.emit(
-        `Layer implementation switched to ${useTiled ? 'TiledOverlayLayer' : 'MultiResolutionFeatureLayer'}`
-      );
-    }
-  }
-
-  /**
    * Get debug information about the current state
    */
   public getDebugInfo(): any {
+    const layerInfo = this.layerManager.getLayerInfo();
     return {
       useMockData: this.useMockData,
       useMockFeatureData: this.useMockFeatureData,
       enableDebugLogging: this.enableDebugLogging,
-      useTiledOverlayLayer: this.useTiledOverlayLayer,
-      featureLayerCount: this.featureLayers.size,
-      featureLayerNames: Array.from(this.featureLayers.keys()),
+      layerCount: this.layerManager.getLayerCount(),
+      layerNames: layerInfo.map(layer => layer.name),
+      layerTypes: layerInfo.map(layer => layer.type),
       imageName: this.imageName,
       deckInstanceExists: !!this.deckInstance,
       selectedModel: this.selectedModel,
@@ -954,14 +800,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Set layer visibility
    */
   public setLayerVisibility(layerId: string, visible: boolean): void {
-    this.layerVisibility.set(layerId, visible);
-    this.updateDeckLayers();
-
-    // Notify layer control button to update state
-    if (this.layerControlButton) {
-      this.layerControlButton.onLayersChanged();
-    }
-
+    this.layerManager.setLayerVisibility(layerId, visible);
     this.statusSignal.emit(`Layer ${layerId} ${visible ? 'shown' : 'hidden'}`);
   }
 
@@ -972,42 +811,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     layerId: string,
     color: [number, number, number, number]
   ): void {
-    this.layerColors.set(layerId, color);
-
-    // Recreate the specific layer with new color
-    if (this.featureLayers.has(layerId)) {
-      const layer = this.featureLayers.get(layerId);
-      if (layer) {
-        // Get the existing getTileData function
-        const existingLayer = layer as any;
-        const getTileData = existingLayer.props.getTileData;
-
-        // Create new layer with updated color
-        const newLayer = this.createFeatureLayer(layerId, getTileData);
-
-        // Replace the layer
-        this.featureLayers.set(layerId, newLayer);
-      }
-    }
-
-    if (this.modelLayers.has(layerId)) {
-      const layer = this.modelLayers.get(layerId);
-      if (layer) {
-        // For model layers, we need to recreate using the existing pattern
-        const existingLayer = layer as any;
-        const getTileData = existingLayer.props.getTileData;
-
-        // Create new model layer with updated color using TiledOverlayLayer
-        const newModelLayer = this.createFeatureLayer(layerId, getTileData);
-
-        // Replace the layer
-        this.modelLayers.set(layerId, newModelLayer);
-      }
-    }
-
-    // Update Deck.gl layers
-    this.updateDeckLayers();
-
+    this.layerManager.setLayerColor(layerId, color);
     this.statusSignal.emit(`Layer ${layerId} color updated`);
   }
 
@@ -1015,36 +819,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Delete a layer
    */
   public deleteLayer(layerId: string): void {
-    // Remove from feature layers
-    if (this.featureLayers.has(layerId)) {
-      const layer = this.featureLayers.get(layerId);
-      if (layer) {
-        layer.clearCache();
-      }
-      this.featureLayers.delete(layerId);
-    }
-
-    // Remove from model layers
-    if (this.modelLayers.has(layerId)) {
-      const layer = this.modelLayers.get(layerId);
-      if (layer) {
-        layer.clearCache();
-      }
-      this.modelLayers.delete(layerId);
-    }
-
-    // Clean up layer state
-    this.layerVisibility.delete(layerId);
-    this.layerColors.delete(layerId);
-
-    // Update deck layers
-    this.updateDeckLayers();
-
-    // Notify layer control button to update state
-    if (this.layerControlButton) {
-      this.layerControlButton.onLayersChanged();
-    }
-
+    this.layerManager.deleteLayer(layerId);
     this.statusSignal.emit(`Layer ${layerId} deleted`);
   }
 
@@ -1052,41 +827,7 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Get layer information for the layer control dialog
    */
   public getLayerInfo(): any[] {
-    const layers: any[] = [];
-
-    // Add feature layers
-    for (const [layerId] of this.featureLayers.entries()) {
-      layers.push({
-        id: layerId,
-        name: layerId,
-        visible: this.layerVisibility.get(layerId) ?? true,
-        color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
-        type: 'feature'
-      });
-    }
-
-    // Add model layers
-    for (const [layerId] of this.modelLayers.entries()) {
-      layers.push({
-        id: layerId,
-        name: layerId,
-        visible: this.layerVisibility.get(layerId) ?? true,
-        color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
-        type: 'model'
-      });
-    }
-
-    return layers;
-  }
-
-  /**
-   * Initialize layer control toolbar button
-   */
-  public addLayerControlButton(): void {
-    if (!this.layerControlButton) {
-      this.layerControlButton = new LayerControlToolbarButton(this);
-      this.toolbar.addItem('layerControl', this.layerControlButton);
-    }
+    return this.layerManager.getLayerInfo();
   }
 
   /**
@@ -1105,20 +846,9 @@ export class ImageViewerWidget extends MainAreaWidget {
       this.deckInstance = undefined;
     }
 
-    // Clear feature layers
-    for (const featureLayer of this.featureLayers.values()) {
-      featureLayer.clearCache();
-    }
-    this.featureLayers.clear();
-
-    // Clear model layers
-    for (const modelLayer of this.modelLayers.values()) {
-      modelLayer.clearCache();
-    }
-    this.modelLayers.clear();
-
     // Clean up services
     try {
+      this.layerManager?.dispose();
       this.imageTileService?.dispose();
       this.featureTileService?.dispose();
       this.kernelService?.dispose();
