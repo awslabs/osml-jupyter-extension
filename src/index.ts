@@ -14,7 +14,8 @@ import { LOGO_ICON } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
 import {
   ModelSelectionToolbarButton,
-  ImageMetadataToolbarButton
+  ImageMetadataToolbarButton,
+  LayerControlToolbarButton
 } from './components';
 import { Widget } from '@lumino/widgets';
 
@@ -105,6 +106,10 @@ async function activate(
         if (toolbarRegistry && widget.toolbar) {
           console.log('Adding toolbar items to ImageViewerWidget');
 
+          // Create and add the layer control button
+          const layerControlButton = new LayerControlToolbarButton(widget);
+          widget.toolbar.addItem('layerControl', layerControlButton);
+
           // Create and add the model selection button
           //const modelSelectionButton = new ModelSelectionToolbarButton(widget);
           //widget.toolbar.addItem('modelSelection', modelSelectionButton);
@@ -172,6 +177,10 @@ async function activate(
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
           console.log('Adding toolbar items to ImageViewerWidget');
+
+          // Create and add the layer control button
+          const layerControlButton = new LayerControlToolbarButton(widget);
+          widget.toolbar.addItem('layerControl', layerControlButton);
 
           // Create and add the image metadata button
           const imageMetadataButton = new ImageMetadataToolbarButton(widget);
