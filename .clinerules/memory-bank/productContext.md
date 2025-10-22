@@ -19,15 +19,16 @@ The OSML Jupyter Extension addresses a critical gap in satellite imagery analysi
 - **Layer Addition**: Additional layers can be added via "OversightML: Add Layer" context menu option
 - **Interactive Viewing**: Pan, zoom, and explore imagery with deck.gl-based controls
 - **Status Feedback**: Real-time status updates in the JupyterLab status bar
+- **View Properties**: See geo-temporal description of the image and locations clicked in the property inspector
 
 ### Key Workflows
 1. **Single Image Viewing**: Open a satellite image file for basic visualization and exploration
-2. **Multi-layer Analysis**: Add multiple data sources as overlays for comparative analysis
-3. **Integrated Analysis**: Use the viewer alongside notebook cells for combined visual and computational analysis
+2. **Reviewing Overlays**: Add multiple data sources as overlays for comparative analysis
+3. **Visualizing Notebooks**: Use the viewer alongside notebook cells for combined visual and computational analysis
 
 ## User Experience Goals
 - **Seamless Integration**: Feel like a native part of JupyterLab, not a separate tool
-- **Intuitive Interface**: Leverage familiar mapping controls and AWS Cloudscape design patterns
+- **Intuitive Interface**: Leverage familiar web mapping controls
 - **Performance**: Handle large satellite imagery files efficiently
 - **Accessibility**: Work within existing conda environments and kernel setups
 - **Flexibility**: Support various satellite image formats commonly used in research
@@ -36,4 +37,4 @@ The OSML Jupyter Extension addresses a critical gap in satellite imagery analysi
 - **Primary**: SageMaker AI managed Jupyter environments
 - **Secondary**: Local developer Jupyter instances
 - **Kernel Requirements**: Conda environment with GDAL, Proj, and osml-imagery-toolkit
-- **User Personas**: Satellite imagery analysts, geospatial researchers, machine learning practitioners working with remote sensing data
+- **User Personas**: Data scientists, geospatial researchers, and machine learning practitioners working with remote sensing data

@@ -5,14 +5,19 @@
 ### Frontend Technologies
 - **TypeScript**: Primary language for extension development
 - **JupyterLab 4.0+**: Extension platform and framework
+  - https://jupyterlab.readthedocs.io/en/4.4.x/extension/extension_dev.html#
 - **Deck.gl**: GPU-powered high powered data visualization framework
+  - https://github.com/visgl/deck.gl/tree/master/docs/api-reference
 - **Lumino**: Widget framework underlying JupyterLab (signals, messaging, widgets)
+  - https://lumino.readthedocs.io/en/latest/api/index.html
 
 ### Backend Technologies
-- **Python 3.12.9**: Backend processing language
+- **Python 3.12**: Backend processing language
 - **GDAL 3.8.5**: Geospatial Data Abstraction Library for raster processing
+  - https://gdal.org/en/stable/api/python/index.html
 - **Proj 9.4.1**: Cartographic projections library
 - **OSML Imagery Toolkit**: Core satellite imagery processing capabilities
+  - https://awslabs.github.io/osml-imagery-toolkit/
 - **Jupyter Kernel**: Python execution environment with comm channel support
 
 ### Build and Development Tools
@@ -24,47 +29,14 @@
 - **Yarn/jlpm**: Package management
 
 ## Development Environment Setup
+See the development build instructions in README.md
 
 ### Primary Development Environment
-```yaml
-name: osml-jupyterlab-ext-dev
-dependencies:
-  - python=3.12.9
-  - gdal=3.8.5
-  - proj=9.4.1
-  - jupyterlab=4
-  - nodejs=18
-  - pip:
-    - osml-imagery-toolkit>=1.4.2
-    - build, twine, hatch
-```
+The project has a development environment defined using conda. See: conda/osml-jupyterlab-ext-dev-environment.yml
 
 ### Kernel Environment
-```yaml
-name: osml-kernel
-dependencies:
-  - python=3.12.9
-  - numpy=2.2.4
-  - gdal=3.8.5
-  - proj=9.4.1
-  - ipykernel
-  - geopandas
-  - pip:
-    - osml-imagery-toolkit>=1.4.2
-    - boto3
-```
-
-## Key Dependencies
-
-### Critical Runtime Dependencies
-- **@jupyterlab/application**: Core JupyterLab application framework
-- **@deck.gl/core**: Mapping and tile display functionality
-- **osml-imagery-toolkit**: Satellite image processing backend
-
-### Development Dependencies
-- **@jupyterlab/builder**: Extension build system
-- **@typescript-eslint**: TypeScript linting
-- **webpack**: Module bundling
+The Jupyter kernel needs to be setup to include the dependencies defined
+in conda/osml-kernel-environment.yml
 
 ## Architecture Constraints
 
@@ -85,29 +57,3 @@ dependencies:
 - Custom message protocol for tile requests/responses
 - Async/Promise-based communication patterns
 
-## Build System
-
-### Development Workflow
-```bash
-# Development setup
-conda env create -f environment.yml
-conda activate osml-jupyterlab-ext-dev
-pip install -e "."
-jupyter labextension develop . --overwrite
-jlpm install
-
-# Development iteration
-jlpm watch  # Auto-rebuild on changes
-jupyter lab # Run in separate terminal
-```
-
-### Production Build
-```bash
-pip install build twine hatch
-python3 -m build  # Creates wheel in ./dist
-```
-
-### Testing
-- **Unit Tests**: Jest for TypeScript components
-- **Integration Tests**: Playwright/Galata for end-to-end testing
-- **Manual Testing**: Requires sample satellite imagery files
