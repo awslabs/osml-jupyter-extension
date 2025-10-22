@@ -4,6 +4,17 @@ import { ITile, TileDataFunction, ITileLoadConfig } from '../types';
 import { CommService } from './CommService';
 
 /**
+ * Interface for image load response
+ */
+export interface IImageLoadResponse {
+  success: boolean;
+  status: string;
+  width?: number;
+  height?: number;
+  error?: string;
+}
+
+/**
  * Service for managing image tile data loading and caching
  */
 export class ImageTileService {
@@ -21,6 +32,59 @@ export class ImageTileService {
       enableDebugLogging: false,
       ...config
     };
+  }
+
+  /**
+   * Load an image and get its metadata
+   */
+  public async loadImage(imageName: string): Promise<IImageLoadResponse> {
+    if (!this.commService.isReady()) {
+      this.debugLog('CommService not ready for image loading');
+      return {
+        success: false,
+        status: 'COMM_NOT_READY',
+        error: 'Communication service not ready'
+      };
+    }
+
+    try {
+      this.debugLog(`Loading image: ${imageName}`);
+
+      const response = await this.commService.sendMessage({
+        type: 'IMAGE_LOAD_REQUEST',
+        dataset: imageName
+      });
+
+      // Check if the image load was successful
+      if (response.status !== 'SUCCESS') {
+        this.debugLog(`Image load failed for ${imageName}`, response);
+        return {
+          success: false,
+          status: response.status || 'UNKNOWN_ERROR',
+          error: `Image could not be loaded as an image (Status: ${response.status})`
+        };
+      }
+
+      this.debugLog(`Image loaded successfully: ${imageName}`, {
+        width: response.width,
+        height: response.height
+      });
+
+      return {
+        success: true,
+        status: response.status,
+        width: response.width,
+        height: response.height
+      };
+    } catch (error: any) {
+      console.error(`Error loading image ${imageName}:`, error);
+      this.debugLog(`Image load error for ${imageName}`, error);
+      return {
+        success: false,
+        status: 'ERROR',
+        error: error.message || 'Unknown error occurred'
+      };
+    }
   }
 
   /**
