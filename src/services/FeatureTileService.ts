@@ -10,6 +10,15 @@ import {
 import { CommService } from './CommService';
 
 /**
+ * Interface for overlay load response
+ */
+export interface IOverlayLoadResponse {
+  success: boolean;
+  status: string;
+  error?: string;
+}
+
+/**
  * Callback function for when async tile data is loaded
  */
 export type TileDataCallback = (tileId: string, data: IFeatureTileData) => void;
@@ -24,6 +33,58 @@ export class FeatureTileService {
   private enableDebugLogging: boolean = true;
 
   constructor(private commService: CommService) {}
+
+  /**
+   * Load an overlay and get its status
+   */
+  public async loadOverlay(
+    imageName: string,
+    overlayName: string
+  ): Promise<IOverlayLoadResponse> {
+    if (!this.commService.isReady()) {
+      this.debugLog('CommService not ready for overlay loading');
+      return {
+        success: false,
+        status: 'COMM_NOT_READY',
+        error: 'Communication service not ready'
+      };
+    }
+
+    try {
+      this.debugLog(`Loading overlay: ${overlayName} for image: ${imageName}`);
+
+      const response = await this.commService.sendMessage({
+        type: 'OVERLAY_LOAD_REQUEST',
+        imageName: imageName,
+        overlayName: overlayName
+      });
+
+      // Check if the overlay load was successful
+      if (response.status !== 'SUCCESS') {
+        this.debugLog(`Overlay load failed for ${overlayName}`, response);
+        return {
+          success: false,
+          status: response.status || 'UNKNOWN_ERROR',
+          error: `Overlay could not be loaded (Status: ${response.status})`
+        };
+      }
+
+      this.debugLog(`Overlay loaded successfully: ${overlayName}`);
+
+      return {
+        success: true,
+        status: response.status
+      };
+    } catch (error: any) {
+      console.error(`Error loading overlay ${overlayName}:`, error);
+      this.debugLog(`Overlay load error for ${overlayName}`, error);
+      return {
+        success: false,
+        status: 'ERROR',
+        error: error.message || 'Unknown error occurred'
+      };
+    }
+  }
 
   /**
    * Get tile data asynchronously with callback support
