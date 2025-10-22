@@ -2,7 +2,7 @@
 
 import { ISessionContext } from '@jupyterlab/apputils';
 
-import { Kernel, ServiceManager } from '@jupyterlab/services';
+import { ServiceManager } from '@jupyterlab/services';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
@@ -36,7 +36,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   private deckInstance?: Deck;
   private featureLayers: Map<string, TiledOverlayLayer> = new Map();
   private modelLayers: Map<string, TiledOverlayLayer> = new Map();
-  private comm?: Kernel.IComm;
   private imageName?: string;
   private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
@@ -142,16 +141,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       this.featureTileService = new FeatureTileService(this.commService);
 
       console.log('CommService initialized successfully.');
-
-      // Create the client side of the comm channel (legacy support)
-      console.log('Setting up new comm!');
-      this.comm = kernel.createComm('osml_comm_target');
-      if (!this.comm) {
-        throw new Error('Failed to create legacy comm');
-      }
-
-      this.comm.open('Open comm');
-      console.log('Comm setup completed.');
 
       // Once the session is initialized we can ask the user to select an image for display.
       // This widget is not a general full-earth geographic display so a single image must be
@@ -376,7 +365,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    if (!this.comm && !this.useMockData) {
+    if (!this.commService.isReady() && !this.useMockData) {
       this.statusSignal.emit(
         `Unable to load ${imageName} because plugin setup failed.`
       );
@@ -600,7 +589,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    if (!this.comm && !this.useMockFeatureData) {
+    if (!this.commService.isReady() && !this.useMockFeatureData) {
       this.statusSignal.emit(
         `Unable to load overlay ${layerDataPath} because plugin setup failed.`
       );
@@ -1145,14 +1134,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     // Clean up DOM
     if (this.mapDiv) {
       this.mapDiv.innerHTML = '';
-    }
-
-    console.log('Shutting down comm as part of dispose()');
-    try {
-      this.comm?.close();
-    } catch (e) {
-      console.warn('Exception caught cleaning up comm resources');
-      console.debug(e);
     }
 
     super.dispose();
