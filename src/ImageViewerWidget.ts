@@ -19,7 +19,8 @@ import {
   ImageTileService,
   FeatureTileService,
   KernelService,
-  IImageLoadResponse
+  IImageLoadResponse,
+  IOverlayLoadResponse
 } from './services';
 import {
   LayerControlToolbarButton,
@@ -611,64 +612,22 @@ export class ImageViewerWidget extends MainAreaWidget {
 
       // Only send overlay load request if using real data
       if (!this.useMockFeatureData) {
-        const loadStatus = await new Promise<string>((resolve, reject) => {
-          const commFuture = this.comm!.send({
-            type: 'OVERLAY_LOAD_REQUEST',
-            imageName: this.imageName!,
-            overlayName: layerDataPath
-          });
-
-          // Set a timeout to reject the promise if we don't get a response
-          const timeoutId = setTimeout(() => {
-            reject(new Error('Timeout waiting for overlay load response'));
-          }, 30000); // 30 second timeout
-
-          commFuture.onIOPub = (msg: any): void => {
-            const msgType = msg.header.msg_type;
-            if (msgType === 'comm_msg') {
-              console.log('Received overlay load response from comm!!!');
-              console.log(
-                'Full response message:',
-                JSON.stringify(msg, null, 2)
-              );
-              console.log('Response content:', msg.content);
-              console.log('Response data:', msg.content?.data);
-              console.log('Response status:', msg.content?.data?.status);
-              console.log('Response error (if any):', msg.content?.data?.error);
-              console.log(
-                'Response details (if any):',
-                msg.content?.data?.details
-              );
-              clearTimeout(timeoutId);
-              resolve(msg.content.data.status);
-            }
-          };
-
-          // Handle comm future done with error
-          commFuture.done.catch(error => {
-            clearTimeout(timeoutId);
-            reject(error);
-          });
-        });
+        const loadResponse: IOverlayLoadResponse =
+          await this.featureTileService.loadOverlay(
+            this.imageName,
+            layerDataPath
+          );
 
         // Check if the overlay load was successful
-        if (loadStatus !== 'SUCCESS') {
-          console.log(`Overlay load failed for ${layerDataPath}`);
-          console.log('Load status received:', loadStatus);
-          console.log('Expected status: SUCCESS');
-
-          // Try to provide more specific error information
-          let errorMessage = `Error: ${layerDataPath} could not be loaded as an overlay layer`;
-          if (loadStatus) {
-            errorMessage += ` (Status: ${loadStatus})`;
-          }
-
-          this.statusSignal.emit(errorMessage);
+        if (!loadResponse.success) {
+          this.statusSignal.emit(
+            `Error: ${layerDataPath} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
+          );
           return; // Exit early - don't proceed with layer creation
         }
 
         this.statusSignal.emit(
-          `Loading overlay from ${layerDataPath}... ${loadStatus}`
+          `Loading overlay from ${layerDataPath}... ${loadResponse.status}`
         );
       }
     } catch (error: any) {
