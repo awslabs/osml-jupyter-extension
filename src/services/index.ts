@@ -6,3 +6,4 @@ export * from './ImageTileService';
 export * from './FeatureTileService';
 export * from './KernelService';
 export * from './LayerManager';
+export * from './ImageManager';
