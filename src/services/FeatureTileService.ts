@@ -93,13 +93,12 @@ export class FeatureTileService {
   public getTileDataAsync(
     tile: IFeatureTile,
     callback: TileDataCallback,
-    dataType: 'mock' | 'real' | 'model' = 'mock',
+    dataType: 'real' | 'model' = 'real',
     options?: {
       imageName?: string;
       overlayName?: string;
       dataset?: string;
       endpointName?: string;
-      squareSize?: number;
     }
   ): IFeatureTileData {
     const tileId = this.getTileId(tile, dataType, options);
@@ -129,25 +128,14 @@ export class FeatureTileService {
   }
 
   /**
-   * Create a mock feature data function for testing
+   * Create a feature data function that uses the comm service
    */
-  public createMockFeatureDataFunction(
-    squareSize: number = 0.1
-  ): FeatureTileDataFunction {
-    return async (tile: IFeatureTile): Promise<IFeatureTileData> => {
-      return this.createMockFeatureData(tile, squareSize);
-    };
-  }
-
-  /**
-   * Create a real feature data function that uses the comm service
-   */
-  public createRealFeatureDataFunction(
+  public createFeatureDataFunction(
     imageName: string,
     overlayName: string
   ): FeatureTileDataFunction {
     return async (tile: IFeatureTile): Promise<IFeatureTileData> => {
-      return this.loadRealFeatureData(tile, imageName, overlayName);
+      return this.loadFeatureData(tile, imageName, overlayName);
     };
   }
 
@@ -164,104 +152,9 @@ export class FeatureTileService {
   }
 
   /**
-   * Generate mock feature data for testing/debugging
+   * Load feature data from the kernel via comm service
    */
-  private async createMockFeatureData(
-    tile: IFeatureTile,
-    squareSize: number
-  ): Promise<IFeatureTileData> {
-    const tileKey = `mock-${tile.x}-${tile.y}-${tile.z}`;
-
-    // Check cache first
-    if (this.featureCache.has(tileKey)) {
-      const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached mock features for tile ${tileKey}`, {
-        count: cached.features.length
-      });
-      return { features: cached.features, byteLength: cached.byteLength };
-    }
-
-    return new Promise(resolve => {
-      const features: Feature[] = [];
-
-      const tileWidth = tile.right - tile.left;
-      const tileHeight = tile.bottom - tile.top;
-      const centerX = tile.left + tileWidth / 2;
-      const centerY = tile.top + tileHeight / 2;
-
-      // Large square at center (20% of tile size)
-      const centerSquareSize = Math.min(tileWidth, tileHeight) * 0.2;
-      const centerSquare = this.createSquareFeature(
-        centerX,
-        centerY,
-        centerSquareSize,
-        `center-${tile.x}-${tile.y}-${tile.z}`,
-        { weight: 10, type: 'center' }
-      );
-      features.push(centerSquare);
-
-      // Smaller squares at corners
-      const cornerSquareSize = Math.min(tileWidth, tileHeight) * squareSize;
-      const cornerOffset = cornerSquareSize / 2;
-
-      const corners = [
-        {
-          x: tile.left + cornerOffset,
-          y: tile.top + cornerOffset,
-          pos: 'top-left'
-        },
-        {
-          x: tile.right - cornerOffset,
-          y: tile.top + cornerOffset,
-          pos: 'top-right'
-        },
-        {
-          x: tile.left + cornerOffset,
-          y: tile.bottom - cornerOffset,
-          pos: 'bottom-left'
-        },
-        {
-          x: tile.right - cornerOffset,
-          y: tile.bottom - cornerOffset,
-          pos: 'bottom-right'
-        }
-      ];
-
-      corners.forEach(corner => {
-        const cornerSquare = this.createSquareFeature(
-          corner.x,
-          corner.y,
-          cornerSquareSize,
-          `corner-${corner.pos}-${tile.x}-${tile.y}-${tile.z}`,
-          { weight: 3, type: 'corner', position: corner.pos }
-        );
-        features.push(cornerSquare);
-      });
-
-      // Calculate approximate byte length for the features
-      const byteLength = this.calculateFeaturesByteLength(features);
-
-      // Cache the result
-      const cacheEntry: IFeatureCacheEntry = {
-        features,
-        byteLength,
-        timestamp: Date.now(),
-        tileKey
-      };
-      this.featureCache.set(tileKey, cacheEntry);
-
-      this.debugLog(`Created mock features for tile ${tileKey}`, {
-        count: features.length
-      });
-
-      resolve({ features, byteLength });
-    });
-  }
-
-  /**
-   * Load real feature data from the kernel via comm service
-   */
-  private async loadRealFeatureData(
+  private async loadFeatureData(
     tile: IFeatureTile,
     imageName: string,
     overlayName: string
@@ -408,48 +301,6 @@ export class FeatureTileService {
   }
 
   /**
-   * Helper function to create a square feature
-   */
-  private createSquareFeature(
-    centerX: number,
-    centerY: number,
-    size: number,
-    id: string,
-    properties: any = {}
-  ): Feature {
-    const halfSize = size / 2;
-
-    // Create square coordinates
-    const coordinates = [
-      [
-        [centerX - halfSize, centerY - halfSize], // top-left
-        [centerX + halfSize, centerY - halfSize], // top-right
-        [centerX + halfSize, centerY + halfSize], // bottom-right
-        [centerX - halfSize, centerY + halfSize], // bottom-left
-        [centerX - halfSize, centerY - halfSize] // close the polygon
-      ]
-    ];
-
-    const imageGeometry = {
-      type: 'Polygon' as const,
-      coordinates: coordinates
-    };
-
-    return {
-      type: 'Feature',
-      id: id,
-      geometry: imageGeometry,
-      properties: {
-        ...properties,
-        imageGeometry: imageGeometry,
-        centerX: centerX,
-        centerY: centerY,
-        size: size
-      }
-    };
-  }
-
-  /**
    * Calculate approximate byte length for an array of features
    */
   private calculateFeaturesByteLength(features: Feature[]): number {
@@ -475,8 +326,6 @@ export class FeatureTileService {
     options?: any
   ): string {
     switch (dataType) {
-      case 'mock':
-        return `mock-${tile.x}-${tile.y}-${tile.z}`;
       case 'real':
         return `${options?.imageName || 'unknown'}-${options?.overlayName || 'unknown'}-${tile.x}-${tile.y}-${tile.z}`;
       case 'model':
@@ -491,7 +340,7 @@ export class FeatureTileService {
    */
   private startAsyncTileLoad(
     tile: IFeatureTile,
-    dataType: 'mock' | 'real' | 'model',
+    dataType: 'real' | 'model',
     options: any = {},
     tileId: string
   ): void {
@@ -500,19 +349,13 @@ export class FeatureTileService {
     let loadPromise: Promise<IFeatureTileData>;
 
     switch (dataType) {
-      case 'mock':
-        loadPromise = this.createMockFeatureData(
-          tile,
-          options.squareSize || 0.1
-        );
-        break;
       case 'real':
         if (!options.imageName || !options.overlayName) {
-          console.error('Real data loading requires imageName and overlayName');
+          console.error('Data loading requires imageName and overlayName');
           this.notifyCallbacks(tileId, { features: [], byteLength: 0 });
           return;
         }
-        loadPromise = this.loadRealFeatureData(
+        loadPromise = this.loadFeatureData(
           tile,
           options.imageName,
           options.overlayName

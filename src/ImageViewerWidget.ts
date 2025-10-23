@@ -46,8 +46,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   private imageManager: ImageManager;
 
   // Configuration options
-  private useMockData: boolean = false; // Set to true for testing with mock tiles
-  private useMockFeatureData: boolean = false; // Set to true for testing with mock features
   private enableDebugLogging: boolean = false;
 
   // Model selection state
@@ -348,7 +346,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    if (!this.commService.isReady() && !this.useMockData) {
+    if (!this.commService.isReady()) {
       this.statusSignal.emit(
         `Unable to load ${imageName} because plugin setup failed.`
       );
@@ -358,8 +356,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     try {
       this.statusSignal.emit(`Loading ${imageName} ...`);
 
-      // Configure ImageManager for mock data if needed
-      this.imageManager.setUseMockData(this.useMockData);
+      // Configure ImageManager
       this.imageManager.setDebugLogging(this.enableDebugLogging);
 
       // First, load image to get metadata and determine dimensions
@@ -376,9 +373,8 @@ export class ImageViewerWidget extends MainAreaWidget {
       }
 
       // Create a getTileData function for the ImageManager
-      const getTileData = this.useMockData
-        ? this.imageTileService.createMockTileDataFunction()
-        : this.imageTileService.createRealTileDataFunction(imageName);
+      const getTileData =
+        this.imageTileService.createTileDataFunction(imageName);
 
       // Use ImageManager to load the image with proper parameters
       this.imageManager.loadImage(
@@ -455,7 +451,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    if (!this.commService.isReady() && !this.useMockFeatureData) {
+    if (!this.commService.isReady()) {
       this.statusSignal.emit(
         `Unable to load overlay ${layerDataPath} because plugin setup failed.`
       );
@@ -465,26 +461,23 @@ export class ImageViewerWidget extends MainAreaWidget {
     try {
       this.statusSignal.emit(`Loading overlay from ${layerDataPath}...`);
 
-      // Only send overlay load request if using real data
-      if (!this.useMockFeatureData) {
-        const loadResponse: IOverlayLoadResponse =
-          await this.featureTileService.loadOverlay(
-            this.imageName,
-            layerDataPath
-          );
-
-        // Check if the overlay load was successful
-        if (!loadResponse.success) {
-          this.statusSignal.emit(
-            `Error: ${layerDataPath} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
-          );
-          return; // Exit early - don't proceed with layer creation
-        }
-
-        this.statusSignal.emit(
-          `Loading overlay from ${layerDataPath}... ${loadResponse.status}`
+      const loadResponse: IOverlayLoadResponse =
+        await this.featureTileService.loadOverlay(
+          this.imageName,
+          layerDataPath
         );
+
+      // Check if the overlay load was successful
+      if (!loadResponse.success) {
+        this.statusSignal.emit(
+          `Error: ${layerDataPath} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
+        );
+        return; // Exit early - don't proceed with layer creation
       }
+
+      this.statusSignal.emit(
+        `Loading overlay from ${layerDataPath}... ${loadResponse.status}`
+      );
     } catch (error: any) {
       console.error('Error loading overlay:', error);
       this.statusSignal.emit(
@@ -493,15 +486,13 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    // Create feature tile data function - can easily swap between mock and real data
-    const getFeatureTileData = this.useMockFeatureData
-      ? this.featureTileService.createMockFeatureDataFunction(0.1) // 10% corner square size
-      : this.featureTileService.createRealFeatureDataFunction(
-          this.imageName,
-          layerDataPath
-        );
+    // Create feature tile data function
+    const getFeatureTileData =
+      this.featureTileService.createFeatureDataFunction(
+        this.imageName,
+        layerDataPath
+      );
 
-    this.debugLog(`Adding layer with mock data: ${this.useMockFeatureData}`);
     this.debugLog(`Layer path: ${layerDataPath}`);
 
     // Add the feature layer via LayerManager
@@ -526,10 +517,10 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     this.statusSignal.emit(`Adding dataset layer: ${datasetName}`);
 
-    // Create feature tile data function using the real data function
+    // Create feature tile data function
     // The image name is the current image and overlayName is the dataset name
     const getFeatureTileData =
-      this.featureTileService.createRealFeatureDataFunction(
+      this.featureTileService.createFeatureDataFunction(
         this.imageName,
         datasetName
       );
@@ -603,14 +594,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Set whether to use mock data for tiles (useful for testing)
-   */
-  public setUseMockData(useMock: boolean): void {
-    this.useMockData = useMock;
-    this.updateDeckLayers();
-  }
-
-  /**
    * Enable/disable debug logging
    */
   public setDebugLogging(enabled: boolean): void {
@@ -635,45 +618,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     console.log('onCloseRequest for ImageViewerWidget');
     super.onCloseRequest(msg);
     this.dispose();
-  }
-
-  /**
-   * Set whether to use mock feature data (useful for testing)
-   */
-  public setUseMockFeatureData(useMock: boolean): void {
-    this.useMockFeatureData = useMock;
-    // Note: Existing layers will continue to use their original data source
-    // New layers added after this call will use the updated mock setting
-  }
-
-  /**
-   * Add a test feature layer with mock data for testing purposes
-   */
-  public addTestFeatureLayer(): void {
-    if (!this.deckInstance) {
-      console.warn(
-        'Cannot add test feature layer: Deck instance not initialized'
-      );
-      return;
-    }
-
-    const testLayerName = 'test-features';
-
-    // Enable mock feature data and debug logging for testing
-    this.useMockFeatureData = true;
-    this.enableDebugLogging = true;
-
-    console.log('Adding test feature layer with mock data...');
-    this.statusSignal.emit('Adding test feature layer with mock squares...');
-
-    // Add the test layer
-    this.addLayer(testLayerName);
-
-    console.log(
-      'Test feature layer added. You should see squares at tile centers and corners.'
-    );
-    console.log('- Zoom >= 0: Individual square features');
-    console.log('- Zoom < 0: Heatmap aggregation');
   }
 
   /**
@@ -717,8 +661,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   public getDebugInfo(): any {
     const layerInfo = this.layerManager.getLayerInfo();
     return {
-      useMockData: this.useMockData,
-      useMockFeatureData: this.useMockFeatureData,
       enableDebugLogging: this.enableDebugLogging,
       layerCount: this.layerManager.getLayerCount(),
       layerNames: layerInfo.map(layer => layer.name),

@@ -88,92 +88,18 @@ export class ImageTileService {
   }
 
   /**
-   * Create a mock tile data function for testing
+   * Create a tile data function that uses the comm service
    */
-  public createMockTileDataFunction(): TileDataFunction {
+  public createTileDataFunction(imageName: string): TileDataFunction {
     return async (tile: ITile): Promise<ImageBitmap | null> => {
-      return this.createMockTileData(tile);
+      return this.loadTileData(tile, imageName);
     };
   }
 
   /**
-   * Create a real tile data function that uses the comm service
+   * Load tile data from the kernel via comm service
    */
-  public createRealTileDataFunction(imageName: string): TileDataFunction {
-    return async (tile: ITile): Promise<ImageBitmap | null> => {
-      return this.loadRealTileData(tile, imageName);
-    };
-  }
-
-  /**
-   * Generate mock tile data for testing/debugging
-   */
-  private async createMockTileData(tile: ITile): Promise<ImageBitmap | null> {
-    const tileKey = `${tile.x}-${tile.y}-${tile.z}`;
-
-    // Check cache first
-    if (this.tileCache.has(tileKey)) {
-      this.debugLog(`Using cached mock tile: ${tileKey}`);
-      return this.tileCache.get(tileKey)!;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = this.config.tileSize;
-    canvas.height = this.config.tileSize;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      return null;
-    }
-
-    // Save context state
-    ctx.save();
-
-    // Fill with gray background
-    ctx.fillStyle = '#808080';
-    ctx.fillRect(0, 0, this.config.tileSize, this.config.tileSize);
-
-    // Add border
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, this.config.tileSize - 2, this.config.tileSize - 2);
-
-    // Add coordinates text
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-      `${tile.x},${tile.y},${tile.z}`,
-      this.config.tileSize / 2,
-      this.config.tileSize / 2
-    );
-
-    // Restore context
-    ctx.restore();
-
-    try {
-      // Convert canvas to ImageBitmap
-      const imageBitmap = await createImageBitmap(canvas);
-      // Add byteLength property for Deck.gl compatibility
-      (imageBitmap as any).byteLength =
-        this.config.tileSize * this.config.tileSize * 4; // RGBA bytes
-
-      // Cache the result
-      this.tileCache.set(tileKey, imageBitmap);
-
-      this.debugLog(`Created mock tile: ${tileKey}`);
-      return imageBitmap;
-    } catch (error) {
-      console.error('Error creating mock tile ImageBitmap:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Load real tile data from the kernel via comm service
-   */
-  private async loadRealTileData(
+  private async loadTileData(
     tile: ITile,
     imageName: string
   ): Promise<ImageBitmap | null> {

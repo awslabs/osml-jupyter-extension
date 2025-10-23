@@ -39,7 +39,6 @@ export class ImageManager {
   private currentImage: IImageMetadata | null = null;
   private imageLayer: TileLayer | null = null;
   private currentGetTileData: TileDataFunction | null = null;
-  private useMockData: boolean = false;
   private tileSize: number = 512;
 
   // Signals for image changes
@@ -284,29 +283,6 @@ export class ImageManager {
   }
 
   /**
-   * Set whether to use mock data for tiles (useful for testing)
-   */
-  public setUseMockData(useMock: boolean): void {
-    if (this.useMockData !== useMock) {
-      this.useMockData = useMock;
-      this.debugLog(`Mock data usage set to: ${useMock}`);
-
-      // Recreate image layer if image is loaded
-      if (this.currentImage && this.currentGetTileData) {
-        this.createImageLayer(this.currentImage.name, this.currentGetTileData);
-        this._imageChanged.emit();
-      }
-    }
-  }
-
-  /**
-   * Get whether mock data is being used
-   */
-  public getUseMockData(): boolean {
-    return this.useMockData;
-  }
-
-  /**
    * Set tile size (affects layer creation)
    */
   public setTileSize(tileSize: number): void {
@@ -345,7 +321,6 @@ export class ImageManager {
       hasImage: this.isImageLoaded(),
       imageName: this.getCurrentImageName(),
       dimensions: this.getImageDimensions(),
-      useMockData: this.useMockData,
       tileSize: this.tileSize,
       hasLayer: !!this.imageLayer,
       enableDebugLogging: this.enableDebugLogging
