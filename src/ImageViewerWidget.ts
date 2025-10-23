@@ -9,10 +9,7 @@ import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
 
 import { Deck, OrthographicView } from '@deck.gl/core';
-import { TileLayer } from '@deck.gl/geo-layers';
-import { BitmapLayer } from '@deck.gl/layers';
 
-import { ITile, TileDataFunction } from './types';
 import { TiledOverlayLayer } from './layers';
 import {
   CommService,
@@ -20,7 +17,7 @@ import {
   FeatureTileService,
   KernelService,
   LayerManager,
-  IImageLoadResponse,
+  ImageManager,
   IOverlayLoadResponse
 } from './services';
 import { FeaturePropertiesDialog } from './components';
@@ -46,6 +43,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   private featureTileService: FeatureTileService;
   private kernelService: KernelService;
   private layerManager: LayerManager;
+  private imageManager: ImageManager;
 
   // Configuration options
   private useMockData: boolean = false; // Set to true for testing with mock tiles
@@ -93,6 +91,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.featureTileService = new FeatureTileService(this.commService);
     this.kernelService = new KernelService(this.manager);
     this.layerManager = new LayerManager(this.enableDebugLogging);
+    this.imageManager = new ImageManager(this.enableDebugLogging);
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -125,9 +124,22 @@ export class ImageViewerWidget extends MainAreaWidget {
       });
       this.featureTileService = new FeatureTileService(this.commService);
 
-      // Connect LayerManager signals
+      // Connect service signals
       this.layerManager.layersChanged.connect(() => {
         this.updateDeckLayers();
+      });
+
+      this.imageManager.imageChanged.connect(() => {
+        this.updateDeckLayers();
+      });
+
+      this.imageManager.imageLoaded.connect((_, imageMetadata) => {
+        this.statusSignal.emit(`${imageMetadata.name} loaded successfully`);
+        this.createDeckInstance(imageMetadata);
+      });
+
+      this.imageManager.imageLoadError.connect((_, errorMessage) => {
+        this.statusSignal.emit(`Error: ${errorMessage}`);
       });
 
       console.log('CommService initialized successfully.');
@@ -262,151 +274,20 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Create a TileLayer for the image with swappable getTileData function
+   * Create Deck.gl instance with the loaded image
    */
-  private createImageLayer(
-    imageName: string,
-    getTileData: TileDataFunction
-  ): TileLayer {
-    return new TileLayer({
-      id: `image-${imageName}`,
-      data: [], // Required by TileLayer but not used since we provide getTileData
-      tileSize: 512,
-      minZoom: -10,
-      maxZoom: 10,
-      maxCacheSize: 100,
-      maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
-      refinementStrategy: 'best-available',
-      debounceTime: 100,
-      getTileData: (tileProps: any) => {
-        // Extract tile coordinates from TileLoadProps
-        const x = tileProps.x ?? tileProps.index?.x;
-        const y = tileProps.y ?? tileProps.index?.y;
-        const z = tileProps.z ?? tileProps.index?.z;
+  private createDeckInstance(imageMetadata: any): void {
+    this.debugLog('Creating Deck.gl instance', imageMetadata);
 
-        // Convert TileLayer's tile format to our ITile format
-        const scale = Math.pow(2, -z);
-        const tileSize = 512;
-        const tile: ITile = {
-          x,
-          y,
-          z,
-          left: x * tileSize * scale,
-          top: y * tileSize * scale,
-          right: (x + 1) * tileSize * scale,
-          bottom: (y + 1) * tileSize * scale
-        };
+    // Update imageName for compatibility with existing code
+    this.imageName = imageMetadata.name;
 
-        this.debugLog(`Loading tile ${x}-${y}-${z}`, tile);
-        return getTileData(tile);
-      },
-      renderSubLayers: (props: any) => {
-        const { tile, data } = props;
-
-        if (!data) {
-          return null;
-        }
-
-        // Extract tile bounds from the tile's bbox
-        const { bbox } = tile;
-        let bounds: number[];
-
-        if ('west' in bbox) {
-          // Geographic bounds format
-          bounds = [bbox.west, bbox.south, bbox.east, bbox.north];
-        } else {
-          // Image coordinate bounds format
-          bounds = [bbox.left, bbox.bottom, bbox.right, bbox.top];
-        }
-
-        this.debugLog(`Rendering tile ${tile.x}-${tile.y}-${tile.z}`, {
-          bounds,
-          hasData: !!data,
-          dataType: typeof data
-        });
-
-        return new BitmapLayer({
-          ...props,
-          id: `${props.id}-bitmap`,
-          image: data,
-          bounds,
-          data: null // Explicitly set data to null to avoid BitmapLayer confusion
-        });
-      },
-      onTileLoad: (tile: any) => {
-        this.debugLog(`Tile loaded: ${tile.x}-${tile.y}-${tile.z}`);
-      },
-      onTileError: (error: any, tile?: any) => {
-        const tileInfo = tile ? `${tile.x}-${tile.y}-${tile.z}` : 'unknown';
-        console.error(`Tile error for ${tileInfo}:`, error);
-        this.debugLog(`Tile error for ${tileInfo}`, error);
-      }
-    });
-  }
-
-  /**
-   * Creates a new Deck.gl visualization containing a base layer for this tiled image.
-   *
-   * @param imageName the full path of the image on the Jupyter notebook instance.
-   */
-  public async openImage(imageName: string | null) {
-    console.log('DEBUG: ImageViewerWidget.openImage("' + imageName + '")');
-    if (!imageName) {
+    // Get the initial viewport state from ImageManager
+    const initialViewState = this.imageManager.getInitialViewState();
+    if (!initialViewState) {
+      console.error('Could not get initial view state from ImageManager');
       return;
     }
-
-    if (!this.commService.isReady() && !this.useMockData) {
-      this.statusSignal.emit(
-        `Unable to load ${imageName} because plugin setup failed.`
-      );
-      return;
-    }
-
-    // Initialize image dimensions for centering
-    let imageWidth = 0;
-    let imageHeight = 0;
-
-    try {
-      this.statusSignal.emit(`Loading ${imageName} ...`);
-
-      // Only send load request if using real data
-      if (!this.useMockData) {
-        const loadResponse: IImageLoadResponse =
-          await this.imageTileService.loadImage(imageName);
-
-        // Check if the image load was successful
-        if (!loadResponse.success) {
-          this.statusSignal.emit(
-            `Error: ${imageName} could not be loaded as an image${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
-          );
-          return; // Exit early - don't proceed with deck.gl setup
-        }
-
-        // Extract image dimensions for centering
-        if (loadResponse.width && loadResponse.height) {
-          imageWidth = loadResponse.width;
-          imageHeight = loadResponse.height;
-          console.log(`Image dimensions: ${imageWidth}x${imageHeight}`);
-        }
-
-        this.statusSignal.emit(
-          `Loading ${imageName} ... ${loadResponse.status}`
-        );
-      }
-    } catch (error: any) {
-      console.error('Error loading image:', error);
-      this.statusSignal.emit(`Error loading ${imageName}: ${error.message}`);
-    }
-
-    this.imageName = imageName;
-
-    // Create tile data function - can easily swap between mock and real data
-    const getTileData = this.useMockData
-      ? this.imageTileService.createMockTileDataFunction()
-      : this.imageTileService.createRealTileDataFunction(imageName);
-
-    // Create the image layer directly using TileLayer
-    const imageLayer = this.createImageLayer(imageName, getTileData);
 
     // Create a canvas element for Deck.gl
     const canvas = document.createElement('canvas');
@@ -415,22 +296,22 @@ export class ImageViewerWidget extends MainAreaWidget {
     canvas.style.backgroundColor = 'black'; // Set canvas background to black
     this.mapDiv.appendChild(canvas);
 
-    // Create Deck.gl instance with OrthographicView
-    // Position the view to show the image centered at (width/2, height/2)
-    const centerX = imageWidth / 2;
-    const centerY = imageHeight / 2;
-    console.log(`Centering view at: [${centerX}, ${centerY}, 0]`);
+    // Get the image layer from ImageManager
+    const imageLayer = this.imageManager.getImageLayer();
+    if (!imageLayer) {
+      console.error('Could not get image layer from ImageManager');
+      return;
+    }
+
+    this.debugLog(
+      `Centering view at: [${initialViewState.target[0]}, ${initialViewState.target[1]}, ${initialViewState.target[2]}]`
+    );
 
     this.deckInstance = new Deck({
       canvas: canvas,
       width: '100%',
       height: '100%',
-      initialViewState: {
-        target: [centerX, centerY, 0],
-        zoom: 0, // Start at full resolution (zoom level 0)
-        minZoom: -10,
-        maxZoom: 10
-      } as any,
+      initialViewState: initialViewState as any,
       views: [
         new OrthographicView({
           id: 'ortho',
@@ -453,7 +334,65 @@ export class ImageViewerWidget extends MainAreaWidget {
       }
     }) as any; // Type assertion to work around Deck.gl typing issues
 
-    this.statusSignal.emit(`${imageName} loaded successfully`);
+    this.debugLog('Deck.gl instance created successfully');
+  }
+
+  /**
+   * Creates a new Deck.gl visualization containing a base layer for this tiled image.
+   *
+   * @param imageName the full path of the image on the Jupyter notebook instance.
+   */
+  public async openImage(imageName: string | null) {
+    console.log('DEBUG: ImageViewerWidget.openImage("' + imageName + '")');
+    if (!imageName) {
+      return;
+    }
+
+    if (!this.commService.isReady() && !this.useMockData) {
+      this.statusSignal.emit(
+        `Unable to load ${imageName} because plugin setup failed.`
+      );
+      return;
+    }
+
+    try {
+      this.statusSignal.emit(`Loading ${imageName} ...`);
+
+      // Configure ImageManager for mock data if needed
+      this.imageManager.setUseMockData(this.useMockData);
+      this.imageManager.setDebugLogging(this.enableDebugLogging);
+
+      // First, load image to get metadata and determine dimensions
+      const imageLoadResponse =
+        await this.imageTileService.loadImage(imageName);
+      if (
+        !imageLoadResponse.success ||
+        !imageLoadResponse.width ||
+        !imageLoadResponse.height
+      ) {
+        throw new Error(
+          `Could not load image: ${imageName} - ${imageLoadResponse.error || 'Unknown error'}`
+        );
+      }
+
+      // Create a getTileData function for the ImageManager
+      const getTileData = this.useMockData
+        ? this.imageTileService.createMockTileDataFunction()
+        : this.imageTileService.createRealTileDataFunction(imageName);
+
+      // Use ImageManager to load the image with proper parameters
+      this.imageManager.loadImage(
+        imageName,
+        imageLoadResponse.width,
+        imageLoadResponse.height,
+        getTileData
+      );
+
+      // The rest of the initialization will be handled by the imageLoaded signal
+    } catch (error: any) {
+      console.error('Error loading image:', error);
+      this.statusSignal.emit(`Error loading ${imageName}: ${error.message}`);
+    }
   }
 
   /**
@@ -643,24 +582,23 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Updates the Deck.gl instance with current layers.
    */
   private updateDeckLayers(): void {
-    if (!this.deckInstance || !this.imageName) {
+    if (!this.deckInstance) {
       return;
     }
 
-    // Recreate the image layer (this is lightweight since TileLayer handles caching)
-    const getTileData = this.useMockData
-      ? this.imageTileService.createMockTileDataFunction()
-      : this.imageTileService.createRealTileDataFunction(this.imageName);
-
-    const imageLayer = this.createImageLayer(this.imageName, getTileData);
+    // Get the image layer from ImageManager
+    const imageLayer = this.imageManager.getImageLayer();
     const allLayers = this.getAllLayers();
 
     this.debugLog(
-      `Updating deck layers: image layer + ${allLayers.length} feature/model layers`
+      `Updating deck layers: ${imageLayer ? 'image layer' : 'no image layer'} + ${allLayers.length} feature/model layers`
     );
 
+    // Combine layers, only include image layer if it exists
+    const layers = imageLayer ? [imageLayer, ...allLayers] : allLayers;
+
     this.deckInstance.setProps({
-      layers: [imageLayer, ...allLayers]
+      layers: layers
     });
   }
 
@@ -849,6 +787,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     // Clean up services
     try {
       this.layerManager?.dispose();
+      this.imageManager?.dispose();
       this.imageTileService?.dispose();
       this.featureTileService?.dispose();
       this.kernelService?.dispose();
