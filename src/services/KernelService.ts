@@ -9,6 +9,7 @@ import {
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
 import { KERNEL_SETUP_CODE } from '../utils';
+import { logger } from '../utils';
 
 /**
  * Service for managing Jupyter kernel setup and lifecycle
@@ -54,10 +55,19 @@ export class KernelService {
    */
   public async restart(): Promise<void> {
     if (!this.sessionContext) {
+      const errorMessage = 'Session context not available for restart';
+      logger.error(`KernelService restart failed: ${errorMessage}`);
       throw new Error('Session context not available');
     }
 
-    await this.sessionContext.session?.kernel?.restart();
+    try {
+      logger.info('Restarting kernel session');
+      await this.sessionContext.session?.kernel?.restart();
+      logger.info('Kernel session restarted successfully');
+    } catch (error: any) {
+      logger.error(`KernelService restart failed: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
@@ -65,7 +75,14 @@ export class KernelService {
    */
   public async shutdown(): Promise<void> {
     if (this.sessionContext?.session) {
-      await this.sessionContext.session.shutdown();
+      try {
+        logger.info('Shutting down kernel session');
+        await this.sessionContext.session.shutdown();
+        logger.info('Kernel session shutdown successfully');
+      } catch (error: any) {
+        logger.error(`KernelService shutdown failed: ${error.message}`);
+        throw error;
+      }
     }
   }
 
@@ -73,18 +90,29 @@ export class KernelService {
    * Create and initialize session context
    */
   private async createAndInitializeSession(): Promise<void> {
-    // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
-    this.sessionContext = new SessionContext({
-      sessionManager: this.manager.sessions,
-      specsManager: this.manager.kernelspecs,
-      name: 'OversightML Image Viewer',
-      kernelPreference: { name: 'ipython' }
-    });
+    try {
+      logger.debug('Creating session context for OversightML Image Viewer');
 
-    // Initialize the session context
-    const initializeResult = await this.sessionContext.initialize();
-    if (!initializeResult) {
-      throw new Error('Failed to initialize session context');
+      // Create a new session to connect to the Jupyter Kernel that will be providing the image tiles.
+      this.sessionContext = new SessionContext({
+        sessionManager: this.manager.sessions,
+        specsManager: this.manager.kernelspecs,
+        name: 'OversightML Image Viewer',
+        kernelPreference: { name: 'ipython' }
+      });
+
+      // Initialize the session context
+      const initializeResult = await this.sessionContext.initialize();
+      if (!initializeResult) {
+        const errorMessage = 'Failed to initialize session context';
+        logger.error(`KernelService session creation failed: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      logger.debug('Session context created and initialized successfully');
+    } catch (error: any) {
+      logger.error(`KernelService session creation failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -93,44 +121,72 @@ export class KernelService {
    */
   private async selectKernel(): Promise<void> {
     if (!this.sessionContext) {
+      const errorMessage = 'Session context not available for kernel selection';
+      logger.error(`KernelService kernel selection failed: ${errorMessage}`);
       throw new Error('Session context not available');
     }
-    await this.sessionContextDialogs.selectKernel(this.sessionContext);
+
+    try {
+      logger.debug('Selecting kernel via dialog');
+      await this.sessionContextDialogs.selectKernel(this.sessionContext);
+      logger.debug('Kernel selection completed');
+    } catch (error: any) {
+      logger.error(`KernelService kernel selection failed: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
    * Execute kernel setup code with proper promise handling
    */
   private async executeKernelSetupCode(): Promise<void> {
-    // Install the code on the Jupyter session needed to create tiles and setup the server side of the comm channel.
-    const kernelSetupFuture =
-      this.sessionContext?.session?.kernel?.requestExecute({
-        code: KERNEL_SETUP_CODE
-      });
+    try {
+      logger.debug('Executing kernel setup code');
 
-    if (kernelSetupFuture) {
-      await new Promise<void>((resolve, reject) => {
-        kernelSetupFuture.onIOPub = function (
-          msg: KernelMessage.IIOPubMessage
-        ): void {
-          const msgType = msg.header.msg_type;
-          switch (msgType) {
-            case 'execute_result':
-              console.log('Completed kernel setup for JupyterImageLayer');
-              resolve();
-              break;
-            case 'error':
-              console.error('Unable to setup kernel for JupyterImageLayer');
-              console.error(msg);
-              reject(new Error('Kernel setup failed'));
-              break;
-          }
-        };
-
-        kernelSetupFuture.done.catch(error => {
-          reject(error);
+      // Install the code on the Jupyter session needed to create tiles and setup the server side of the comm channel.
+      const kernelSetupFuture =
+        this.sessionContext?.session?.kernel?.requestExecute({
+          code: KERNEL_SETUP_CODE
         });
-      });
+
+      if (kernelSetupFuture) {
+        await new Promise<void>((resolve, reject) => {
+          kernelSetupFuture.onIOPub = function (
+            msg: KernelMessage.IIOPubMessage
+          ): void {
+            const msgType = msg.header.msg_type;
+            switch (msgType) {
+              case 'execute_result':
+                resolve();
+                break;
+              case 'error': {
+                const errorMessage = 'Kernel setup code execution failed';
+                logger.error(`KernelService setup failed: ${errorMessage}`);
+                console.error('Unable to setup kernel for JupyterImageLayer');
+                console.error(msg);
+                reject(new Error('Kernel setup failed'));
+                break;
+              }
+            }
+          };
+
+          kernelSetupFuture.done.catch(error => {
+            logger.error(
+              `KernelService setup code execution failed: ${error.message}`
+            );
+            reject(error);
+          });
+        });
+
+        logger.debug('Kernel setup code executed successfully');
+      } else {
+        const errorMessage = 'Failed to create kernel setup future';
+        logger.error(`KernelService setup failed: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+    } catch (error: any) {
+      logger.error(`KernelService setup code failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -138,22 +194,31 @@ export class KernelService {
    * Initialize the kernel session and setup code
    */
   public async initialize(): Promise<void> {
-    // Create and initialize session context
-    await this.createAndInitializeSession();
+    try {
+      logger.info('Initializing KernelService');
 
-    // Select kernel using dialog
-    await this.selectKernel();
+      // Create and initialize session context
+      await this.createAndInitializeSession();
 
-    // Execute kernel setup code
-    await this.executeKernelSetupCode();
+      // Select kernel using dialog
+      await this.selectKernel();
 
-    // Verify kernel is available after initialization
-    const kernel = this.sessionContext!.session?.kernel;
-    if (!kernel) {
-      throw new Error('Kernel not available after initialization');
+      // Execute kernel setup code
+      await this.executeKernelSetupCode();
+
+      // Verify kernel is available after initialization
+      const kernel = this.sessionContext!.session?.kernel;
+      if (!kernel) {
+        const errorMessage = 'Kernel not available after initialization';
+        logger.error(`KernelService initialization failed: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      logger.info('KernelService initialized successfully');
+    } catch (error: any) {
+      logger.error(`KernelService initialization failed: ${error.message}`);
+      throw error;
     }
-
-    console.log('Kernel service initialized successfully.');
   }
 
   /**

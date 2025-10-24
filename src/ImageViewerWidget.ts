@@ -21,6 +21,7 @@ import {
   IOverlayLoadResponse
 } from './services';
 import { FeaturePropertiesDialog } from './components';
+import { logger } from './utils';
 
 /**
  * This widget provides a way to display geospatial information in a Jupyter environment overlaid on an image.
@@ -44,9 +45,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   private kernelService: KernelService;
   private layerManager: LayerManager;
   private imageManager: ImageManager;
-
-  // Configuration options
-  private enableDebugLogging: boolean = false;
 
   // Model selection state
   private selectedModel: string = '';
@@ -83,13 +81,11 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Initialize services (will be properly initialized after kernel setup)
     this.commService = new CommService();
-    this.imageTileService = new ImageTileService(this.commService, {
-      enableDebugLogging: this.enableDebugLogging
-    });
+    this.imageTileService = new ImageTileService(this.commService);
     this.featureTileService = new FeatureTileService(this.commService);
     this.kernelService = new KernelService(this.manager);
-    this.layerManager = new LayerManager(this.enableDebugLogging);
-    this.imageManager = new ImageManager(this.enableDebugLogging);
+    this.layerManager = new LayerManager();
+    this.imageManager = new ImageManager();
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -103,6 +99,8 @@ export class ImageViewerWidget extends MainAreaWidget {
 
   private async initialize(selectedFileName: string | null) {
     try {
+      logger.info('Initializing ImageViewerWidget services');
+
       // Use KernelService to handle kernel initialization
       await this.kernelService.initialize();
 
@@ -117,10 +115,10 @@ export class ImageViewerWidget extends MainAreaWidget {
       await this.commService.initialize('osml_comm_target');
 
       // Create services with the new CommService
-      this.imageTileService = new ImageTileService(this.commService, {
-        enableDebugLogging: this.enableDebugLogging
-      });
+      this.imageTileService = new ImageTileService(this.commService);
       this.featureTileService = new FeatureTileService(this.commService);
+
+      logger.info('ImageViewerWidget services initialized successfully');
 
       // Connect service signals
       this.layerManager.layersChanged.connect(() => {
@@ -133,14 +131,14 @@ export class ImageViewerWidget extends MainAreaWidget {
 
       this.imageManager.imageLoaded.connect((_, imageMetadata) => {
         this.statusSignal.emit(`${imageMetadata.name} loaded successfully`);
+        logger.info(`Image loaded successfully: ${imageMetadata.name}`);
         this.createDeckInstance(imageMetadata);
       });
 
       this.imageManager.imageLoadError.connect((_, errorMessage) => {
         this.statusSignal.emit(`Error: ${errorMessage}`);
+        logger.error(`Image load failed: ${errorMessage}`);
       });
-
-      console.log('CommService initialized successfully.');
 
       // Once the session is initialized we can ask the user to select an image for display.
       // This widget is not a general full-earth geographic display so a single image must be
@@ -149,6 +147,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         await this.openImage(selectedFileName);
       }
     } catch (reason) {
+      logger.error(`Failed to initialize ImageViewerWidget: ${reason}`);
       console.error(
         `Failed to initialize the session in OSML Image Viewer.\n${reason}`
       );
@@ -158,32 +157,12 @@ export class ImageViewerWidget extends MainAreaWidget {
   public statusSignal: Signal<any, any> = new Signal<any, any>(this);
 
   /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.enableDebugLogging) {
-      console.log(`[ImageViewerWidget] ${message}`, data || '');
-    }
-  }
-
-  /**
    * Shows the React-based feature properties dialog
    */
   private showFeaturePropertiesDialog(feature: any): void {
-    console.log(
-      '[ImageViewerWidget] showFeaturePropertiesDialog called with:',
-      feature
-    );
-
     if (!feature) {
-      console.log(
-        '[ImageViewerWidget] showFeaturePropertiesDialog early return: no feature'
-      );
       return;
     }
-
-    const properties = feature.properties || {};
-    console.log('[ImageViewerWidget] Feature properties:', properties);
 
     // Hide any existing dialog first
     this.hideFeaturePropertiesDialog();
@@ -202,19 +181,6 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Force the widget to render
     this.featurePropertiesDialog.update();
-
-    console.log(
-      '[ImageViewerWidget] React feature properties dialog created and shown'
-    );
-    console.log(
-      '[ImageViewerWidget] Dialog node:',
-      this.featurePropertiesDialog.node
-    );
-    console.log(
-      '[ImageViewerWidget] Dialog node parent:',
-      this.featurePropertiesDialog.node.parentElement
-    );
-    this.debugLog('Feature properties dialog shown', { feature });
   }
 
   /**
@@ -226,8 +192,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       this.featurePropertiesDialog.dispose();
       this.featurePropertiesDialog = undefined;
       this.featurePropertiesDialogVisible = false;
-      console.log('[ImageViewerWidget] React feature properties dialog hidden');
-      this.debugLog('Feature properties dialog hidden');
     }
   }
 
@@ -235,39 +199,21 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Handles click events on the map to show feature properties dialog
    */
   private handleMapClick(info: any, event: any): boolean {
-    // Always log click events for debugging
-    console.log('[ImageViewerWidget] Map clicked - Raw info:', info);
-    console.log('[ImageViewerWidget] Map clicked - Event:', event);
-    console.log('[ImageViewerWidget] Map clicked - Has object:', !!info.object);
-    console.log('[ImageViewerWidget] Map clicked - Layer info:', {
-      layer: info.layer?.id,
-      sourceLayer: info.sourceLayer?.id,
-      picked: info.picked,
-      coordinate: info.coordinate,
-      x: info.x,
-      y: info.y
-    });
-
-    this.debugLog('Map clicked', { info, event });
-
-    // Hide dialog if clicking on empty area
+    // If click was not assocaited with an object ensure the
+    // properties dialog is hidden
     if (!info.object) {
-      console.log('[ImageViewerWidget] No object clicked, hiding dialog');
       this.hideFeaturePropertiesDialog();
       return false;
     }
 
-    // Show React dialog for picked feature
+    // Deck.gl picking associated an object with the click. Show the
+    // properties dialog for that object.
     if (info.object && info.x !== undefined && info.y !== undefined) {
-      console.log(
-        '[ImageViewerWidget] Feature clicked, showing dialog:',
-        info.object
-      );
       this.showFeaturePropertiesDialog(info.object);
       return true; // Mark as handled
     }
 
-    console.log('[ImageViewerWidget] Click event not handled');
+    // Click not handled
     return false;
   }
 
@@ -275,8 +221,6 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Create Deck.gl instance with the loaded image
    */
   private createDeckInstance(imageMetadata: any): void {
-    this.debugLog('Creating Deck.gl instance', imageMetadata);
-
     // Update imageName for compatibility with existing code
     this.imageName = imageMetadata.name;
 
@@ -301,10 +245,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    this.debugLog(
-      `Centering view at: [${initialViewState.target[0]}, ${initialViewState.target[1]}, ${initialViewState.target[2]}]`
-    );
-
     this.deckInstance = new Deck({
       canvas: canvas,
       width: '100%',
@@ -323,7 +263,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       } as any, // Type assertion to work around Deck.gl typing issues
       onViewStateChange: ({ viewState }) => {
         // Handle view state changes if needed
-        this.debugLog('View state changed:', viewState);
         // Use throttled update to prevent excessive layer updates during rapid viewport changes
         this.throttledViewportUpdate();
       },
@@ -331,8 +270,6 @@ export class ImageViewerWidget extends MainAreaWidget {
         return this.handleMapClick(info, event);
       }
     }) as any; // Type assertion to work around Deck.gl typing issues
-
-    this.debugLog('Deck.gl instance created successfully');
   }
 
   /**
@@ -341,23 +278,19 @@ export class ImageViewerWidget extends MainAreaWidget {
    * @param imageName the full path of the image on the Jupyter notebook instance.
    */
   public async openImage(imageName: string | null) {
-    console.log('DEBUG: ImageViewerWidget.openImage("' + imageName + '")');
     if (!imageName) {
       return;
     }
 
     if (!this.commService.isReady()) {
-      this.statusSignal.emit(
-        `Unable to load ${imageName} because plugin setup failed.`
-      );
+      const errorMessage = `Unable to load ${imageName} because plugin setup failed.`;
+      this.statusSignal.emit(errorMessage);
+      logger.error(`Image load failed - comm service not ready: ${imageName}`);
       return;
     }
 
     try {
       this.statusSignal.emit(`Loading ${imageName} ...`);
-
-      // Configure ImageManager
-      this.imageManager.setDebugLogging(this.enableDebugLogging);
 
       // First, load image to get metadata and determine dimensions
       const imageLoadResponse =
@@ -385,7 +318,9 @@ export class ImageViewerWidget extends MainAreaWidget {
       );
 
       // The rest of the initialization will be handled by the imageLoaded signal
+      logger.info(`Image ${imageName} loaded successfully.`);
     } catch (error: any) {
+      logger.error(`Failed to open image ${imageName}: ${error.message}`);
       console.error('Error loading image:', error);
       this.statusSignal.emit(`Error loading ${imageName}: ${error.message}`);
     }
@@ -396,14 +331,20 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public createModelFeatureLayer(modelName: string): void {
     if (!this.imageName || !this.deckInstance) {
-      console.warn(
-        'Cannot create model feature layer: No image loaded or Deck instance not initialized'
+      const errorMessage =
+        'Cannot create model feature layer: No image loaded or Deck instance not initialized';
+      console.warn(errorMessage);
+      logger.error(
+        `Model layer creation failed - ${!this.imageName ? 'no image' : 'deck not initialized'}: ${modelName}`
       );
       return;
     }
 
     if (!modelName || modelName.trim() === '') {
-      console.warn('Cannot create model feature layer: No model name provided');
+      const errorMessage =
+        'Cannot create model feature layer: No model name provided';
+      console.warn(errorMessage);
+      logger.error('Model layer creation failed - no model name provided');
       return;
     }
 
@@ -416,12 +357,11 @@ export class ImageViewerWidget extends MainAreaWidget {
         modelName
       );
 
-    this.debugLog(`Creating model layer for model: ${modelName}`);
-
     // Add the model feature layer via LayerManager
     this.layerManager.addModelFeatureLayer(modelName, getModelFeatureTileData);
 
     this.statusSignal.emit(`Model feature layer created: ${modelName}`);
+    logger.info(`Model feature layer created successfully: ${modelName}`);
   }
 
   /**
@@ -429,31 +369,38 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public clearModelLayers(): void {
     this.layerManager.clearModelLayers();
-    this.debugLog('Model layers cleared');
     this.statusSignal.emit('Model layers cleared');
+    logger.info('Model layers cleared successfully');
   }
 
   public async addLayer(layerDataPath: string | null) {
     if (!layerDataPath) {
-      this.statusSignal.emit('Error: No layer file selected');
+      const errorMessage = 'Error: No layer file selected';
+      this.statusSignal.emit(errorMessage);
+      logger.error('Layer addition failed - no layer file selected');
       return;
     }
 
     if (!this.imageName) {
-      this.statusSignal.emit(
-        'Error: No image loaded. Please open an image first before adding layers.'
-      );
+      const errorMessage =
+        'Error: No image loaded. Please open an image first before adding layers.';
+      this.statusSignal.emit(errorMessage);
+      logger.error('Layer addition failed - no image loaded');
       return;
     }
 
     if (!this.deckInstance) {
-      this.statusSignal.emit('Error: Map viewer not initialized');
+      const errorMessage = 'Error: Map viewer not initialized';
+      this.statusSignal.emit(errorMessage);
+      logger.error('Layer addition failed - map viewer not initialized');
       return;
     }
 
     if (!this.commService.isReady()) {
-      this.statusSignal.emit(
-        `Unable to load overlay ${layerDataPath} because plugin setup failed.`
+      const errorMessage = `Unable to load overlay ${layerDataPath} because plugin setup failed.`;
+      this.statusSignal.emit(errorMessage);
+      logger.error(
+        `Layer addition failed - comm service not ready: ${layerDataPath}`
       );
       return;
     }
@@ -469,8 +416,10 @@ export class ImageViewerWidget extends MainAreaWidget {
 
       // Check if the overlay load was successful
       if (!loadResponse.success) {
-        this.statusSignal.emit(
-          `Error: ${layerDataPath} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`
+        const errorMessage = `Error: ${layerDataPath} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`;
+        this.statusSignal.emit(errorMessage);
+        logger.error(
+          `Failed to load overlay ${layerDataPath}: ${loadResponse.error || 'Unknown error'}`
         );
         return; // Exit early - don't proceed with layer creation
       }
@@ -479,6 +428,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         `Loading overlay from ${layerDataPath}... ${loadResponse.status}`
       );
     } catch (error: any) {
+      logger.error(`Failed to add layer ${layerDataPath}: ${error.message}`);
       console.error('Error loading overlay:', error);
       this.statusSignal.emit(
         `Error loading overlay ${layerDataPath}: ${error.message}`
@@ -493,12 +443,11 @@ export class ImageViewerWidget extends MainAreaWidget {
         layerDataPath
       );
 
-    this.debugLog(`Layer path: ${layerDataPath}`);
-
     // Add the feature layer via LayerManager
     this.layerManager.addFeatureLayer(layerDataPath, getFeatureTileData);
 
     this.statusSignal.emit(`Added overlay layer: ${layerDataPath}`);
+    logger.info(`Layer added successfully: ${layerDataPath}`);
     return;
   }
 
@@ -507,11 +456,16 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public addNamedDataset(datasetName: string): void {
     if (!datasetName || !this.imageName || !this.deckInstance) {
-      console.warn('Cannot add named dataset: Missing required parameters', {
+      const errorMessage =
+        'Cannot add named dataset: Missing required parameters';
+      console.warn(errorMessage, {
         datasetName: !!datasetName,
         imageName: !!this.imageName,
         deckInstance: !!this.deckInstance
       });
+      logger.error(
+        `Dataset addition failed - missing parameters: ${datasetName}`
+      );
       return;
     }
 
@@ -525,14 +479,11 @@ export class ImageViewerWidget extends MainAreaWidget {
         datasetName
       );
 
-    this.debugLog(
-      `Adding named dataset layer: ${datasetName} for image: ${this.imageName}`
-    );
-
     // Add the feature layer via LayerManager
     this.layerManager.addFeatureLayer(datasetName, getFeatureTileData);
 
     this.statusSignal.emit(`Added dataset layer: ${datasetName}`);
+    logger.info(`Dataset layer added successfully: ${datasetName}`);
   }
 
   /**
@@ -581,23 +532,12 @@ export class ImageViewerWidget extends MainAreaWidget {
     const imageLayer = this.imageManager.getImageLayer();
     const allLayers = this.getAllLayers();
 
-    this.debugLog(
-      `Updating deck layers: ${imageLayer ? 'image layer' : 'no image layer'} + ${allLayers.length} feature/model layers`
-    );
-
     // Combine layers, only include image layer if it exists
     const layers = imageLayer ? [imageLayer, ...allLayers] : allLayers;
 
     this.deckInstance.setProps({
       layers: layers
     });
-  }
-
-  /**
-   * Enable/disable debug logging
-   */
-  public setDebugLogging(enabled: boolean): void {
-    this.enableDebugLogging = enabled;
   }
 
   /**
@@ -615,7 +555,6 @@ export class ImageViewerWidget extends MainAreaWidget {
    * @protected
    */
   protected onCloseRequest(msg: Message): void {
-    console.log('onCloseRequest for ImageViewerWidget');
     super.onCloseRequest(msg);
     this.dispose();
   }
@@ -628,9 +567,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     if (modelEnabled !== undefined) {
       this.selectedModelEnabled = modelEnabled;
     }
-    console.log(
-      `Selected model updated - Name: ${modelName}, Enabled: ${this.selectedModelEnabled}`
-    );
 
     if (!this.selectedModelEnabled) {
       this.statusSignal.emit('Model processing disabled');
@@ -661,7 +597,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   public getDebugInfo(): any {
     const layerInfo = this.layerManager.getLayerInfo();
     return {
-      enableDebugLogging: this.enableDebugLogging,
       layerCount: this.layerManager.getLayerCount(),
       layerNames: layerInfo.map(layer => layer.name),
       layerTypes: layerInfo.map(layer => layer.type),
@@ -701,6 +636,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   public deleteLayer(layerId: string): void {
     this.layerManager.deleteLayer(layerId);
     this.statusSignal.emit(`Layer ${layerId} deleted`);
+    logger.info(`Layer deleted successfully: ${layerId}`);
   }
 
   /**

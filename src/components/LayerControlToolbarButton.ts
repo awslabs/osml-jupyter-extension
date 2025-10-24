@@ -26,10 +26,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
       // Get fresh layer information from the ImageViewerWidget
       const layers = this._getLayerInfo();
 
-      if (layers.length === 0) {
-        console.log('No layers available - showing empty layer dialog');
-      }
-
       // Create the dialog content with close handler
       const dialogContent: LayerControlDialog = new LayerControlDialog(
         layers,
@@ -59,8 +55,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
 
       // Force the widget to render
       dialogContent.update();
-
-      console.log('Layer control dialog opened');
     } catch (error) {
       console.error('Error showing layer control dialog:', error);
     }
@@ -117,8 +111,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      console.log(`Toggling visibility for layer: ${layerId}`);
-
       // Call method on ImageViewerWidget if it exists
       if (
         typeof (this._imageViewerWidget as any).setLayerVisibility ===
@@ -154,8 +146,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      console.log(`Updating color for layer ${layerId}:`, color);
-
       // Call method on ImageViewerWidget if it exists
       if (
         typeof (this._imageViewerWidget as any).setLayerColor === 'function'
@@ -180,8 +170,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
    */
   private _deleteLayer(layerId: string, dialog?: LayerControlDialog): void {
     try {
-      console.log(`Deleting layer: ${layerId}`);
-
       // Call method on ImageViewerWidget if it exists
       if (typeof (this._imageViewerWidget as any).deleteLayer === 'function') {
         (this._imageViewerWidget as any).deleteLayer(layerId);
@@ -207,8 +195,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      console.log(`Adding named dataset as layer: ${datasetName}`);
-
       // Call method on ImageViewerWidget if it exists
       if (
         typeof (this._imageViewerWidget as any).addNamedDataset === 'function'

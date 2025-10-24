@@ -3,6 +3,7 @@
 import { Signal } from '@lumino/signaling';
 import { TiledOverlayLayer } from '../layers';
 import { ILayerInfo, FeatureTileDataFunction } from '../types';
+import { logger } from '../utils';
 
 /**
  * LayerManager handles all layer-related operations including visibility,
@@ -18,22 +19,13 @@ export class LayerManager {
   // Signals for layer changes
   private _layersChanged = new Signal<LayerManager, void>(this);
 
-  constructor(private enableDebugLogging: boolean = false) {}
+  constructor() {}
 
   /**
    * Signal emitted when layers change (add, remove, visibility, color)
    */
   get layersChanged(): Signal<LayerManager, void> {
     return this._layersChanged;
-  }
-
-  /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.enableDebugLogging) {
-      console.log(`[LayerManager] ${message}`, data || '');
-    }
   }
 
   /**
@@ -47,7 +39,6 @@ export class LayerManager {
     const customColor = this.layerColors.get(overlayName) ?? [255, 0, 0, 128];
     const lineColor = customColor;
 
-    console.log(`[LayerManager] Creating TiledOverlayLayer for ${overlayName}`);
     return new TiledOverlayLayer({
       id: `features-${overlayName}`,
       data: [], // Required by TileLayer but not used since we provide getTileData
@@ -70,8 +61,7 @@ export class LayerManager {
       featureFillColor: lineColor, // Use full color for features
       featureLineColor: lineColor,
       featureLineWidth: 1,
-      adaptivePointSize: true,
-      enableDebugLogging: true || this.enableDebugLogging
+      adaptivePointSize: true
     } as any); // Type assertion to bypass the prop type conflict
   }
 
@@ -82,13 +72,13 @@ export class LayerManager {
     layerId: string,
     getTileData: FeatureTileDataFunction
   ): void {
-    this.debugLog(`Adding feature layer: ${layerId}`);
-
     // Create the feature layer using TiledOverlayLayer
     const featureLayer = this.createFeatureLayer(layerId, getTileData);
 
     // Store the feature layer
     this.featureLayers.set(layerId, featureLayer);
+
+    logger.info(`LayerManager added feature layer: ${layerId}`);
 
     // Emit layers changed signal
     this._layersChanged.emit();
@@ -101,8 +91,6 @@ export class LayerManager {
     modelName: string,
     getTileData: FeatureTileDataFunction
   ): void {
-    this.debugLog(`Adding model feature layer: ${modelName}`);
-
     // Remove existing model layer if present (only one model at a time)
     this.clearModelLayers();
 
@@ -111,6 +99,8 @@ export class LayerManager {
 
     // Store the model layer
     this.modelLayers.set(modelName, modelFeatureLayer);
+
+    logger.info(`LayerManager added model feature layer: ${modelName}`);
 
     // Emit layers changed signal
     this._layersChanged.emit();
@@ -121,7 +111,6 @@ export class LayerManager {
    */
   public setLayerVisibility(layerId: string, visible: boolean): void {
     this.layerVisibility.set(layerId, visible);
-    this.debugLog(`Layer ${layerId} visibility set to ${visible}`);
 
     // Emit layers changed signal
     this._layersChanged.emit();
@@ -135,7 +124,6 @@ export class LayerManager {
     color: [number, number, number, number]
   ): void {
     this.layerColors.set(layerId, color);
-    this.debugLog(`Layer ${layerId} color updated`, color);
 
     // Recreate the specific layer with new color
     if (this.featureLayers.has(layerId)) {
@@ -176,7 +164,7 @@ export class LayerManager {
    * Delete a layer
    */
   public deleteLayer(layerId: string): void {
-    this.debugLog(`Deleting layer: ${layerId}`);
+    let layerDeleted = false;
 
     // Remove from feature layers
     if (this.featureLayers.has(layerId)) {
@@ -185,6 +173,7 @@ export class LayerManager {
         layer.clearCache();
       }
       this.featureLayers.delete(layerId);
+      layerDeleted = true;
     }
 
     // Remove from model layers
@@ -194,6 +183,11 @@ export class LayerManager {
         layer.clearCache();
       }
       this.modelLayers.delete(layerId);
+      layerDeleted = true;
+    }
+
+    if (layerDeleted) {
+      logger.info(`LayerManager deleted layer: ${layerId}`);
     }
 
     // Clean up layer state
@@ -209,7 +203,9 @@ export class LayerManager {
    */
   public clearModelLayers(): void {
     if (this.modelLayers.size > 0) {
-      this.debugLog('Clearing model layers');
+      logger.info(
+        `LayerManager clearing ${this.modelLayers.size} model layers`
+      );
 
       // Clear caches and dispose of layers
       for (const modelLayer of this.modelLayers.values()) {
@@ -296,8 +292,6 @@ export class LayerManager {
    * Dispose of all layers and clean up resources
    */
   public dispose(): void {
-    this.debugLog('Disposing LayerManager');
-
     // Clear feature layers
     for (const featureLayer of this.featureLayers.values()) {
       featureLayer.clearCache();
@@ -316,12 +310,5 @@ export class LayerManager {
 
     // Clear signals
     Signal.clearData(this);
-  }
-
-  /**
-   * Enable/disable debug logging
-   */
-  public setDebugLogging(enabled: boolean): void {
-    this.enableDebugLogging = enabled;
   }
 }

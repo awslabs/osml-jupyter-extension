@@ -77,9 +77,6 @@ export interface ITiledOverlayLayerProps
 
   /** Whether to scale point size with zoom (default: true) */
   adaptivePointSize?: boolean;
-
-  /** Enable debug logging */
-  enableDebugLogging?: boolean;
 }
 
 const defaultProps: DefaultProps<ITiledOverlayLayerProps> = {
@@ -93,7 +90,6 @@ const defaultProps: DefaultProps<ITiledOverlayLayerProps> = {
   featureLineColor: [255, 0, 0, 255],
   featureLineWidth: 1,
   adaptivePointSize: true,
-  enableDebugLogging: false,
   tileSize: 512,
   minZoom: -10,
   maxZoom: 10,
@@ -139,15 +135,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
   }
 
   /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.typedProps.enableDebugLogging) {
-      console.log(`[TiledOverlayLayer] ${message}`, data || '');
-    }
-  }
-
-  /**
    * Get the current zoom level from the viewport
    */
   private getCurrentZoom(): number {
@@ -187,7 +174,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
       bottom: (y + 1) * tileSize * scale
     };
 
-    this.debugLog(`Loading tile data for ${x}-${y}-${z}`, tile);
     return getTileDataFn(tile);
   }
 
@@ -472,10 +458,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
 
     featuresWithSize.sort((a, b) => b.size - a.size);
 
-    this.debugLog(
-      `Count-based culling: ${features.length} -> ${maxFeaturesPerTile} features`
-    );
-
     return featuresWithSize
       .slice(0, maxFeaturesPerTile!)
       .map(item => item.feature);
@@ -698,10 +680,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
       }
     });
 
-    this.debugLog(
-      `Point clustering: ${points.length} -> ${clusteredFeatures.length} points`
-    );
-
     return [...nonPoints, ...clusteredFeatures];
   }
 
@@ -798,23 +776,17 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
   ): Feature[] {
     let features = [...tileData.features]; // Copy to avoid mutation
 
-    this.debugLog(`Processing ${features.length} features for tile ${tile.id}`);
-
     // 1. Spatial culling
     features = this.applySpatialCulling(features, tile);
-    this.debugLog(`After spatial culling: ${features.length} features`);
 
     // 2. Zoom-based culling
     features = this.applyZoomBasedCulling(features);
-    this.debugLog(`After zoom-based culling: ${features.length} features`);
 
     // 3. LOD optimizations
     features = this.applyLODOptimizations(features, tile);
-    this.debugLog(`After LOD optimizations: ${features.length} features`);
 
     // 4. Count-based culling (last, to ensure we don't exceed limits)
     //features = this.applyCountBasedCulling(features);
-    //this.debugLog(`After count-based culling: ${features.length} features`);
 
     return features;
   }
@@ -825,37 +797,14 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
   renderSubLayers(props: any): Layer | null | LayersList {
     const { data: tileData, tile } = props;
 
-    console.log(
-      `[TiledOverlayLayer] renderSubLayers called for tile ${tile.x}-${tile.y}-${tile.z}`,
-      {
-        hasTileData: !!tileData,
-        featureCount: tileData?.features?.length || 0,
-        tileId: props.id
-      }
-    );
-
     if (!tileData || !tileData.features || tileData.features.length === 0) {
-      console.log(
-        `[TiledOverlayLayer] No features for tile ${tile.x}-${tile.y}-${tile.z}`
-      );
       return null;
     }
 
     // Process features with culling and LOD optimizations
     const processedFeatures = this.processTileFeatures(tileData, tile);
 
-    console.log(
-      `[TiledOverlayLayer] Processed features for tile ${tile.x}-${tile.y}-${tile.z}:`,
-      {
-        originalCount: tileData.features.length,
-        processedCount: processedFeatures.length
-      }
-    );
-
     if (processedFeatures.length === 0) {
-      console.log(
-        `[TiledOverlayLayer] No processed features for tile ${tile.x}-${tile.y}-${tile.z}`
-      );
       return null;
     }
 
@@ -886,15 +835,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
       }
     });
 
-    console.log(
-      `[TiledOverlayLayer] Feature type breakdown for tile ${tile.x}-${tile.y}-${tile.z}:`,
-      {
-        points: points.length,
-        lines: lines.length,
-        polygons: polygons.length
-      }
-    );
-
     const layers: Layer[] = [];
     const {
       featureFillColor,
@@ -910,10 +850,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
         features: [...polygons, ...lines]
       };
 
-      console.log(
-        `[TiledOverlayLayer] Creating GeoJsonLayer with ${geoJsonData.features.length} features (tile ${tile.x}-${tile.y}-${tile.z})`
-      );
-
       const geoJsonLayer = new GeoJsonLayer({
         ...props,
         id: `${props.id}-geojson`,
@@ -925,12 +861,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
         stroked: true,
         lineWidthMinPixels: 1,
         pickable: true
-      });
-
-      console.log('[TiledOverlayLayer] GeoJsonLayer created:', {
-        id: geoJsonLayer.id,
-        pickable: geoJsonLayer.props.pickable,
-        dataLength: geoJsonData.features.length
       });
 
       layers.push(geoJsonLayer);
@@ -963,10 +893,6 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
       const zoom = this.getCurrentZoom();
       const baseRadius = adaptivePointSize ? Math.max(2, 8 - zoom * 0.5) : 5;
 
-      console.log(
-        `[TiledOverlayLayer] Creating ScatterplotLayer with ${pointData.length} points (tile ${tile.x}-${tile.y}-${tile.z})`
-      );
-
       const scatterplotLayer = new ScatterplotLayer({
         ...props,
         id: `${props.id}-points`,
@@ -995,19 +921,9 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
         pickable: true
       });
 
-      console.log('[TiledOverlayLayer] ScatterplotLayer created:', {
-        id: scatterplotLayer.id,
-        pickable: scatterplotLayer.props.pickable,
-        dataLength: pointData.length,
-        baseRadius
-      });
-
       layers.push(scatterplotLayer);
     }
 
-    console.log(
-      `[TiledOverlayLayer] Returning ${layers.length} sub-layers for tile ${tile.x}-${tile.y}-${tile.z}`
-    );
     return layers;
   }
 
@@ -1029,6 +945,5 @@ export class TiledOverlayLayer extends TileLayer<IFeatureTileData> {
   public clearCache(): void {
     // TileLayer handles its own caching, so this is primarily for interface compatibility
     // We could potentially add custom cache clearing logic here if needed
-    this.debugLog('Cache cleared (TileLayer manages its own cache)');
   }
 }

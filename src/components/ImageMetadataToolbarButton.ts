@@ -57,8 +57,6 @@ export class ImageMetadataToolbarButton extends ToolbarButton {
 
       // Force the widget to render
       dialogWidget.update();
-
-      console.log('Metadata dialog opened');
     } catch (error) {
       console.error('Error showing image metadata dialog:', error);
     }

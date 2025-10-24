@@ -5,6 +5,7 @@ import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
 import { ITile, TileDataFunction } from '../types';
+import { logger } from '../utils';
 
 /**
  * Interface for image metadata
@@ -46,7 +47,7 @@ export class ImageManager {
   private _imageLoaded = new Signal<ImageManager, IImageMetadata>(this);
   private _imageLoadError = new Signal<ImageManager, string>(this);
 
-  constructor(private enableDebugLogging: boolean = false) {}
+  constructor() {}
 
   /**
    * Signal emitted when image changes (load, clear)
@@ -70,15 +71,6 @@ export class ImageManager {
   }
 
   /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.enableDebugLogging) {
-      console.log(`[ImageManager] ${message}`, data || '');
-    }
-  }
-
-  /**
    * Load an image and create its layer with provided metadata and tile data function
    */
   public loadImage(
@@ -87,9 +79,11 @@ export class ImageManager {
     imageHeight: number,
     getTileData: TileDataFunction
   ): void {
-    this.debugLog(`Loading image: ${imageName} (${imageWidth}x${imageHeight})`);
-
     try {
+      logger.debug(
+        `ImageManager loading image: ${imageName} (${imageWidth}x${imageHeight})`
+      );
+
       // Create image metadata
       const imageMetadata: IImageMetadata = {
         name: imageName,
@@ -110,15 +104,17 @@ export class ImageManager {
       // Create the image layer with provided getTileData function
       this.createImageLayer(imageName, getTileData);
 
-      this.debugLog(`Image loaded successfully: ${imageName}`, imageMetadata);
+      logger.info(`ImageManager successfully loaded image: ${imageName}`);
 
       // Emit signals
       this._imageLoaded.emit(imageMetadata);
       this._imageChanged.emit();
     } catch (error: any) {
       const errorMessage = `Error loading ${imageName}: ${error.message}`;
+      logger.error(
+        `ImageManager loadImage failed for ${imageName}: ${error.message}`
+      );
       console.error('Error loading image:', error);
-      this.debugLog('Image load error', error);
       this._imageLoadError.emit(errorMessage);
     }
   }
@@ -159,7 +155,6 @@ export class ImageManager {
           bottom: (y + 1) * tileSize * scale
         };
 
-        this.debugLog(`Loading tile ${x}-${y}-${z}`, tile);
         return getTileData(tile);
       },
       renderSubLayers: (props: any) => {
@@ -181,12 +176,6 @@ export class ImageManager {
           bounds = [bbox.left, bbox.bottom, bbox.right, bbox.top];
         }
 
-        this.debugLog(`Rendering tile ${tile.x}-${tile.y}-${tile.z}`, {
-          bounds,
-          hasData: !!data,
-          dataType: typeof data
-        });
-
         return new BitmapLayer({
           ...props,
           id: `${props.id}-bitmap`,
@@ -195,25 +184,18 @@ export class ImageManager {
           data: null // Explicitly set data to null to avoid BitmapLayer confusion
         });
       },
-      onTileLoad: (tile: any) => {
-        this.debugLog(`Tile loaded: ${tile.x}-${tile.y}-${tile.z}`);
-      },
+      onTileLoad: (tile: any) => {},
       onTileError: (error: any, tile?: any) => {
         const tileInfo = tile ? `${tile.x}-${tile.y}-${tile.z}` : 'unknown';
         console.error(`Tile error for ${tileInfo}:`, error);
-        this.debugLog(`Tile error for ${tileInfo}`, error);
       }
     });
-
-    this.debugLog(`Image layer created for: ${imageName}`);
   }
 
   /**
    * Clear the current image and layer
    */
   public clearImage(): void {
-    this.debugLog('Clearing current image');
-
     this.currentImage = null;
     this.imageLayer = null;
 
@@ -272,8 +254,6 @@ export class ImageManager {
     const centerX = this.currentImage.width / 2;
     const centerY = this.currentImage.height / 2;
 
-    this.debugLog(`Calculated view center: [${centerX}, ${centerY}, 0]`);
-
     return {
       target: [centerX, centerY, 0],
       zoom: 0, // Start at full resolution (zoom level 0)
@@ -288,7 +268,6 @@ export class ImageManager {
   public setTileSize(tileSize: number): void {
     if (this.tileSize !== tileSize) {
       this.tileSize = tileSize;
-      this.debugLog(`Tile size set to: ${tileSize}`);
 
       // Recreate image layer if image is loaded
       if (this.currentImage && this.currentGetTileData) {
@@ -306,14 +285,6 @@ export class ImageManager {
   }
 
   /**
-   * Enable/disable debug logging
-   */
-  public setDebugLogging(enabled: boolean): void {
-    this.enableDebugLogging = enabled;
-    this.debugLog(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
-  }
-
-  /**
    * Get debug information about the current state
    */
   public getDebugInfo(): any {
@@ -322,8 +293,7 @@ export class ImageManager {
       imageName: this.getCurrentImageName(),
       dimensions: this.getImageDimensions(),
       tileSize: this.tileSize,
-      hasLayer: !!this.imageLayer,
-      enableDebugLogging: this.enableDebugLogging
+      hasLayer: !!this.imageLayer
     };
   }
 
@@ -331,8 +301,6 @@ export class ImageManager {
    * Dispose of the image manager and clean up resources
    */
   public dispose(): void {
-    this.debugLog('Disposing ImageManager');
-
     // Clear current state
     this.currentImage = null;
     this.imageLayer = null;
