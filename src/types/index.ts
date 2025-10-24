@@ -80,9 +80,6 @@ export type MetadataValue =
  * Debug information interface
  */
 export interface IDebugInfo {
-  useMockData: boolean;
-  useMockFeatureData: boolean;
-  enableDebugLogging: boolean;
   featureLayerCount: number;
   featureLayerNames: string[];
   imageName?: string;

@@ -8,6 +8,7 @@ import {
   IFeatureCacheEntry
 } from '../types';
 import { CommService } from './CommService';
+import { logger } from '../utils';
 
 /**
  * Interface for overlay load response
@@ -30,7 +31,6 @@ export class FeatureTileService {
   private featureCache: Map<string, IFeatureCacheEntry> = new Map();
   private loadingPromises: Map<string, Promise<IFeatureTileData>> = new Map();
   private dataChangeCallbacks: Map<string, Set<TileDataCallback>> = new Map();
-  private enableDebugLogging: boolean = true;
 
   constructor(private commService: CommService) {}
 
@@ -42,17 +42,18 @@ export class FeatureTileService {
     overlayName: string
   ): Promise<IOverlayLoadResponse> {
     if (!this.commService.isReady()) {
-      this.debugLog('CommService not ready for overlay loading');
+      const errorMessage = 'Communication service not ready';
+      logger.error(
+        `FeatureTileService loadOverlay failed for ${overlayName}: ${errorMessage}`
+      );
       return {
         success: false,
         status: 'COMM_NOT_READY',
-        error: 'Communication service not ready'
+        error: errorMessage
       };
     }
 
     try {
-      this.debugLog(`Loading overlay: ${overlayName} for image: ${imageName}`);
-
       const response = await this.commService.sendMessage({
         type: 'OVERLAY_LOAD_REQUEST',
         imageName: imageName,
@@ -61,23 +62,26 @@ export class FeatureTileService {
 
       // Check if the overlay load was successful
       if (response.status !== 'SUCCESS') {
-        this.debugLog(`Overlay load failed for ${overlayName}`, response);
+        const errorMessage = `Overlay could not be loaded (Status: ${response.status})`;
+        logger.error(
+          `FeatureTileService loadOverlay failed for ${overlayName}: ${response.status}`
+        );
         return {
           success: false,
           status: response.status || 'UNKNOWN_ERROR',
-          error: `Overlay could not be loaded (Status: ${response.status})`
+          error: errorMessage
         };
       }
-
-      this.debugLog(`Overlay loaded successfully: ${overlayName}`);
 
       return {
         success: true,
         status: response.status
       };
     } catch (error: any) {
+      logger.error(
+        `FeatureTileService loadOverlay failed for ${overlayName}: ${error.message}`
+      );
       console.error(`Error loading overlay ${overlayName}:`, error);
-      this.debugLog(`Overlay load error for ${overlayName}`, error);
       return {
         success: false,
         status: 'ERROR',
@@ -106,9 +110,6 @@ export class FeatureTileService {
     // Return cached data immediately if available
     if (this.featureCache.has(tileId)) {
       const cached = this.featureCache.get(tileId)!;
-      this.debugLog(`Returning cached data for tile ${tileId}`, {
-        count: cached.features.length
-      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
@@ -164,20 +165,17 @@ export class FeatureTileService {
     // Check cache first
     if (this.featureCache.has(tileKey)) {
       const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached real features for tile ${tileKey}`, {
-        count: cached.features.length
-      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
     if (!this.commService.isReady()) {
-      console.error('CommService not ready for feature loading');
+      const errorMessage = 'CommService not ready for feature loading';
+      logger.error(`FeatureTileService feature load failed: ${errorMessage}`);
+      console.error(errorMessage);
       return { features: [], byteLength: 0 };
     }
 
     try {
-      this.debugLog(`Loading real features for tile ${tileKey}`);
-
       const response = await this.commService.sendMessage({
         type: 'OVERLAY_TILE_REQUEST',
         imageName: imageName,
@@ -213,12 +211,11 @@ export class FeatureTileService {
       };
       this.featureCache.set(tileKey, cacheEntry);
 
-      this.debugLog(`Loaded real features for tile ${tileKey}`, {
-        count: processedFeatures.length
-      });
-
       return { features: processedFeatures, byteLength };
-    } catch (error) {
+    } catch (error: any) {
+      logger.error(
+        `FeatureTileService feature tile load failed for ${tileKey}: ${error.message}`
+      );
       console.error(`Error loading features for tile ${tileKey}:`, error);
       return { features: [], byteLength: 0 };
     }
@@ -237,20 +234,19 @@ export class FeatureTileService {
     // Check cache first
     if (this.featureCache.has(tileKey)) {
       const cached = this.featureCache.get(tileKey)!;
-      this.debugLog(`Using cached model features for tile ${tileKey}`, {
-        count: cached.features.length
-      });
       return { features: cached.features, byteLength: cached.byteLength };
     }
 
     if (!this.commService.isReady()) {
-      console.error('CommService not ready for model feature loading');
+      const errorMessage = 'CommService not ready for model feature loading';
+      logger.error(
+        `FeatureTileService model feature load failed: ${errorMessage}`
+      );
+      console.error(errorMessage);
       return { features: [], byteLength: 0 };
     }
 
     try {
-      this.debugLog(`Loading model features for tile ${tileKey}`);
-
       const response = await this.commService.sendMessage(
         {
           type: 'MODEL_TILE_REQUEST',
@@ -289,12 +285,11 @@ export class FeatureTileService {
       };
       this.featureCache.set(tileKey, cacheEntry);
 
-      this.debugLog(`Loaded model features for tile ${tileKey}`, {
-        count: processedFeatures.length
-      });
-
       return { features: processedFeatures, byteLength };
-    } catch (error) {
+    } catch (error: any) {
+      logger.error(
+        `FeatureTileService model feature tile load failed for ${tileKey}: ${error.message}`
+      );
       console.error(`Error loading model features for tile ${tileKey}:`, error);
       return { features: [], byteLength: 0 };
     }
@@ -344,8 +339,6 @@ export class FeatureTileService {
     options: any = {},
     tileId: string
   ): void {
-    this.debugLog(`Starting async load for tile ${tileId}`);
-
     let loadPromise: Promise<IFeatureTileData>;
 
     switch (dataType) {
@@ -383,9 +376,6 @@ export class FeatureTileService {
 
     loadPromise
       .then(data => {
-        this.debugLog(`Async load completed for tile ${tileId}`, {
-          count: data.features.length
-        });
         this.notifyCallbacks(tileId, data);
       })
       .catch(error => {
@@ -421,7 +411,6 @@ export class FeatureTileService {
   public cancelTileLoad(tileId: string): void {
     this.loadingPromises.delete(tileId);
     this.dataChangeCallbacks.delete(tileId);
-    this.debugLog(`Cancelled loading for tile ${tileId}`);
   }
 
   /**
@@ -431,7 +420,6 @@ export class FeatureTileService {
     this.featureCache.clear();
     this.loadingPromises.clear();
     this.dataChangeCallbacks.clear();
-    this.debugLog('Feature cache cleared');
   }
 
   /**
@@ -452,22 +440,6 @@ export class FeatureTileService {
       keys: Array.from(this.featureCache.keys()),
       totalFeatures
     };
-  }
-
-  /**
-   * Enable/disable debug logging
-   */
-  public setDebugLogging(enabled: boolean): void {
-    this.enableDebugLogging = enabled;
-  }
-
-  /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.enableDebugLogging) {
-      console.log(`[FeatureTileService] ${message}`, data || '');
-    }
   }
 
   /**

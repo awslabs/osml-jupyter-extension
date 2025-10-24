@@ -10,7 +10,8 @@ import { ILauncher } from '@jupyterlab/launcher';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
-import { LOGO_ICON } from './utils';
+import { ILoggerRegistry } from '@jupyterlab/logconsole';
+import { LOGO_ICON, logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
 import {
   ModelSelectionToolbarButton,
@@ -31,7 +32,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description:
     'A JupyterLab extension to work with satellite imagery using OversightML.',
   autoStart: true,
-  requires: [ICommandPalette],
+  requires: [ICommandPalette, ILoggerRegistry],
   optional: [
     ISettingRegistry,
     ILauncher,
@@ -45,27 +46,26 @@ const plugin: JupyterFrontEndPlugin<void> = {
 async function activate(
   app: JupyterFrontEnd,
   palette: ICommandPalette,
+  loggerRegistry: ILoggerRegistry,
   settingRegistry: ISettingRegistry | null,
   launcher: ILauncher | null,
   browser: IFileBrowserFactory | null,
   statusBar: IStatusBar | null,
   toolbarRegistry: IToolbarWidgetRegistry | null
 ): Promise<void> {
-  console.log('JupyterLab extension osml-jupyter-elt is activated!');
+  // Note: Logger initialization moved to ImageViewerWidget creation
+  // to ensure log console infrastructure is ready
 
   const manager = app.serviceManager;
   let widget: ImageViewerWidget;
 
   // Register toolbar items if toolbar registry is available
   if (toolbarRegistry) {
-    console.log('Registering toolbar items for ImageViewerWidget');
-
     // Register the model selection toolbar button factory
     toolbarRegistry.addFactory<ImageViewerWidget>(
       'ImageViewer',
       'modelSelection',
       (widget: ImageViewerWidget) => {
-        console.log('Creating ModelSelectionToolbarButton for widget');
         return new ModelSelectionToolbarButton(widget);
       }
     );
@@ -75,7 +75,6 @@ async function activate(
       'ImageViewer',
       'imageMetadata',
       (widget: ImageViewerWidget) => {
-        console.log('Creating ImageMetadataToolbarButton for widget');
         return new ImageMetadataToolbarButton(widget);
       }
     );
@@ -94,9 +93,6 @@ async function activate(
 
       // Regenerate the widget if disposed
       if (!widget || widget.isDisposed) {
-        console.log(
-          `Creating new OSML ImageViewerWidget for ${selectedFileName}`
-        );
         widget = await ImageViewerWidget.createForImage(
           manager,
           selectedFileName
@@ -104,8 +100,6 @@ async function activate(
 
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
-          console.log('Adding toolbar items to ImageViewerWidget');
-
           // Create and add the layer control button
           const layerControlButton = new LayerControlToolbarButton(widget);
           widget.toolbar.addItem('layerControl', layerControlButton);
@@ -119,7 +113,6 @@ async function activate(
           widget.toolbar.addItem('imageMetadata', imageMetadataButton);
         }
         if (statusBar) {
-          console.log('StatusBar found. Setting up status widget.');
           const statusWidget = new Widget();
           statusWidget.node.textContent = 'OSML Image Viewer Starting...';
           const statusItem = statusBar.registerStatusItem(
@@ -130,8 +123,6 @@ async function activate(
             }
           );
           widget.statusSignal.connect((source, msg) => {
-            console.log('StatusWidget handler:');
-            console.log(msg);
             statusWidget.node.textContent = msg;
           });
           widget.disposed.connect(() => {
@@ -139,19 +130,20 @@ async function activate(
           });
         }
       } else {
-        console.log(
-          `OSML ImageViewerWidget Exists. Opening ${selectedFileName}`
-        );
         await widget.openImage(selectedFileName);
       }
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there already
-        console.log('Attaching OSML ImageViewerWidget to main');
         app.shell.add(widget, 'main');
       }
       // Activate the widget
-      console.log('Activating OSML ImageViewerWidget');
       app.shell.activateById(widget.id);
+
+      // TODO: Fix the context here. Unclear what needs to be set to make
+      // this context something other than ''. Would be great if we could
+      // set it to the name of the image being viewed or the name of the
+      // plugin.
+      logger.bindToSourceLogger(loggerRegistry, '');
     }
   });
 
@@ -168,7 +160,6 @@ async function activate(
 
       // Create the widget if it doesn't exist or is disposed
       if (!widget || widget.isDisposed) {
-        console.log('Creating new OSML ImageViewerWidget for layer addition');
         widget = await ImageViewerWidget.createForImage(
           manager,
           null // No image - widget will handle this in addLayer
@@ -176,8 +167,6 @@ async function activate(
 
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
-          console.log('Adding toolbar items to ImageViewerWidget');
-
           // Create and add the layer control button
           const layerControlButton = new LayerControlToolbarButton(widget);
           widget.toolbar.addItem('layerControl', layerControlButton);
@@ -187,7 +176,6 @@ async function activate(
           widget.toolbar.addItem('imageMetadata', imageMetadataButton);
         }
         if (statusBar) {
-          console.log('StatusBar found. Setting up status widget.');
           const statusWidget = new Widget();
           statusWidget.node.textContent = 'OSML Image Viewer Starting...';
           const statusItem = statusBar.registerStatusItem(
@@ -198,8 +186,6 @@ async function activate(
             }
           );
           widget.statusSignal.connect((source, msg) => {
-            console.log('StatusWidget handler:');
-            console.log(msg);
             statusWidget.node.textContent = msg;
           });
           widget.disposed.connect(() => {
@@ -209,19 +195,20 @@ async function activate(
       }
 
       // Always try to add the layer - let the widget handle the error if no image is loaded
-      console.log(
-        `OSML ImageViewerWidget available. Adding layer ${selectedFileName}`
-      );
       await widget.addLayer(selectedFileName);
 
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there already
-        console.log('Attaching OSML ImageViewerWidget to main');
         app.shell.add(widget, 'main');
       }
       // Activate the widget
-      console.log('Activating OSML ImageViewerWidget');
       app.shell.activateById(widget.id);
+
+      // TODO: Fix the context here. Unclear what needs to be set to make
+      // this context something other than ''. Would be great if we could
+      // set it to the name of the image being viewed or the name of the
+      // plugin.
+      logger.bindToSourceLogger(loggerRegistry, '');
     }
   });
 
@@ -239,11 +226,12 @@ async function activate(
   if (settingRegistry) {
     settingRegistry
       .load(plugin.id)
-      .then(settings => {
-        console.log('osml-jupyter-elt settings loaded:', settings.composite);
-      })
+      .then(settings => {})
       .catch(reason => {
-        console.error('Failed to load settings for osml-jupyter-elt.', reason);
+        console.error(
+          'Failed to load settings for osml-jupyter-plugin.',
+          reason
+        );
       });
   }
 }

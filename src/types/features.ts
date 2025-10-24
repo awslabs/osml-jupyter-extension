@@ -21,7 +21,6 @@ export interface IFeatureLayerConfig {
   featureFillColor?: [number, number, number, number];
   featureLineColor?: [number, number, number, number];
   featureLineWidth?: number;
-  enableDebugLogging?: boolean;
 }
 
 /**

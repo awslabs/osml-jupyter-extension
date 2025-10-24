@@ -58,7 +58,6 @@ export interface ITileLoadConfig {
   tileSize?: number;
   timeout?: number;
   maxRetries?: number;
-  enableDebugLogging?: boolean;
 }
 
 /**

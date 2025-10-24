@@ -2,6 +2,7 @@
 
 import { ITile, TileDataFunction, ITileLoadConfig } from '../types';
 import { CommService } from './CommService';
+import { logger } from '../utils';
 
 /**
  * Interface for image load response
@@ -29,7 +30,6 @@ export class ImageTileService {
       tileSize: 512,
       timeout: 10000,
       maxRetries: 3,
-      enableDebugLogging: false,
       ...config
     };
   }
@@ -39,17 +39,18 @@ export class ImageTileService {
    */
   public async loadImage(imageName: string): Promise<IImageLoadResponse> {
     if (!this.commService.isReady()) {
-      this.debugLog('CommService not ready for image loading');
+      const errorMessage = 'Communication service not ready';
+      logger.error(
+        `ImageTileService loadImage failed for ${imageName}: ${errorMessage}`
+      );
       return {
         success: false,
         status: 'COMM_NOT_READY',
-        error: 'Communication service not ready'
+        error: errorMessage
       };
     }
 
     try {
-      this.debugLog(`Loading image: ${imageName}`);
-
       const response = await this.commService.sendMessage({
         type: 'IMAGE_LOAD_REQUEST',
         dataset: imageName
@@ -57,18 +58,16 @@ export class ImageTileService {
 
       // Check if the image load was successful
       if (response.status !== 'SUCCESS') {
-        this.debugLog(`Image load failed for ${imageName}`, response);
+        const errorMessage = `Image could not be loaded as an image (Status: ${response.status})`;
+        logger.error(
+          `ImageTileService loadImage failed for ${imageName}: ${response.status}`
+        );
         return {
           success: false,
           status: response.status || 'UNKNOWN_ERROR',
-          error: `Image could not be loaded as an image (Status: ${response.status})`
+          error: errorMessage
         };
       }
-
-      this.debugLog(`Image loaded successfully: ${imageName}`, {
-        width: response.width,
-        height: response.height
-      });
 
       return {
         success: true,
@@ -77,8 +76,10 @@ export class ImageTileService {
         height: response.height
       };
     } catch (error: any) {
+      logger.error(
+        `ImageTileService loadImage failed for ${imageName}: ${error.message}`
+      );
       console.error(`Error loading image ${imageName}:`, error);
-      this.debugLog(`Image load error for ${imageName}`, error);
       return {
         success: false,
         status: 'ERROR',
@@ -107,18 +108,17 @@ export class ImageTileService {
 
     // Check cache first
     if (this.tileCache.has(tileKey)) {
-      this.debugLog(`Using cached real tile: ${tileKey}`);
       return this.tileCache.get(tileKey)!;
     }
 
     if (!this.commService.isReady()) {
-      console.error('CommService not ready for tile loading');
+      const errorMessage = 'CommService not ready for tile loading';
+      logger.error(`ImageTileService tile load failed: ${errorMessage}`);
+      console.error(errorMessage);
       return null;
     }
 
     try {
-      this.debugLog(`Loading real tile: ${tileKey}`);
-
       const response = await this.commService.sendMessage({
         type: 'IMAGE_TILE_REQUEST',
         dataset: imageName,
@@ -129,7 +129,9 @@ export class ImageTileService {
 
       const base64Data = response.img;
       if (!base64Data) {
-        console.error(`No image data received for tile ${tileKey}`);
+        const errorMessage = `No image data received for tile ${tileKey}`;
+        logger.error(`ImageTileService tile load failed: ${errorMessage}`);
+        console.error(errorMessage);
         return null;
       }
 
@@ -148,22 +150,32 @@ export class ImageTileService {
             // Cache the result
             this.tileCache.set(tileKey, imageBitmap);
 
-            this.debugLog(`Loaded real tile: ${tileKey}`);
             resolve(imageBitmap);
-          } catch (error) {
+          } catch (error: any) {
+            const errorMessage = `Error creating ImageBitmap from tile data: ${error.message}`;
+            logger.error(
+              `ImageTileService tile processing failed for ${tileKey}: ${errorMessage}`
+            );
             console.error('Error creating ImageBitmap from tile data:', error);
             resolve(null);
           }
         };
 
         img.onerror = () => {
-          console.error(`Failed to load image for tile ${tileKey}`);
+          const errorMessage = `Failed to load image for tile ${tileKey}`;
+          logger.error(
+            `ImageTileService tile image load failed: ${errorMessage}`
+          );
+          console.error(errorMessage);
           resolve(null);
         };
 
         img.src = dataUrl;
       });
-    } catch (error) {
+    } catch (error: any) {
+      logger.error(
+        `ImageTileService tile request failed for ${tileKey}: ${error.message}`
+      );
       console.error(`Error loading tile ${tileKey}:`, error);
       return null;
     }
@@ -180,7 +192,6 @@ export class ImageTileService {
       }
     }
     this.tileCache.clear();
-    this.debugLog('Tile cache cleared');
   }
 
   /**
@@ -198,15 +209,6 @@ export class ImageTileService {
    */
   public updateConfig(config: Partial<ITileLoadConfig>): void {
     this.config = { ...this.config, ...config };
-  }
-
-  /**
-   * Debug logging utility
-   */
-  private debugLog(message: string, data?: any): void {
-    if (this.config.enableDebugLogging) {
-      console.log(`[ImageTileService] ${message}`, data || '');
-    }
   }
 
   /**

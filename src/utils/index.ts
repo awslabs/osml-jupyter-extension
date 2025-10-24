@@ -11,3 +11,6 @@ export * from './propertyFlattener';
 
 // Object filtering utilities
 export * from './objectFilter';
+
+// Logging utilities
+export * from './logging';

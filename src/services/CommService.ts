@@ -2,6 +2,7 @@
 
 import { Kernel } from '@jupyterlab/services';
 import { ICommMessage } from '../types';
+import { logger } from '../utils';
 
 /**
  * Service for managing Jupyter comm channel communication
@@ -36,22 +37,38 @@ export class CommService {
     targetName: string = 'osml_comm_target'
   ): Promise<void> {
     if (!this.kernel) {
-      throw new Error('Kernel connection not available');
+      const errorMessage = 'Kernel connection not available';
+      logger.error(`CommService initialization failed: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
 
-    if (this.debug) {
-      console.log(
-        `[CommService] Initializing comm channel with target: ${targetName}`
-      );
-    }
-
-    this.comm = this.kernel.createComm(targetName);
-    if (this.comm) {
-      this.comm.open('Open comm');
+    try {
+      logger.debug(`Initializing comm channel with target: ${targetName}`);
 
       if (this.debug) {
-        console.log('[CommService] Comm channel initialized successfully');
+        console.log(
+          `[CommService] Initializing comm channel with target: ${targetName}`
+        );
       }
+
+      this.comm = this.kernel.createComm(targetName);
+      if (this.comm) {
+        this.comm.open('Open comm');
+        logger.info(
+          `CommService initialized successfully with target: ${targetName}`
+        );
+
+        if (this.debug) {
+          console.log('[CommService] Comm channel initialized successfully');
+        }
+      } else {
+        const errorMessage = 'Failed to create comm channel';
+        logger.error(`CommService initialization failed: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+    } catch (error: any) {
+      logger.error(`CommService initialization failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -63,7 +80,9 @@ export class CommService {
     timeoutMs: number = 30000
   ): Promise<any> {
     if (!this.comm) {
-      throw new Error('Comm channel not initialized');
+      const errorMessage = 'Comm channel not initialized';
+      logger.error(`CommService sendMessage failed: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
 
     if (this.debug) {
@@ -80,10 +99,11 @@ export class CommService {
       const commFuture = this.comm!.send(message as any);
 
       const timeoutId = setTimeout(() => {
+        const timeoutError = `Timeout (${timeoutMs}ms) waiting for response to ${message.type}`;
+        logger.error(`CommService timeout: ${timeoutError}`);
+
         if (this.debug) {
-          console.warn(
-            `[CommService] Timeout (${timeoutMs}ms) waiting for response to ${message.type}`
-          );
+          console.warn(`[CommService] ${timeoutError}`);
         }
         reject(new Error(`Timeout waiting for response to ${message.type}`));
       }, timeoutMs);
@@ -100,8 +120,11 @@ export class CommService {
             );
           }
 
-          // Always log responses with non-SUCCESS status, even when debug is off
+          // Log responses with non-SUCCESS status
           if (responseData?.status && responseData.status !== 'SUCCESS') {
+            logger.error(
+              `CommService received error response for ${message.type}: ${responseData.status} - ${responseData.error || 'Unknown error'}`
+            );
             console.error(
               '[CommService] Received response with error status:',
               JSON.stringify(responseData, null, 2)
@@ -115,6 +138,10 @@ export class CommService {
 
       commFuture.done.catch(error => {
         clearTimeout(timeoutId);
+        logger.error(
+          `CommService send message failed for ${message.type}: ${error.message}`
+        );
+
         if (this.debug) {
           console.error('[CommService] Send message error:', error);
         }
