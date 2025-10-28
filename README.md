@@ -4,6 +4,8 @@
 
 A JupyterLab extension that provides interactive satellite imagery visualization and analysis capabilities using the OversightML (OSML) toolkit. This extension enables data scientists, researchers, and engineers to work with satellite imagery directly within the Jupyter Notebook ecosystem without switching to external GIS tools.
 
+> 🚧 **Early Release** - This extension is actively evolving. See [ROADMAP](docs/ROADMAP.md) for planned features and [LIMITATIONS](docs/LIMITATIONS.md) for current constraints.
+
 ## Key Features
 
 The OSML Jupyter Extension is intended to let image scientists and machine learning engineers work with remote sensing imagery.
