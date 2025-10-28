@@ -2,11 +2,17 @@
 
 ## Introduction
 
-Welcome to the OSML Jupyter Extension! This is an **early release** of the extension provided for review and feedback from the community.
+Welcome to the OSML Jupyter Extension! This extension brings satellite imagery visualization capabilities directly into your JupyterLab environment, allowing data scientists, researchers, and engineers to work with complex satellite imagery formats (GeoTIFF, NITF, SICD, SIDD) without leaving their familiar Jupyter workflow.
 
-> **⚠️ Important Notice**: This extension is currently in active development. The APIs and interfaces have not been finalized and may change in future releases. Please provide feedback through our GitHub repository to help shape the final version.
+> **⚠️ Early Release Notice**: This extension is in active development with APIs that may change. This guide corresponds to the current release candidate version. See [ROADMAP](ROADMAP.md) for planned features and [LIMITATIONS](LIMITATIONS.md) for current constraints.
 
-The OSML Jupyter Extension brings satellite imagery visualization capabilities directly into your JupyterLab environment. It allows data scientists, researchers, and engineers to work with complex satellite imagery formats (GeoTIFF, NITF, SICD, SIDD) without leaving their familiar Jupyter workflow.
+### Who This Extension Is For
+
+This extension is designed for **data scientists and engineers building tools for satellite imagery analysts**, not as a replacement for full-featured electronic light tables (ELTs) or geographic information system (GIS) software. It's particularly well-suited for:
+
+- Machine learning workflows involving satellite imagery
+- Data exploration and visualization in Jupyter notebooks
+- Integration with AWS SageMaker AI environments
 
 ### Key Features
 

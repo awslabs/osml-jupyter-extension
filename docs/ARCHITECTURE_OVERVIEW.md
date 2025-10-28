@@ -40,6 +40,23 @@ The cache system is a performance optimization that stores frequently accessed d
 **OSML Toolkit Integration**
 The OSML Toolkit integration forms the core processing engine that handles all geospatial data operations. This integration includes a tile factory that converts complex satellite imagery into web-compatible tiles, advanced sensor models that handle geometric correction and coordinate transformations for accurate satellite imagery positioning, efficient spatial indexing capabilities for rapid querying of large vector datasets and overlay features. GDAL integration provides the low-level geospatial data processing and broad format support across various satellite imagery and vector data types.
 
+### Kernel Code Build and Injection System
+
+A critical aspect of the extension's architecture is its kernel code management system, which handles the deployment of Python backend code into running Jupyter kernels. The backend Python code follows a modular, numbered file architecture that ensures proper dependency resolution when concatenated.
+
+**Concatenation Process:**
+
+1. `scripts/concat-kernel.py` scans `src/kernel/` for files matching pattern `[0-9][0-9]*_*.py`
+2. Files are sorted numerically to maintain dependency order
+3. Encoding/shebang conflicts are filtered during concatenation
+4. Output generates `src/kernel/kernel-setup.py` with section markers
+5. Completion indicator added for injection validation
+
+#### Kernel Injection and Initialization
+
+The concatenated kernel code is injected into Jupyter kernels from the frontend when the ImageViewerWidget connects to a new backend kernel.
+Once injected, the kernel code establishes communication channels allowing the frontend and backend to exchange messages.
+
 ## Communication Architecture
 
 The **Jupyter Server** acts as the orchestrator, managing kernel sessions and facilitating secure communication between the frontend widget and the Python kernel through Jupyter's established comm channel protocol.
@@ -97,7 +114,9 @@ sequenceDiagram
 
 ### Example Message Request/Response Flow
 
-The extension uses a standardized message request/response pattern for all communication between the frontend and backend. This pattern ensures consistent error handling, timeout management, and data serialization across all operations. The following sequence diagram illustrates a typical message flow using an image tile request as an example:
+The extension uses a standardized message request/response pattern for all communication between the frontend and backend. This pattern ensures consistent error handling, timeout management, and data serialization across all operations.
+
+The following sequence diagram illustrates a typical message flow using an image tile request as an example:
 
 ```mermaid
 sequenceDiagram
