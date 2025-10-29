@@ -7,3 +7,4 @@ export * from './FeatureTileService';
 export * from './KernelService';
 export * from './LayerManager';
 export * from './ImageManager';
+export * from './GeocoderService';

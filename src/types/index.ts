@@ -37,6 +37,10 @@ export type CommMessageType =
   | 'LIST_AVAILABLE_ENDPOINTS_RESPONSE'
   | 'IMAGE_METADATA_REQUEST'
   | 'IMAGE_METADATA_RESPONSE'
+  | 'WORLD_TO_IMAGE_REQUEST'
+  | 'WORLD_TO_IMAGE_RESPONSE'
+  | 'IMAGE_TO_WORLD_REQUEST'
+  | 'IMAGE_TO_WORLD_RESPONSE'
   | 'KERNEL_COMM_SETUP_COMPLETE';
 
 /**
@@ -127,4 +131,52 @@ export interface ILayerControlActions {
   ) => void;
   deleteLayer: (layerId: string) => void;
   addNamedDataset: (datasetName: string) => void;
+}
+
+/**
+ * Coordinate system types for GeocoderService
+ */
+export type CoordinateType = 'pixel' | 'world' | 'unknown';
+
+export interface ICoordinateInput {
+  type: CoordinateType;
+  raw: string;
+}
+
+export interface IPixelCoordinates extends ICoordinateInput {
+  type: 'pixel';
+  x: number;
+  y: number;
+}
+
+export interface IWorldCoordinates extends ICoordinateInput {
+  type: 'world';
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+}
+
+export interface IUnknownCoordinates extends ICoordinateInput {
+  type: 'unknown';
+  error: string;
+}
+
+export type ParsedCoordinates =
+  | IPixelCoordinates
+  | IWorldCoordinates
+  | IUnknownCoordinates;
+
+/**
+ * Geocoder service interfaces
+ */
+export interface IGeocoderResult {
+  longitude: number;
+  latitude: number;
+}
+
+export interface IWorldToImageResponse {
+  success: boolean;
+  status: string;
+  imageCoordinates: number[][];
+  error?: string;
 }

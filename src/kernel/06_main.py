@@ -26,6 +26,10 @@ def initialize_message_processors():
     endpoint_list_processor = EndpointListProcessor(global_cache_manager, global_logger)
     model_tile_processor = ModelTileProcessor(global_cache_manager, global_logger)
     
+    # Coordinate transformation processors
+    image_to_world_processor = ImageToWorldProcessor(global_cache_manager, global_logger)
+    world_to_image_processor = WorldToImageProcessor(global_cache_manager, global_logger)
+    
     # Register existing processors with the message registry
     global_message_registry.register('IMAGE_LOAD_REQUEST', image_load_processor)
     global_message_registry.register('IMAGE_TILE_REQUEST', image_tile_processor)
@@ -41,6 +45,10 @@ def initialize_message_processors():
     global_message_registry.register('OVERLAY_UNLOAD_REQUEST', overlay_unload_processor)
     global_message_registry.register('LIST_AVAILABLE_ENDPOINTS', endpoint_list_processor)
     global_message_registry.register('MODEL_TILE_REQUEST', model_tile_processor)
+    
+    # Register coordinate transformation processors
+    global_message_registry.register('IMAGE_TO_WORLD_REQUEST', image_to_world_processor)
+    global_message_registry.register('WORLD_TO_IMAGE_REQUEST', world_to_image_processor)
     
     global_logger.info("Message processors initialized and registered")
 
