@@ -16,7 +16,8 @@ import { ImageViewerWidget } from './ImageViewerWidget';
 import {
   ModelSelectionToolbarButton,
   ImageMetadataToolbarButton,
-  LayerControlToolbarButton
+  LayerControlToolbarButton,
+  GeocoderToolbarWidget
 } from './components';
 import { Widget } from '@lumino/widgets';
 
@@ -111,6 +112,10 @@ async function activate(
           // Create and add the image metadata button
           const imageMetadataButton = new ImageMetadataToolbarButton(widget);
           widget.toolbar.addItem('imageMetadata', imageMetadataButton);
+
+          // Create and add the geocoder toolbar widget
+          const geocoderWidget = new GeocoderToolbarWidget(widget);
+          widget.toolbar.addItem('geocoder', geocoderWidget);
         }
         if (statusBar) {
           const statusWidget = new Widget();
@@ -174,6 +179,10 @@ async function activate(
           // Create and add the image metadata button
           const imageMetadataButton = new ImageMetadataToolbarButton(widget);
           widget.toolbar.addItem('imageMetadata', imageMetadataButton);
+
+          // Create and add the geocoder toolbar widget
+          const geocoderWidget = new GeocoderToolbarWidget(widget);
+          widget.toolbar.addItem('geocoder', geocoderWidget);
         }
         if (statusBar) {
           const statusWidget = new Widget();
