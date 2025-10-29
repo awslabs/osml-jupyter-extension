@@ -8,4 +8,5 @@ export * from './ImageMetadataToolbarButton';
 export * from './LayerControlDialog';
 export * from './LayerControlToolbarButton';
 export * from './FeaturePropertiesDialog';
+export * from './LocationInfoDialog';
 export * from './GeocoderWidget';

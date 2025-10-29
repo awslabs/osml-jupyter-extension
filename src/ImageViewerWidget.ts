@@ -21,7 +21,11 @@ import {
   GeocoderService,
   IOverlayLoadResponse
 } from './services';
-import { FeaturePropertiesDialog, GeocoderWidget } from './components';
+import {
+  FeaturePropertiesDialog,
+  LocationInfoDialog,
+  GeocoderWidget
+} from './components';
 import { logger } from './utils';
 
 /**
@@ -38,6 +42,10 @@ export class ImageViewerWidget extends MainAreaWidget {
   // Feature properties dialog state
   private featurePropertiesDialog?: ReactWidget;
   private featurePropertiesDialogVisible: boolean = false;
+
+  // Location info dialog state
+  private locationInfoDialog?: LocationInfoDialog;
+  private locationInfoDialogVisible: boolean = false;
 
   // Service instances
   private commService: CommService;
@@ -200,16 +208,81 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Handles click events on the map to show feature properties dialog
+   * Shows the coordinate info dialog with both image and world coordinates
    */
-  private handleMapClick(info: any, event: any): boolean {
-    // If click was not assocaited with an object ensure the
-    // properties dialog is hidden
-    if (!info.object) {
-      this.hideFeaturePropertiesDialog();
-      return false;
+  private async showLocationInfoDialog(x: number, y: number): Promise<void> {
+    if (!this.imageName) {
+      logger.error('Cannot show location info: No image loaded');
+      return;
     }
 
+    // Hide any existing dialogs first
+    this.hideCoordinateInfoDialog();
+    this.hideFeaturePropertiesDialog();
+
+    // Create CoordinateInfoDialog with initial image coordinates
+    this.locationInfoDialog = new LocationInfoDialog(
+      { x, y },
+      undefined,
+      undefined,
+      () => this.hideCoordinateInfoDialog()
+    );
+
+    this.locationInfoDialog.id = 'location-info-dialog';
+    this.locationInfoDialog.title.label = 'Location Information';
+
+    // Add to document body for proper modal behavior
+    document.body.appendChild(this.locationInfoDialog.node);
+    this.locationInfoDialogVisible = true;
+
+    // Force the widget to render with loading state
+    this.locationInfoDialog.update();
+
+    // Try to convert image coordinates to world coordinates
+    try {
+      const worldCoords = await this.geocoderService.convertImageToWorld(
+        this.imageName,
+        x,
+        y
+      );
+
+      // Update the dialog with the world coordinates
+      if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+        this.locationInfoDialog.updateWorldCoordinates(worldCoords);
+      }
+
+      logger.debug(
+        `Coordinate conversion successful: (${x}, ${y}) -> (${worldCoords.latitude}, ${worldCoords.longitude}, ${worldCoords.elevation})`
+      );
+    } catch (error: any) {
+      logger.error(`Failed to convert coordinates: ${error.message}`);
+
+      // Update the dialog with the error
+      if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+        this.locationInfoDialog.updateWorldCoordinates(
+          undefined,
+          error.message
+        );
+      }
+    }
+  }
+
+  /**
+   * Hides the coordinate info dialog
+   */
+  private hideCoordinateInfoDialog(): void {
+    if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+      this.locationInfoDialog.node.remove();
+      this.locationInfoDialog.dispose();
+      this.locationInfoDialog = undefined;
+      this.locationInfoDialogVisible = false;
+    }
+  }
+
+  /**
+   * Handles click events on the map to show feature properties dialog or coordinate info
+   */
+  private handleMapClick(info: any, event: any): boolean {
     // Deck.gl picking associated an object with the click. Show the
     // properties dialog for that object.
     if (info.object && info.x !== undefined && info.y !== undefined) {
@@ -217,7 +290,18 @@ export class ImageViewerWidget extends MainAreaWidget {
       return true; // Mark as handled
     }
 
-    // Click not handled
+    // If click was not associated with an object, show coordinate info
+    // Use coordinate from Deck.gl which gives us the world coordinates in the OrthographicView
+    if (!info.object && info.coordinate) {
+      const [x, y] = info.coordinate;
+      // Show coordinate info dialog with image coordinates
+      this.showLocationInfoDialog(x, y);
+      return true; // Mark as handled
+    }
+
+    // Click not handled - hide any existing dialogs
+    this.hideFeaturePropertiesDialog();
+    this.hideCoordinateInfoDialog();
     return false;
   }
 
@@ -736,6 +820,9 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Clean up feature properties dialog
     this.hideFeaturePropertiesDialog();
+
+    // Clean up coordinate info dialog
+    this.hideCoordinateInfoDialog();
 
     // Clean up DOM
     if (this.mapDiv) {
