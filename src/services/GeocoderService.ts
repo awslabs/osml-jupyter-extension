@@ -147,6 +147,66 @@ export class GeocoderService {
   }
 
   /**
+   * Convert image coordinates to world coordinates using backend processor
+   */
+  public async convertImageToWorld(
+    imageName: string,
+    x: number,
+    y: number
+  ): Promise<{ latitude: number; longitude: number; elevation: number }> {
+    if (!this.commService.isReady()) {
+      const errorMessage = 'Communication service not ready';
+      logger.error(
+        `GeocoderService convertImageToWorld failed: ${errorMessage}`
+      );
+      throw new Error(errorMessage);
+    }
+
+    try {
+      logger.debug(
+        `Converting image coordinates to world coordinates: x=${x}, y=${y}`
+      );
+
+      const response = await this.commService.sendMessage({
+        type: 'IMAGE_TO_WORLD_REQUEST',
+        dataset: imageName,
+        imageCoordinates: [[x, y]]
+      });
+
+      if (response.status !== 'SUCCESS') {
+        const errorMessage = `Image to world conversion failed: ${response.status} - ${response.error || 'Unknown error'}`;
+        logger.error(
+          `GeocoderService convertImageToWorld failed: ${errorMessage}`
+        );
+        throw new Error(errorMessage);
+      }
+
+      if (
+        !response.worldCoordinates ||
+        response.worldCoordinates.length === 0
+      ) {
+        const errorMessage = 'No world coordinates returned from conversion';
+        logger.error(
+          `GeocoderService convertImageToWorld failed: ${errorMessage}`
+        );
+        throw new Error(errorMessage);
+      }
+
+      const [longitude, latitude, elevation] = response.worldCoordinates[0];
+      logger.debug(
+        `Image coordinates converted to world coordinates: lat=${latitude}, lon=${longitude}, elevation=${elevation}`
+      );
+
+      return { latitude, longitude, elevation };
+    } catch (error: any) {
+      logger.error(
+        `GeocoderService convertImageToWorld failed: ${error.message}`
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Convert world coordinates to image coordinates using backend processor
    */
   public async convertWorldToImage(
