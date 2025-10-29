@@ -21,11 +21,7 @@ import {
   GeocoderService,
   IOverlayLoadResponse
 } from './services';
-import {
-  FeaturePropertiesDialog,
-  LocationInfoDialog,
-  GeocoderWidget
-} from './components';
+import { FeaturePropertiesDialog, LocationInfoDialog } from './components';
 import { logger } from './utils';
 
 /**
@@ -341,20 +337,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
-    // Create GeocoderWidget to enable easy navigation
-    const geocoderWidget = new GeocoderWidget({
-      placement: 'bottom-right',
-      label: 'Navigate to coordinates',
-      transitionDuration: 500,
-      onNavigate: (x: number, y: number) => {
-        this.navigateToCoordinates(x, y);
-      },
-      onStatus: (message: string) => {
-        this.statusSignal.emit(message);
-      },
-      geocoderService: this.geocoderService
-    });
-
     this.deckInstance = new Deck({
       canvas: canvas,
       width: '100%',
@@ -368,7 +350,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         })
       ],
       layers: [imageLayer],
-      widgets: [geocoderWidget],
+      widgets: [],
       parameters: {
         clearColor: [0, 0, 0, 1] // Black background (RGBA: 0, 0, 0, 1)
       } as any, // Type assertion to work around Deck.gl typing issues
@@ -760,7 +742,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   /**
    * Navigate to specific coordinates by updating the view state
    */
-  private navigateToCoordinates(x: number, y: number): void {
+  public navigateToCoordinates(x: number, y: number): void {
     if (!this.deckInstance) {
       logger.error('Cannot navigate: Deck instance not available');
       return;
