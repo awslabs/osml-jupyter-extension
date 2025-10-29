@@ -18,9 +18,10 @@ import {
   KernelService,
   LayerManager,
   ImageManager,
+  GeocoderService,
   IOverlayLoadResponse
 } from './services';
-import { FeaturePropertiesDialog } from './components';
+import { FeaturePropertiesDialog, GeocoderWidget } from './components';
 import { logger } from './utils';
 
 /**
@@ -45,6 +46,7 @@ export class ImageViewerWidget extends MainAreaWidget {
   private kernelService: KernelService;
   private layerManager: LayerManager;
   private imageManager: ImageManager;
+  private geocoderService: GeocoderService;
 
   // Model selection state
   private selectedModel: string = '';
@@ -86,6 +88,7 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.kernelService = new KernelService(this.manager);
     this.layerManager = new LayerManager();
     this.imageManager = new ImageManager();
+    this.geocoderService = new GeocoderService(this.commService);
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -117,6 +120,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       // Create services with the new CommService
       this.imageTileService = new ImageTileService(this.commService);
       this.featureTileService = new FeatureTileService(this.commService);
+      this.geocoderService = new GeocoderService(this.commService);
 
       logger.info('ImageViewerWidget services initialized successfully');
 
@@ -224,6 +228,14 @@ export class ImageViewerWidget extends MainAreaWidget {
     // Update imageName for compatibility with existing code
     this.imageName = imageMetadata.name;
 
+    logger.info(`Setting GeocoderService Image Context for ${this.imageName}`);
+    // Set image context for GeocoderService
+    this.geocoderService.setImageContext(
+      imageMetadata.name,
+      imageMetadata.width,
+      imageMetadata.height
+    );
+
     // Get the initial viewport state from ImageManager
     const initialViewState = this.imageManager.getInitialViewState();
     if (!initialViewState) {
@@ -245,6 +257,20 @@ export class ImageViewerWidget extends MainAreaWidget {
       return;
     }
 
+    // Create GeocoderWidget to enable easy navigation
+    const geocoderWidget = new GeocoderWidget({
+      placement: 'bottom-right',
+      label: 'Navigate to coordinates',
+      transitionDuration: 500,
+      onNavigate: (x: number, y: number) => {
+        this.navigateToCoordinates(x, y);
+      },
+      onStatus: (message: string) => {
+        this.statusSignal.emit(message);
+      },
+      geocoderService: this.geocoderService
+    });
+
     this.deckInstance = new Deck({
       canvas: canvas,
       width: '100%',
@@ -258,6 +284,7 @@ export class ImageViewerWidget extends MainAreaWidget {
         })
       ],
       layers: [imageLayer],
+      widgets: [geocoderWidget],
       parameters: {
         clearColor: [0, 0, 0, 1] // Black background (RGBA: 0, 0, 0, 1)
       } as any, // Type assertion to work around Deck.gl typing issues
@@ -644,6 +671,38 @@ export class ImageViewerWidget extends MainAreaWidget {
    */
   public getLayerInfo(): any[] {
     return this.layerManager.getLayerInfo();
+  }
+
+  /**
+   * Navigate to specific coordinates by updating the view state
+   */
+  private navigateToCoordinates(x: number, y: number): void {
+    if (!this.deckInstance) {
+      logger.error('Cannot navigate: Deck instance not available');
+      return;
+    }
+
+    try {
+      // Create new view state for OrthographicView with the target coordinates
+      const newViewState = {
+        target: [x, y, 0],
+        zoom: 0, // Keep current zoom level or set a default
+        transitionDuration: 500
+      } as any; // Type assertion to work around strict typing
+
+      // Update the view state using setProps
+      this.deckInstance.setProps({
+        initialViewState: newViewState
+      });
+
+      this.statusSignal.emit(
+        `Navigated to coordinates: ${x.toFixed(2)}, ${y.toFixed(2)}`
+      );
+      logger.info(`Navigation successful: x=${x}, y=${y}`);
+    } catch (error: any) {
+      logger.error(`Navigation failed: ${error.message}`);
+      this.statusSignal.emit(`Navigation failed: ${error.message}`);
+    }
   }
 
   /**

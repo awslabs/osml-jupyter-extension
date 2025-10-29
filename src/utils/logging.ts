@@ -99,20 +99,12 @@ class OSMLLoggerManager {
     message: string
   ): void {
     if (this.isInitialized && this.logger) {
-      console.log(
-        '[OSML Debug] Attempting to log message:',
-        message,
-        'with level:',
-        level
-      );
       const logMessage: ITextLog = {
         type: 'text',
         level: level as any,
         data: `[OSML] ${message}`
       };
-      console.log('[OSML Debug] Created log message object:', logMessage);
       this.logger.log(logMessage);
-      console.log('[OSML Debug] Logger.log() called successfully');
     } else {
       console.log(
         '[OSML Debug] Cannot log - logger not initialized or not available'
