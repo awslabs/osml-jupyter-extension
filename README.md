@@ -88,13 +88,13 @@ For development work, clone the repository and set up the development environmen
 conda env create -f conda/osml-jupyterlab-ext-dev-environment.yml
 conda activate osml-jupyterlab-ext-dev
 
-# Install in development mode
-pip install -e "."
-jupyter labextension develop . --overwrite
-
 # Install dependencies and build
 jlpm install
 jlpm build
+
+# Install in development mode
+pip install -e "."
+jupyter labextension develop . --overwrite
 ```
 
 ### Development Workflow
