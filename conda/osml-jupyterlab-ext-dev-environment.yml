@@ -1,5 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates.
 
+# Note: The Python, GDAL, and Proj versions should be verified to be compatible
+# with the version of osml-imagery-toolkit selected. 
+
 name: osml-jupyterlab-ext-dev
 channels:
   - conda-forge
@@ -9,7 +12,7 @@ dependencies:
   - conda-forge::gdal=3.8.5
   - conda-forge::proj=9.4.1
   - jupyterlab=4
-  - nodejs=18
+  - nodejs>=21
   - copier=7
   - jinja2-time
   - git
