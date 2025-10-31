@@ -4,6 +4,7 @@
 export * from './tiles';
 export * from './features';
 export * from './models';
+export * from './signals';
 
 /**
  * Common application types
@@ -113,6 +114,26 @@ export interface IViewportState {
 }
 
 /**
+ * Interface for image load response
+ */
+export interface IImageLoadResponse {
+  success: boolean;
+  status: string;
+  width?: number;
+  height?: number;
+  error?: string;
+}
+
+/**
+ * Interface for image metadata response
+ */
+export interface IImageMetadataResponse {
+  success: boolean;
+  metadata?: IMetadataObject;
+  error?: string;
+}
+
+/**
  * Layer management types
  */
 export interface ILayerInfo {
@@ -131,6 +152,20 @@ export interface ILayerControlActions {
   ) => void;
   deleteLayer: (layerId: string) => void;
   addNamedDataset: (datasetName: string) => void;
+}
+
+/**
+ * New interface for LayerControlActions that work with LayerManager directly
+ */
+export interface ILayerManagerActions {
+  toggleVisibility: (layerId: string) => void;
+  updateColor: (
+    layerId: string,
+    color: [number, number, number, number]
+  ) => void;
+  deleteLayer: (layerId: string) => void;
+  addNamedDataset: (datasetName: string) => void;
+  getLayerInfo: () => ILayerInfo[];
 }
 
 /**

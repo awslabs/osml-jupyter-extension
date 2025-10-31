@@ -15,17 +15,13 @@ export class LayerManager {
   private layerColors: Map<string, [number, number, number, number]> =
     new Map();
 
-  // Signals for layer changes
-  private _layersChanged = new Signal<LayerManager, void>(this);
+  // Signal emitted whenever layers are modified (visibility, color, addition, deletion)
+  public readonly layersChanged: Signal<LayerManager, void> = new Signal<
+    LayerManager,
+    void
+  >(this);
 
   constructor() {}
-
-  /**
-   * Signal emitted when layers change (add, remove, visibility, color)
-   */
-  get layersChanged(): Signal<LayerManager, void> {
-    return this._layersChanged;
-  }
 
   /**
    * Create a feature layer for overlay data using TiledOverlayLayer
@@ -79,8 +75,8 @@ export class LayerManager {
 
     logger.info(`LayerManager added feature layer: ${layerId}`);
 
-    // Emit layers changed signal
-    this._layersChanged.emit();
+    // Emit signal to notify listeners that layers have changed
+    this.layersChanged.emit();
   }
 
   /**
@@ -89,8 +85,8 @@ export class LayerManager {
   public setLayerVisibility(layerId: string, visible: boolean): void {
     this.layerVisibility.set(layerId, visible);
 
-    // Emit layers changed signal
-    this._layersChanged.emit();
+    // Emit signal to notify listeners that layers have changed
+    this.layersChanged.emit();
   }
 
   /**
@@ -118,8 +114,8 @@ export class LayerManager {
       }
     }
 
-    // Emit layers changed signal
-    this._layersChanged.emit();
+    // Emit signal to notify listeners that layers have changed
+    this.layersChanged.emit();
   }
 
   /**
@@ -146,8 +142,10 @@ export class LayerManager {
     this.layerVisibility.delete(layerId);
     this.layerColors.delete(layerId);
 
-    // Emit layers changed signal
-    this._layersChanged.emit();
+    // Emit signal to notify listeners that layers have changed (only if layer was actually deleted)
+    if (layerDeleted) {
+      this.layersChanged.emit();
+    }
   }
 
   /**
@@ -214,8 +212,5 @@ export class LayerManager {
     // Clear state maps
     this.layerVisibility.clear();
     this.layerColors.clear();
-
-    // Clear signals
-    Signal.clearData(this);
   }
 }
