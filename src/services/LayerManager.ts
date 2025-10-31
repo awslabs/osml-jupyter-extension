@@ -11,7 +11,6 @@ import { logger } from '../utils';
  */
 export class LayerManager {
   private featureLayers: Map<string, TiledOverlayLayer> = new Map();
-  private modelLayers: Map<string, TiledOverlayLayer> = new Map();
   private layerVisibility: Map<string, boolean> = new Map();
   private layerColors: Map<string, [number, number, number, number]> =
     new Map();
@@ -85,28 +84,6 @@ export class LayerManager {
   }
 
   /**
-   * Add a model feature layer
-   */
-  public addModelFeatureLayer(
-    modelName: string,
-    getTileData: FeatureTileDataFunction
-  ): void {
-    // Remove existing model layer if present (only one model at a time)
-    this.clearModelLayers();
-
-    // Create the model feature layer using TiledOverlayLayer
-    const modelFeatureLayer = this.createFeatureLayer(modelName, getTileData);
-
-    // Store the model layer
-    this.modelLayers.set(modelName, modelFeatureLayer);
-
-    logger.info(`LayerManager added model feature layer: ${modelName}`);
-
-    // Emit layers changed signal
-    this._layersChanged.emit();
-  }
-
-  /**
    * Set layer visibility
    */
   public setLayerVisibility(layerId: string, visible: boolean): void {
@@ -141,21 +118,6 @@ export class LayerManager {
       }
     }
 
-    if (this.modelLayers.has(layerId)) {
-      const layer = this.modelLayers.get(layerId);
-      if (layer) {
-        // For model layers, we need to recreate using the existing pattern
-        const existingLayer = layer as any;
-        const getTileData = existingLayer.props.getTileData;
-
-        // Create new model layer with updated color using TiledOverlayLayer
-        const newModelLayer = this.createFeatureLayer(layerId, getTileData);
-
-        // Replace the layer
-        this.modelLayers.set(layerId, newModelLayer);
-      }
-    }
-
     // Emit layers changed signal
     this._layersChanged.emit();
   }
@@ -176,16 +138,6 @@ export class LayerManager {
       layerDeleted = true;
     }
 
-    // Remove from model layers
-    if (this.modelLayers.has(layerId)) {
-      const layer = this.modelLayers.get(layerId);
-      if (layer) {
-        layer.clearCache();
-      }
-      this.modelLayers.delete(layerId);
-      layerDeleted = true;
-    }
-
     if (layerDeleted) {
       logger.info(`LayerManager deleted layer: ${layerId}`);
     }
@@ -196,26 +148,6 @@ export class LayerManager {
 
     // Emit layers changed signal
     this._layersChanged.emit();
-  }
-
-  /**
-   * Clear all model feature layers
-   */
-  public clearModelLayers(): void {
-    if (this.modelLayers.size > 0) {
-      logger.info(
-        `LayerManager clearing ${this.modelLayers.size} model layers`
-      );
-
-      // Clear caches and dispose of layers
-      for (const modelLayer of this.modelLayers.values()) {
-        modelLayer.clearCache();
-      }
-      this.modelLayers.clear();
-
-      // Emit layers changed signal
-      this._layersChanged.emit();
-    }
   }
 
   /**
@@ -232,17 +164,6 @@ export class LayerManager {
         visible: this.layerVisibility.get(layerId) ?? true,
         color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
         type: 'feature'
-      });
-    }
-
-    // Add model layers
-    for (const [layerId] of this.modelLayers.entries()) {
-      layers.push({
-        id: layerId,
-        name: layerId,
-        visible: this.layerVisibility.get(layerId) ?? true,
-        color: this.layerColors.get(layerId) ?? [255, 0, 0, 128],
-        type: 'model'
       });
     }
 
@@ -263,14 +184,6 @@ export class LayerManager {
       }
     }
 
-    // Add visible model layers
-    for (const [layerId, layer] of this.modelLayers.entries()) {
-      const visible = this.layerVisibility.get(layerId) ?? true;
-      if (visible) {
-        visibleLayers.push(layer);
-      }
-    }
-
     return visibleLayers;
   }
 
@@ -278,14 +191,14 @@ export class LayerManager {
    * Check if a layer exists
    */
   public hasLayer(layerId: string): boolean {
-    return this.featureLayers.has(layerId) || this.modelLayers.has(layerId);
+    return this.featureLayers.has(layerId);
   }
 
   /**
    * Get layer count
    */
   public getLayerCount(): number {
-    return this.featureLayers.size + this.modelLayers.size;
+    return this.featureLayers.size;
   }
 
   /**
@@ -297,12 +210,6 @@ export class LayerManager {
       featureLayer.clearCache();
     }
     this.featureLayers.clear();
-
-    // Clear model layers
-    for (const modelLayer of this.modelLayers.values()) {
-      modelLayer.clearCache();
-    }
-    this.modelLayers.clear();
 
     // Clear state maps
     this.layerVisibility.clear();

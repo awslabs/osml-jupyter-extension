@@ -51,10 +51,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   private featureTileService: FeatureTileService;
   private geocoderService: GeocoderService;
 
-  // Model selection state
-  private selectedModel: string = '';
-  private selectedModelEnabled: boolean = false;
-
   // Property Inspector
   private propertyInspector?: IPropertyInspector;
   private currentSelection: ICurrentSelection = { type: null };
@@ -319,53 +315,6 @@ export class ImageViewerWidget extends MainAreaWidget {
     }
   }
 
-  /**
-   * Create a TiledOverlayLayer for model inference results
-   */
-  public createModelFeatureLayer(modelName: string): void {
-    if (!this.imageName || !this.deckInstance) {
-      const errorMessage =
-        'Cannot create model feature layer: No image loaded or Deck instance not initialized';
-      console.warn(errorMessage);
-      logger.error(
-        `Model layer creation failed - ${!this.imageName ? 'no image' : 'deck not initialized'}: ${modelName}`
-      );
-      return;
-    }
-
-    if (!modelName || modelName.trim() === '') {
-      const errorMessage =
-        'Cannot create model feature layer: No model name provided';
-      console.warn(errorMessage);
-      logger.error('Model layer creation failed - no model name provided');
-      return;
-    }
-
-    this.statusSignal.emit(`Creating model feature layer for: ${modelName}`);
-
-    // Create model feature tile data function
-    const getModelFeatureTileData =
-      this.featureTileService.createModelFeatureDataFunction(
-        this.imageName,
-        modelName
-      );
-
-    // Add the model feature layer via LayerManager
-    this.layerManager.addModelFeatureLayer(modelName, getModelFeatureTileData);
-
-    this.statusSignal.emit(`Model feature layer created: ${modelName}`);
-    logger.info(`Model feature layer created successfully: ${modelName}`);
-  }
-
-  /**
-   * Clear all model feature layers
-   */
-  public clearModelLayers(): void {
-    this.layerManager.clearModelLayers();
-    this.statusSignal.emit('Model layers cleared');
-    logger.info('Model layers cleared successfully');
-  }
-
   public async addLayer(layerDataPath: string | null) {
     if (!layerDataPath) {
       const errorMessage = 'Error: No layer file selected';
@@ -553,38 +502,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
-   * Set the selected model for tile processing
-   */
-  public setSelectedModel(modelName: string, modelEnabled?: boolean): void {
-    this.selectedModel = modelName;
-    if (modelEnabled !== undefined) {
-      this.selectedModelEnabled = modelEnabled;
-    }
-
-    if (!this.selectedModelEnabled) {
-      this.statusSignal.emit('Model processing disabled');
-    } else if (modelName) {
-      this.statusSignal.emit(`Model selected: ${modelName}`);
-    } else {
-      this.statusSignal.emit('Model enabled but no name specified');
-    }
-  }
-
-  /**
-   * Get the currently selected model
-   */
-  public getSelectedModel(): string {
-    return this.selectedModel;
-  }
-
-  /**
-   * Get the currently selected model enabled state
-   */
-  public getSelectedModelEnabled(): boolean {
-    return this.selectedModelEnabled;
-  }
-
-  /**
    * Get debug information about the current state
    */
   public getDebugInfo(): any {
@@ -594,9 +511,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       layerNames: layerInfo.map(layer => layer.name),
       layerTypes: layerInfo.map(layer => layer.type),
       imageName: this.imageName,
-      deckInstanceExists: !!this.deckInstance,
-      selectedModel: this.selectedModel,
-      selectedModelEnabled: this.selectedModelEnabled
+      deckInstanceExists: !!this.deckInstance
     };
   }
 
