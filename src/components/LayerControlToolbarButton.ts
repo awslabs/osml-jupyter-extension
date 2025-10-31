@@ -1,16 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { ToolbarButton } from '@jupyterlab/apputils';
-import { ImageViewerWidget } from '../ImageViewerWidget';
+import { LayerManager, FeatureTileService } from '../services';
 import { listIcon } from '../utils/icons';
 import LayerControlDialog from './LayerControlDialog';
-import { ILayerInfo } from '../types';
 
 /**
  * A toolbar button widget for controlling overlay layers
  */
 export class LayerControlToolbarButton extends ToolbarButton {
-  constructor(private _imageViewerWidget: ImageViewerWidget) {
+  constructor(
+    private _layerManager: LayerManager,
+    private _featureTileService: FeatureTileService,
+    private _getCurrentImageName: () => string | undefined
+  ) {
     super({
       icon: listIcon,
       onClick: () => this._handleClick(),
@@ -23,8 +26,8 @@ export class LayerControlToolbarButton extends ToolbarButton {
    */
   private async _handleClick(): Promise<void> {
     try {
-      // Get fresh layer information from the ImageViewerWidget
-      const layers = this._getLayerInfo();
+      // Get fresh layer information from LayerManager
+      const layers = this._layerManager.getLayerInfo();
 
       // Create the dialog content with close handler
       const dialogContent: LayerControlDialog = new LayerControlDialog(
@@ -50,6 +53,12 @@ export class LayerControlToolbarButton extends ToolbarButton {
         }
       );
 
+      // Set up signal connection to update dialog when layers change
+      this._layerManager.layersChanged.connect(() => {
+        const updatedLayers = this._layerManager.getLayerInfo();
+        dialogContent.updateLayers(updatedLayers);
+      });
+
       // Add dialog to document body to show as overlay
       document.body.appendChild(dialogContent.node);
 
@@ -61,49 +70,6 @@ export class LayerControlToolbarButton extends ToolbarButton {
   }
 
   /**
-   * Get layer information from the ImageViewerWidget
-   */
-  private _getLayerInfo(): ILayerInfo[] {
-    // Use the ImageViewerWidget's getLayerInfo method to get actual layer state
-    if (typeof (this._imageViewerWidget as any).getLayerInfo === 'function') {
-      return (this._imageViewerWidget as any).getLayerInfo();
-    }
-
-    // Fallback to manual construction if method doesn't exist
-    const layers: ILayerInfo[] = [];
-
-    // Get feature layers
-    const featureLayers = (this._imageViewerWidget as any).featureLayers;
-    if (featureLayers && featureLayers instanceof Map) {
-      for (const [layerId] of featureLayers.entries()) {
-        layers.push({
-          id: layerId,
-          name: layerId,
-          visible: true, // Default to visible for now
-          color: [255, 0, 0, 128], // Default red color with alpha
-          type: 'feature'
-        });
-      }
-    }
-
-    // Get model layers
-    const modelLayers = (this._imageViewerWidget as any).modelLayers;
-    if (modelLayers && modelLayers instanceof Map) {
-      for (const [layerId] of modelLayers.entries()) {
-        layers.push({
-          id: layerId,
-          name: layerId,
-          visible: true, // Default to visible for now
-          color: [255, 0, 0, 128], // Default red color with alpha
-          type: 'model'
-        });
-      }
-    }
-
-    return layers;
-  }
-
-  /**
    * Toggle layer visibility
    */
   private _toggleLayerVisibility(
@@ -111,27 +77,13 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      // Call method on ImageViewerWidget if it exists
-      if (
-        typeof (this._imageViewerWidget as any).setLayerVisibility ===
-        'function'
-      ) {
-        const currentLayers = this._getLayerInfo();
-        const layer = currentLayers.find(l => l.id === layerId);
-        const newVisibility = layer ? !layer.visible : true;
-        (this._imageViewerWidget as any).setLayerVisibility(
-          layerId,
-          newVisibility
-        );
-      } else {
-        console.warn('setLayerVisibility method not implemented yet');
-      }
+      // Get current visibility state from LayerManager
+      const currentLayers = this._layerManager.getLayerInfo();
+      const layer = currentLayers.find(l => l.id === layerId);
+      const newVisibility = layer ? !layer.visible : true;
 
-      // Update the dialog with fresh layer data
-      if (dialog) {
-        const updatedLayers = this._getLayerInfo();
-        dialog.updateLayers(updatedLayers);
-      }
+      // Call LayerManager method directly - this will emit signal to update UI
+      this._layerManager.setLayerVisibility(layerId, newVisibility);
     } catch (error) {
       console.error('Error toggling layer visibility:', error);
     }
@@ -146,20 +98,8 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      // Call method on ImageViewerWidget if it exists
-      if (
-        typeof (this._imageViewerWidget as any).setLayerColor === 'function'
-      ) {
-        (this._imageViewerWidget as any).setLayerColor(layerId, color);
-      } else {
-        console.warn('setLayerColor method not implemented yet');
-      }
-
-      // Update the dialog with fresh layer data
-      if (dialog) {
-        const updatedLayers = this._getLayerInfo();
-        dialog.updateLayers(updatedLayers);
-      }
+      // Call LayerManager method directly - this will emit signal to update UI
+      this._layerManager.setLayerColor(layerId, color);
     } catch (error) {
       console.error('Error updating layer color:', error);
     }
@@ -170,18 +110,8 @@ export class LayerControlToolbarButton extends ToolbarButton {
    */
   private _deleteLayer(layerId: string, dialog?: LayerControlDialog): void {
     try {
-      // Call method on ImageViewerWidget if it exists
-      if (typeof (this._imageViewerWidget as any).deleteLayer === 'function') {
-        (this._imageViewerWidget as any).deleteLayer(layerId);
-      } else {
-        console.warn('deleteLayer method not implemented yet');
-      }
-
-      // Update the dialog with fresh layer data
-      if (dialog) {
-        const updatedLayers = this._getLayerInfo();
-        dialog.updateLayers(updatedLayers);
-      }
+      // Call LayerManager method directly - this will emit signal to update UI
+      this._layerManager.deleteLayer(layerId);
     } catch (error) {
       console.error('Error deleting layer:', error);
     }
@@ -195,20 +125,31 @@ export class LayerControlToolbarButton extends ToolbarButton {
     dialog?: LayerControlDialog
   ): void {
     try {
-      // Call method on ImageViewerWidget if it exists
-      if (
-        typeof (this._imageViewerWidget as any).addNamedDataset === 'function'
-      ) {
-        (this._imageViewerWidget as any).addNamedDataset(datasetName);
-      } else {
-        console.warn('addNamedDataset method not implemented yet');
+      // Get current image name from the injected function
+      const imageName = this._getCurrentImageName();
+
+      console.log(
+        `LayerControlToolbarButton._addNamedDataset for ${imageName}:${datasetName}`
+      );
+
+      if (!datasetName || !imageName || !this._featureTileService) {
+        console.warn('Cannot add named dataset: Missing required parameters', {
+          datasetName: !!datasetName,
+          imageName: !!imageName,
+          featureTileService: !!this._featureTileService
+        });
+        return;
       }
 
-      // Update the dialog with fresh layer data
-      if (dialog) {
-        const updatedLayers = this._getLayerInfo();
-        dialog.updateLayers(updatedLayers);
-      }
+      // Create feature tile data function
+      const getFeatureTileData =
+        this._featureTileService.createFeatureDataFunction(
+          imageName,
+          datasetName
+        );
+
+      // Add the feature layer via LayerManager - this will emit signal to update UI
+      this._layerManager.addFeatureLayer(datasetName, getFeatureTileData);
     } catch (error) {
       console.error('Error adding named dataset:', error);
     }

@@ -4,7 +4,8 @@ import { Signal } from '@lumino/signaling';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 
-import { ITile, TileDataFunction } from '../types';
+import { ITile, TileDataFunction, IImageInfo } from '../types';
+import { ImageTileService } from './ImageTileService';
 import { logger } from '../utils';
 
 /**
@@ -42,46 +43,48 @@ export class ImageManager {
   private currentGetTileData: TileDataFunction | null = null;
   private tileSize: number = 512;
 
-  // Signals for image changes
-  private _imageChanged = new Signal<ImageManager, void>(this);
-  private _imageLoaded = new Signal<ImageManager, IImageMetadata>(this);
-  private _imageLoadError = new Signal<ImageManager, string>(this);
+  // Signal emitted when a new image is loaded or cleared, now with rich metadata
+  public readonly imageChanged: Signal<ImageManager, IImageInfo> = new Signal<
+    ImageManager,
+    IImageInfo
+  >(this);
 
-  constructor() {}
-
-  /**
-   * Signal emitted when image changes (load, clear)
-   */
-  get imageChanged(): Signal<ImageManager, void> {
-    return this._imageChanged;
-  }
+  constructor(private imageTileService: ImageTileService) {}
 
   /**
-   * Signal emitted when image loads successfully
+   * Load an image and create its layer, handling all tile service operations internally.
+   * This method will:
+   * 1. Load image metadata from the ImageTileService to get dimensions
+   * 2. Create a tile data function using the ImageTileService
+   * 3. Create the image layer with the tile data function
+   * 4. Emit imageChanged signals for property inspector updates
+   *
+   * @param imageName - The name/path of the image to load
+   * @throws {Error} If the image cannot be loaded or if required metadata is missing
    */
-  get imageLoaded(): Signal<ImageManager, IImageMetadata> {
-    return this._imageLoaded;
-  }
+  public async loadImage(imageName: string): Promise<void> {
+    logger.debug(`ImageManager loading image: ${imageName}`);
 
-  /**
-   * Signal emitted when image load fails
-   */
-  get imageLoadError(): Signal<ImageManager, string> {
-    return this._imageLoadError;
-  }
-
-  /**
-   * Load an image and create its layer with provided metadata and tile data function
-   */
-  public loadImage(
-    imageName: string,
-    imageWidth: number,
-    imageHeight: number,
-    getTileData: TileDataFunction
-  ): void {
     try {
+      // First, load image to get metadata and determine dimensions
+      const imageLoadResponse =
+        await this.imageTileService.loadImage(imageName);
+
+      if (
+        !imageLoadResponse.success ||
+        !imageLoadResponse.width ||
+        !imageLoadResponse.height
+      ) {
+        const errorMessage = `Could not load image: ${imageName} - ${imageLoadResponse.error || 'Unknown error'}`;
+        logger.error(`ImageManager loadImage failed: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      const imageWidth = imageLoadResponse.width;
+      const imageHeight = imageLoadResponse.height;
+
       logger.debug(
-        `ImageManager loading image: ${imageName} (${imageWidth}x${imageHeight})`
+        `ImageManager loaded image metadata: ${imageName} (${imageWidth}x${imageHeight})`
       );
 
       // Create image metadata
@@ -97,25 +100,26 @@ export class ImageManager {
         }
       };
 
+      // Create a getTileData function using the ImageTileService
+      const getTileData =
+        this.imageTileService.createTileDataFunction(imageName);
+
       // Store current image and getTileData function
       this.currentImage = imageMetadata;
       this.currentGetTileData = getTileData;
 
-      // Create the image layer with provided getTileData function
+      // Create the image layer with the tile data function
       this.createImageLayer(imageName, getTileData);
 
       logger.info(`ImageManager successfully loaded image: ${imageName}`);
 
-      // Emit signals
-      this._imageLoaded.emit(imageMetadata);
-      this._imageChanged.emit();
+      // Emit initial loading state and asynchronously load detailed metadata
+      this.emitImageInfoChanged(imageName);
     } catch (error: any) {
-      const errorMessage = `Error loading ${imageName}: ${error.message}`;
       logger.error(
-        `ImageManager loadImage failed for ${imageName}: ${error.message}`
+        `ImageManager failed to load image ${imageName}: ${error.message}`
       );
-      console.error('Error loading image:', error);
-      this._imageLoadError.emit(errorMessage);
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
@@ -199,7 +203,46 @@ export class ImageManager {
     this.currentImage = null;
     this.imageLayer = null;
 
-    this._imageChanged.emit();
+    // Emit signal to notify listeners that image has been cleared
+    this.imageChanged.emit({});
+  }
+
+  /**
+   * Load image metadata and emit signal for property inspector
+   */
+  private async emitImageInfoChanged(imageName: string): Promise<void> {
+    // Emit initial loading state
+    this.imageChanged.emit({
+      name: imageName,
+      isLoadingMetadata: true
+    });
+
+    try {
+      const response = await this.imageTileService.loadImageMetadata(imageName);
+
+      if (response.success && response.metadata) {
+        // Emit success state with metadata
+        this.imageChanged.emit({
+          name: imageName,
+          metadata: response.metadata,
+          isLoadingMetadata: false
+        });
+      } else {
+        // Emit error state
+        this.imageChanged.emit({
+          name: imageName,
+          metadataError: response.error || 'Failed to fetch metadata',
+          isLoadingMetadata: false
+        });
+      }
+    } catch (error: any) {
+      // Emit error state
+      this.imageChanged.emit({
+        name: imageName,
+        metadataError: error.message,
+        isLoadingMetadata: false
+      });
+    }
   }
 
   /**
@@ -272,7 +315,6 @@ export class ImageManager {
       // Recreate image layer if image is loaded
       if (this.currentImage && this.currentGetTileData) {
         this.createImageLayer(this.currentImage.name, this.currentGetTileData);
-        this._imageChanged.emit();
       }
     }
   }
@@ -304,8 +346,5 @@ export class ImageManager {
     // Clear current state
     this.currentImage = null;
     this.imageLayer = null;
-
-    // Clear signals
-    Signal.clearData(this);
   }
 }

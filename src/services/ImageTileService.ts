@@ -1,6 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
-import { ITile, TileDataFunction, ITileLoadConfig } from '../types';
+import {
+  ITile,
+  TileDataFunction,
+  ITileLoadConfig,
+  IImageMetadataResponse
+} from '../types';
 import { CommService } from './CommService';
 import { logger } from '../utils';
 
@@ -83,6 +88,56 @@ export class ImageTileService {
       return {
         success: false,
         status: 'ERROR',
+        error: error.message || 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Load image metadata
+   */
+  public async loadImageMetadata(
+    imageName: string
+  ): Promise<IImageMetadataResponse> {
+    if (!this.commService.isReady()) {
+      const errorMessage = 'Communication service not ready';
+      logger.error(
+        `ImageTileService loadImageMetadata failed for ${imageName}: ${errorMessage}`
+      );
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+
+    try {
+      const response = await this.commService.sendMessage({
+        type: 'IMAGE_METADATA_REQUEST',
+        dataset: imageName
+      });
+
+      if (response.status === 'SUCCESS' && response.metadata) {
+        return {
+          success: true,
+          metadata: response.metadata
+        };
+      } else {
+        const errorMessage = response.error || 'Failed to fetch metadata';
+        logger.error(
+          `ImageTileService loadImageMetadata failed for ${imageName}: ${errorMessage}`
+        );
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error: any) {
+      logger.error(
+        `ImageTileService loadImageMetadata failed for ${imageName}: ${error.message}`
+      );
+      console.error(`Error loading metadata for ${imageName}:`, error);
+      return {
+        success: false,
         error: error.message || 'Unknown error occurred'
       };
     }

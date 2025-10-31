@@ -15,6 +15,7 @@ import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
 import { LOGO_ICON, logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
 import { LayerControlToolbarButton, GeocoderToolbarWidget } from './components';
+import { ServiceContainer } from './services';
 import { Widget } from '@lumino/widgets';
 
 namespace CommandIDs {
@@ -57,6 +58,7 @@ async function activate(
 
   const manager = app.serviceManager;
   let widget: ImageViewerWidget;
+  let serviceContainer: ServiceContainer;
 
   app.commands.addCommand(CommandIDs.openWithViewer, {
     label: 'OversightML: Open',
@@ -71,20 +73,61 @@ async function activate(
 
       // Regenerate the widget if disposed
       if (!widget || widget.isDisposed) {
-        widget = await ImageViewerWidget.createInstance(
+        // Create and initialize service container
+        serviceContainer = new ServiceContainer(
           manager,
-          selectedFileName
+          propertyInspectorProvider || undefined
         );
+        await serviceContainer.initialize();
 
-        // Register with property inspector if available
+        // Create widget with service container
+        widget = new ImageViewerWidget(serviceContainer);
+
+        // If an image was selected, load it via ImageManager (which will trigger signals)
+        if (selectedFileName) {
+          try {
+            widget.statusSignal.emit(`Loading ${selectedFileName} ...`);
+
+            // Get services from container
+            const services = serviceContainer.getServices();
+            const { imageManager } = services;
+
+            // Use ImageManager to load the image - this will handle all tile service operations internally
+            await imageManager.loadImage(selectedFileName);
+
+            logger.info(
+              `Image ${selectedFileName} loaded successfully via command.`
+            );
+          } catch (error: any) {
+            logger.error(
+              `Failed to load image ${selectedFileName}: ${error.message}`
+            );
+            console.error('Error loading image:', error);
+            widget.statusSignal.emit(
+              `Error loading ${selectedFileName}: ${error.message}`
+            );
+          }
+        }
+
+        // Register with property inspector if available - this is now handled by ServiceContainer
         if (propertyInspectorProvider) {
-          widget.registerWithPropertyInspector(propertyInspectorProvider);
+          serviceContainer.registerPropertyInspector(
+            propertyInspectorProvider,
+            widget
+          );
         }
 
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
-          // Create and add the layer control button
-          const layerControlButton = new LayerControlToolbarButton(widget);
+          // Get services from container
+          const services = serviceContainer.getServices();
+
+          // Create and add the layer control button with proper service injection
+          const layerControlButton = new LayerControlToolbarButton(
+            services.layerManager,
+            services.featureTileService,
+            () => (widget as any).imageName // Access current image name via closure
+          );
           widget.toolbar.addItem('layerControl', layerControlButton);
 
           // Create and add the model selection button
@@ -113,7 +156,31 @@ async function activate(
           });
         }
       } else {
-        await widget.openImage(selectedFileName);
+        // Load the selected image if widget already exists
+        if (selectedFileName) {
+          try {
+            widget.statusSignal.emit(`Loading ${selectedFileName} ...`);
+
+            // Get services from container
+            const services = serviceContainer.getServices();
+            const { imageManager } = services;
+
+            // Use ImageManager to load the image - this will handle all tile service operations internally
+            await imageManager.loadImage(selectedFileName);
+
+            logger.info(
+              `Image ${selectedFileName} loaded successfully via command.`
+            );
+          } catch (error: any) {
+            logger.error(
+              `Failed to load image ${selectedFileName}: ${error.message}`
+            );
+            console.error('Error loading image:', error);
+            widget.statusSignal.emit(
+              `Error loading ${selectedFileName}: ${error.message}`
+            );
+          }
+        }
       }
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there already
@@ -141,22 +208,46 @@ async function activate(
         selectedFileName = String(firstSelectedItem.value?.path);
       }
 
+      // Validate layer file selection
+      if (!selectedFileName) {
+        console.error('Layer addition failed - no layer file selected');
+        return;
+      }
+
       // Create the widget if it doesn't exist or is disposed
       if (!widget || widget.isDisposed) {
-        widget = await ImageViewerWidget.createInstance(
+        // Create and initialize service container
+        serviceContainer = new ServiceContainer(
           manager,
-          null // No image - widget will handle this in addLayer
+          propertyInspectorProvider || undefined
         );
+        await serviceContainer.initialize();
 
-        // Register with property inspector if available
+        // Create widget with service container
+        widget = new ImageViewerWidget(serviceContainer);
+
+        // Register with property inspector if available - this is now handled by ServiceContainer
         if (propertyInspectorProvider) {
-          widget.registerWithPropertyInspector(propertyInspectorProvider);
+          serviceContainer.registerPropertyInspector(
+            propertyInspectorProvider,
+            widget
+          );
         }
 
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
-          // Create and add the layer control button
-          const layerControlButton = new LayerControlToolbarButton(widget);
+          // Get services from container
+          const services = serviceContainer.getServices();
+
+          // Create and add the layer control button with proper service injection
+          const layerControlButton = new LayerControlToolbarButton(
+            services.layerManager,
+            services.featureTileService,
+            () => {
+              const currentImage = services.imageManager.getCurrentImage();
+              return currentImage ? currentImage.name : undefined;
+            }
+          );
           widget.toolbar.addItem('layerControl', layerControlButton);
 
           // Create and add the geocoder toolbar widget
@@ -182,8 +273,63 @@ async function activate(
         }
       }
 
-      // Always try to add the layer - let the widget handle the error if no image is loaded
-      await widget.addLayer(selectedFileName);
+      // Get services from container
+      const services = serviceContainer.getServices();
+      const { layerManager, featureTileService, imageManager } = services;
+
+      // Validate that an image is loaded
+      const currentImage = imageManager.getCurrentImage();
+      if (!currentImage) {
+        const errorMessage =
+          'Error: No image loaded. Please open an image first before adding layers.';
+        widget.statusSignal.emit(errorMessage);
+        logger.error('Layer addition failed - no image loaded');
+        return;
+      }
+
+      try {
+        widget.statusSignal.emit(`Loading overlay from ${selectedFileName}...`);
+
+        const loadResponse = await featureTileService.loadOverlay(
+          currentImage.name,
+          selectedFileName
+        );
+
+        // Check if the overlay load was successful
+        if (!loadResponse.success) {
+          const errorMessage = `Error: ${selectedFileName} could not be loaded as an overlay layer${loadResponse.error ? ` - ${loadResponse.error}` : ''}`;
+          widget.statusSignal.emit(errorMessage);
+          logger.error(
+            `Failed to load overlay ${selectedFileName}: ${loadResponse.error || 'Unknown error'}`
+          );
+          return;
+        }
+
+        widget.statusSignal.emit(
+          `Loading overlay from ${selectedFileName}... ${loadResponse.status}`
+        );
+
+        // Create feature tile data function
+        const getFeatureTileData = featureTileService.createFeatureDataFunction(
+          currentImage.name,
+          selectedFileName
+        );
+
+        // Add the feature layer via LayerManager - signal will automatically update deck layers
+        layerManager.addFeatureLayer(selectedFileName, getFeatureTileData);
+
+        widget.statusSignal.emit(`Added overlay layer: ${selectedFileName}`);
+        logger.info(`Layer added successfully: ${selectedFileName}`);
+      } catch (error: any) {
+        logger.error(
+          `Failed to add layer ${selectedFileName}: ${error.message}`
+        );
+        console.error('Error loading overlay:', error);
+        widget.statusSignal.emit(
+          `Error loading overlay ${selectedFileName}: ${error.message}`
+        );
+        return;
+      }
 
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there already

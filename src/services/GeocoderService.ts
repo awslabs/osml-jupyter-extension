@@ -314,6 +314,28 @@ export class GeocoderService {
   }
 
   /**
+   * Connect to ImageManager's imageChanged signal to automatically update image context
+   */
+  public connectToImageManager(imageManager: any): void {
+    imageManager.imageChanged.connect((sender: any, imageMetadata: any) => {
+      if (imageMetadata) {
+        // Image was loaded, update context
+        this.setImageContext(
+          imageMetadata.name,
+          imageMetadata.width,
+          imageMetadata.height
+        );
+      } else {
+        // Image was cleared, clear context
+        this.currentImageName = null;
+        this.currentImageWidth = 0;
+        this.currentImageHeight = 0;
+        logger.debug('Image context cleared via signal');
+      }
+    });
+  }
+
+  /**
    * Dispose of the service and clean up resources
    */
   public dispose(): void {
