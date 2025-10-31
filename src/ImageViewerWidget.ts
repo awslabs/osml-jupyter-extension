@@ -2,7 +2,6 @@
 
 import { ServiceManager } from '@jupyterlab/services';
 import { MainAreaWidget, Toolbar, ISessionContext } from '@jupyterlab/apputils';
-import { ReactWidget } from '@jupyterlab/ui-components';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
@@ -31,25 +30,20 @@ export class ImageViewerWidget extends MainAreaWidget {
   private mapDiv: HTMLDivElement;
   private deckInstance?: Deck;
   private imageName?: string;
-  private manager?: ServiceManager.IManager;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
 
-  // Feature properties dialog state
-  private featurePropertiesDialog?: ReactWidget;
-  private featurePropertiesDialogVisible: boolean = false;
-
-  // Location info dialog state
+  // Popup Dialogs
+  private featurePropertiesDialog?: FeaturePropertiesDialog;
   private locationInfoDialog?: LocationInfoDialog;
-  private locationInfoDialogVisible: boolean = false;
 
   // Service instances
-  private commService: CommService;
-  private imageTileService: ImageTileService;
-  private featureTileService: FeatureTileService;
   private kernelService: KernelService;
   private layerManager: LayerManager;
   private imageManager: ImageManager;
+  private commService: CommService;
+  private imageTileService: ImageTileService;
+  private featureTileService: FeatureTileService;
   private geocoderService: GeocoderService;
 
   // Model selection state
@@ -57,25 +51,38 @@ export class ImageViewerWidget extends MainAreaWidget {
   private selectedModelEnabled: boolean = false;
 
   /**
-   * Static Factory Method for the ImageViewerWidget.
+   * Asynchronus Factory Pattern for the ImageViewerWidget.
    *
-   * On creation this widget injects code into a Python Kernel that establishes the server side of a "comm" channel
-   * and sets up tile readers / vector indexes based on the osml-imagery-toolkit. These resources will be accessed
-   * by custom messages sent by layers added to the map.
+   * This widget requires an asynchronus initialization step as part of the construction process. Since
+   * typescript constructors must always be synchronus we have adopted the Asyncronus Factory Pattern for
+   * creation of these instances. This static async function creates the new instance and then initializes it
+   * returning a promise of a fully configured instance.
    *
-   * @param manager Jupyter service manager dependency
-   * @param selectedFileName Path of the selected file on the local file system
+   * @param manager Jupyter service manager
+   * @param selectedFileName Path of the base image on the local file system
    */
-  public static async createForImage(
+  public static async createInstance(
     manager: ServiceManager.IManager,
     selectedFileName: string | null
   ): Promise<ImageViewerWidget> {
     const widget = new ImageViewerWidget(manager);
-    await widget.initialize(selectedFileName);
+    await widget.initialize();
+
+    // If an image was selected open it
+    if (selectedFileName) {
+      await widget.openImage(selectedFileName);
+    }
     return widget;
   }
 
-  public constructor(manager: ServiceManager.IManager) {
+  /**
+   * Private constructor for ImageViewerWidget. This class can not be created directly. Instead use the static
+   * asynchronus factory methods.
+   *
+   * @param manager Jupyter service manager
+   */
+  private constructor(manager: ServiceManager.IManager) {
+    // Initialize the base class with a content area and toolbar
     const content = new Widget();
     const toolbar = new Toolbar();
     super({ content, toolbar });
@@ -83,16 +90,14 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.title.label = 'OSML Image View';
     this.title.closable = true;
 
-    this.manager = manager;
-
-    // Initialize services (will be properly initialized after kernel setup)
+    // Initialize services
+    this.kernelService = new KernelService(manager);
     this.commService = new CommService();
     this.imageTileService = new ImageTileService(this.commService);
     this.featureTileService = new FeatureTileService(this.commService);
-    this.kernelService = new KernelService(this.manager);
+    this.geocoderService = new GeocoderService(this.commService);
     this.layerManager = new LayerManager();
     this.imageManager = new ImageManager();
-    this.geocoderService = new GeocoderService(this.commService);
 
     // Create a new div that will contain the Deck.gl managed content. This div will be the full window in the
     // Jupyter tabbed panel.
@@ -104,29 +109,29 @@ export class ImageViewerWidget extends MainAreaWidget {
     this.content.node.appendChild(this.mapDiv);
   }
 
-  private async initialize(selectedFileName: string | null) {
+  /**
+   * The initialization of this class includes having a user select a Python kernel that will support the backend
+   * operations. Once selected this widget will run code on the kernel that establishes a "comm" channel and sets
+   * up the raster/vector tile readers and caches using the osml-imagery-toolkit. This comm messaging channel is
+   * required by several of the services that contain business logic for this widget.
+   */
+  private async initialize() {
     try {
       logger.info('Initializing ImageViewerWidget services');
 
       // Use KernelService to handle kernel initialization
       await this.kernelService.initialize();
 
-      // Get kernel using accessor method
+      // Ensure the user selected a kernel
       const kernel = this.kernelService.getKernel();
       if (!kernel) {
         throw new Error('Kernel not available after initialization');
       }
 
-      // Initialize CommService with kernel connection
-      this.commService = new CommService(kernel);
-      await this.commService.initialize('osml_comm_target');
+      // Configure the messaging service to connect to the selected kernel
+      await this.commService.initialize(kernel, 'osml_comm_target');
 
-      // Create services with the new CommService
-      this.imageTileService = new ImageTileService(this.commService);
-      this.featureTileService = new FeatureTileService(this.commService);
-      this.geocoderService = new GeocoderService(this.commService);
-
-      logger.info('ImageViewerWidget services initialized successfully');
+      logger.debug('ImageViewerWidget services initialized successfully');
 
       // Connect service signals
       this.layerManager.layersChanged.connect(() => {
@@ -148,12 +153,6 @@ export class ImageViewerWidget extends MainAreaWidget {
         logger.error(`Image load failed: ${errorMessage}`);
       });
 
-      // Once the session is initialized we can ask the user to select an image for display.
-      // This widget is not a general full-earth geographic display so a single image must be
-      // selected as the base layer.
-      if (selectedFileName) {
-        await this.openImage(selectedFileName);
-      }
     } catch (reason) {
       logger.error(`Failed to initialize ImageViewerWidget: ${reason}`);
       console.error(
@@ -185,7 +184,6 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Add to document body for proper modal behavior
     document.body.appendChild(this.featurePropertiesDialog.node);
-    this.featurePropertiesDialogVisible = true;
 
     // Force the widget to render
     this.featurePropertiesDialog.update();
@@ -195,11 +193,10 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Hides the React-based feature properties dialog
    */
   private hideFeaturePropertiesDialog(): void {
-    if (this.featurePropertiesDialog && this.featurePropertiesDialogVisible) {
+    if (this.featurePropertiesDialog) {
       this.featurePropertiesDialog.node.remove();
       this.featurePropertiesDialog.dispose();
       this.featurePropertiesDialog = undefined;
-      this.featurePropertiesDialogVisible = false;
     }
   }
 
@@ -229,7 +226,6 @@ export class ImageViewerWidget extends MainAreaWidget {
 
     // Add to document body for proper modal behavior
     document.body.appendChild(this.locationInfoDialog.node);
-    this.locationInfoDialogVisible = true;
 
     // Force the widget to render with loading state
     this.locationInfoDialog.update();
@@ -243,7 +239,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       );
 
       // Update the dialog with the world coordinates
-      if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+      if (this.locationInfoDialog) {
         this.locationInfoDialog.updateWorldCoordinates(worldCoords);
       }
 
@@ -254,7 +250,7 @@ export class ImageViewerWidget extends MainAreaWidget {
       logger.error(`Failed to convert coordinates: ${error.message}`);
 
       // Update the dialog with the error
-      if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+      if (this.locationInfoDialog) {
         this.locationInfoDialog.updateWorldCoordinates(
           undefined,
           error.message
@@ -267,11 +263,10 @@ export class ImageViewerWidget extends MainAreaWidget {
    * Hides the coordinate info dialog
    */
   private hideCoordinateInfoDialog(): void {
-    if (this.locationInfoDialog && this.locationInfoDialogVisible) {
+    if (this.locationInfoDialog) {
       this.locationInfoDialog.node.remove();
       this.locationInfoDialog.dispose();
       this.locationInfoDialog = undefined;
-      this.locationInfoDialogVisible = false;
     }
   }
 

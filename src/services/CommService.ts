@@ -10,8 +10,9 @@ import { logger } from '../utils';
 export class CommService {
   private comm?: Kernel.IComm;
   private debug: boolean = false;
+  private kernel?: Kernel.IKernelConnection;
 
-  constructor(private kernel?: Kernel.IKernelConnection) {}
+  constructor() {}
 
   /**
    * Enable or disable debug logging for comm messages
@@ -34,8 +35,11 @@ export class CommService {
    * Initialize the comm channel
    */
   public async initialize(
+    kernel: Kernel.IKernelConnection,
     targetName: string = 'osml_comm_target'
   ): Promise<void> {
+    this.kernel = kernel;
+
     if (!this.kernel) {
       const errorMessage = 'Kernel connection not available';
       logger.error(`CommService initialization failed: ${errorMessage}`);

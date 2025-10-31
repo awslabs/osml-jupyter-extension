@@ -94,7 +94,7 @@ async function activate(
 
       // Regenerate the widget if disposed
       if (!widget || widget.isDisposed) {
-        widget = await ImageViewerWidget.createForImage(
+        widget = await ImageViewerWidget.createInstance(
           manager,
           selectedFileName
         );
@@ -165,7 +165,7 @@ async function activate(
 
       // Create the widget if it doesn't exist or is disposed
       if (!widget || widget.isDisposed) {
-        widget = await ImageViewerWidget.createForImage(
+        widget = await ImageViewerWidget.createInstance(
           manager,
           null // No image - widget will handle this in addLayer
         );
