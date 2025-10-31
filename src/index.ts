@@ -14,11 +14,7 @@ import { ILoggerRegistry } from '@jupyterlab/logconsole';
 import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
 import { LOGO_ICON, logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
-import {
-  ModelSelectionToolbarButton,
-  LayerControlToolbarButton,
-  GeocoderToolbarWidget
-} from './components';
+import { LayerControlToolbarButton, GeocoderToolbarWidget } from './components';
 import { Widget } from '@lumino/widgets';
 
 namespace CommandIDs {
@@ -61,18 +57,6 @@ async function activate(
 
   const manager = app.serviceManager;
   let widget: ImageViewerWidget;
-
-  // Register toolbar items if toolbar registry is available
-  if (toolbarRegistry) {
-    // Register the model selection toolbar button factory
-    toolbarRegistry.addFactory<ImageViewerWidget>(
-      'ImageViewer',
-      'modelSelection',
-      (widget: ImageViewerWidget) => {
-        return new ModelSelectionToolbarButton(widget);
-      }
-    );
-  }
 
   app.commands.addCommand(CommandIDs.openWithViewer, {
     label: 'OversightML: Open',
