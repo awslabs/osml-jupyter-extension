@@ -3004,6 +3004,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@jupyterlab/property-inspector@npm:^4.4.0":
+  version: 4.4.10
+  resolution: "@jupyterlab/property-inspector@npm:4.4.10"
+  dependencies:
+    "@jupyterlab/application": ^4.4.10
+    "@jupyterlab/translation": ^4.4.10
+    "@jupyterlab/ui-components": ^4.4.10
+    "@lumino/coreutils": ^2.2.1
+    "@lumino/disposable": ^2.1.4
+    "@lumino/signaling": ^2.1.4
+    "@lumino/widgets": ^2.7.1
+    react: ^18.2.0
+  checksum: 82e1e6a245ded06558bdc15f0dd1631934dd67070fb11b5434786ff14277e2c4a5851ae9d7192b2939e48301decafa14e3288f9e53c3603772ab8a5f827fafea
+  languageName: node
+  linkType: hard
+
 "@jupyterlab/rendermime-interfaces@npm:^3.12.10":
   version: 3.12.10
   resolution: "@jupyterlab/rendermime-interfaces@npm:3.12.10"
@@ -9985,6 +10001,7 @@ __metadata:
     "@jupyterlab/builder": ^4.4.0
     "@jupyterlab/launcher": ^4.4.0
     "@jupyterlab/logconsole": ^4.4.0
+    "@jupyterlab/property-inspector": ^4.4.0
     "@jupyterlab/settingregistry": ^4.4.0
     "@jupyterlab/testutils": ^4.4.0
     "@jupyterlab/ui-components": ^4.4.0

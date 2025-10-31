@@ -3,10 +3,16 @@
 // UI Components
 export * from './ModelSelectionDialog';
 export * from './ModelSelectionToolbarButton';
-export * from './ImageMetadataDialog';
-export * from './ImageMetadataToolbarButton';
 export * from './LayerControlDialog';
 export * from './LayerControlToolbarButton';
-export * from './FeaturePropertiesDialog';
-export * from './LocationInfoDialog';
 export * from './GeocoderToolbarWidget';
+export { default as ImageViewerPropertyInspector } from './ImageViewerPropertyInspector';
+export { default as ImageProperties } from './ImageProperties';
+export { default as CurrentSelectionProperties } from './CurrentSelectionProperties';
+export type {
+  ICurrentSelection,
+  IImageInfo,
+  IImageViewerPropertyInspectorProps
+} from './ImageViewerPropertyInspector';
+export type { IImagePropertiesProps } from './ImageProperties';
+export type { ICurrentSelectionPropertiesProps } from './CurrentSelectionProperties';

@@ -11,11 +11,11 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILoggerRegistry } from '@jupyterlab/logconsole';
+import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
 import { LOGO_ICON, logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
 import {
   ModelSelectionToolbarButton,
-  ImageMetadataToolbarButton,
   LayerControlToolbarButton,
   GeocoderToolbarWidget
 } from './components';
@@ -39,7 +39,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
     ILauncher,
     IFileBrowserFactory,
     IStatusBar,
-    IToolbarWidgetRegistry
+    IToolbarWidgetRegistry,
+    IPropertyInspectorProvider
   ],
   activate: activate
 };
@@ -52,7 +53,8 @@ async function activate(
   launcher: ILauncher | null,
   browser: IFileBrowserFactory | null,
   statusBar: IStatusBar | null,
-  toolbarRegistry: IToolbarWidgetRegistry | null
+  toolbarRegistry: IToolbarWidgetRegistry | null,
+  propertyInspectorProvider: IPropertyInspectorProvider | null
 ): Promise<void> {
   // Note: Logger initialization moved to ImageViewerWidget creation
   // to ensure log console infrastructure is ready
@@ -68,15 +70,6 @@ async function activate(
       'modelSelection',
       (widget: ImageViewerWidget) => {
         return new ModelSelectionToolbarButton(widget);
-      }
-    );
-
-    // Register the image metadata toolbar button factory
-    toolbarRegistry.addFactory<ImageViewerWidget>(
-      'ImageViewer',
-      'imageMetadata',
-      (widget: ImageViewerWidget) => {
-        return new ImageMetadataToolbarButton(widget);
       }
     );
   }
@@ -99,6 +92,11 @@ async function activate(
           selectedFileName
         );
 
+        // Register with property inspector if available
+        if (propertyInspectorProvider) {
+          widget.registerWithPropertyInspector(propertyInspectorProvider);
+        }
+
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
           // Create and add the layer control button
@@ -108,10 +106,6 @@ async function activate(
           // Create and add the model selection button
           //const modelSelectionButton = new ModelSelectionToolbarButton(widget);
           //widget.toolbar.addItem('modelSelection', modelSelectionButton);
-
-          // Create and add the image metadata button
-          const imageMetadataButton = new ImageMetadataToolbarButton(widget);
-          widget.toolbar.addItem('imageMetadata', imageMetadataButton);
 
           // Create and add the geocoder toolbar widget
           const geocoderWidget = new GeocoderToolbarWidget(widget);
@@ -170,15 +164,16 @@ async function activate(
           null // No image - widget will handle this in addLayer
         );
 
+        // Register with property inspector if available
+        if (propertyInspectorProvider) {
+          widget.registerWithPropertyInspector(propertyInspectorProvider);
+        }
+
         // Add toolbar items if toolbar registry is available
         if (toolbarRegistry && widget.toolbar) {
           // Create and add the layer control button
           const layerControlButton = new LayerControlToolbarButton(widget);
           widget.toolbar.addItem('layerControl', layerControlButton);
-
-          // Create and add the image metadata button
-          const imageMetadataButton = new ImageMetadataToolbarButton(widget);
-          widget.toolbar.addItem('imageMetadata', imageMetadataButton);
 
           // Create and add the geocoder toolbar widget
           const geocoderWidget = new GeocoderToolbarWidget(widget);

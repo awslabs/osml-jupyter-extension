@@ -2,10 +2,15 @@
 
 import { ServiceManager } from '@jupyterlab/services';
 import { MainAreaWidget, Toolbar, ISessionContext } from '@jupyterlab/apputils';
+import {
+  IPropertyInspector,
+  IPropertyInspectorProvider
+} from '@jupyterlab/property-inspector';
 
 import { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
+import * as React from 'react';
 
 import { Deck, OrthographicView } from '@deck.gl/core';
 
@@ -20,7 +25,11 @@ import {
   GeocoderService,
   IOverlayLoadResponse
 } from './services';
-import { FeaturePropertiesDialog, LocationInfoDialog } from './components';
+import {
+  ImageViewerPropertyInspector,
+  ICurrentSelection,
+  IImageInfo
+} from './components';
 import { logger } from './utils';
 
 /**
@@ -32,10 +41,6 @@ export class ImageViewerWidget extends MainAreaWidget {
   private imageName?: string;
   private viewportUpdateTimeout?: NodeJS.Timeout;
   private lastViewportUpdate: number = 0;
-
-  // Popup Dialogs
-  private featurePropertiesDialog?: FeaturePropertiesDialog;
-  private locationInfoDialog?: LocationInfoDialog;
 
   // Service instances
   private kernelService: KernelService;
@@ -49,6 +54,11 @@ export class ImageViewerWidget extends MainAreaWidget {
   // Model selection state
   private selectedModel: string = '';
   private selectedModelEnabled: boolean = false;
+
+  // Property Inspector
+  private propertyInspector?: IPropertyInspector;
+  private currentSelection: ICurrentSelection = { type: null };
+  private imageInfo: IImageInfo = {};
 
   /**
    * Asynchronus Factory Pattern for the ImageViewerWidget.
@@ -152,7 +162,6 @@ export class ImageViewerWidget extends MainAreaWidget {
         this.statusSignal.emit(`Error: ${errorMessage}`);
         logger.error(`Image load failed: ${errorMessage}`);
       });
-
     } catch (reason) {
       logger.error(`Failed to initialize ImageViewerWidget: ${reason}`);
       console.error(
@@ -164,135 +173,28 @@ export class ImageViewerWidget extends MainAreaWidget {
   public statusSignal: Signal<any, any> = new Signal<any, any>(this);
 
   /**
-   * Shows the React-based feature properties dialog
-   */
-  private showFeaturePropertiesDialog(feature: any): void {
-    if (!feature) {
-      return;
-    }
-
-    // Hide any existing dialog first
-    this.hideFeaturePropertiesDialog();
-
-    // Create FeaturePropertiesDialog widget directly
-    this.featurePropertiesDialog = new FeaturePropertiesDialog(feature, () =>
-      this.hideFeaturePropertiesDialog()
-    );
-
-    this.featurePropertiesDialog.id = 'feature-properties-dialog';
-    this.featurePropertiesDialog.title.label = 'Feature Properties';
-
-    // Add to document body for proper modal behavior
-    document.body.appendChild(this.featurePropertiesDialog.node);
-
-    // Force the widget to render
-    this.featurePropertiesDialog.update();
-  }
-
-  /**
-   * Hides the React-based feature properties dialog
-   */
-  private hideFeaturePropertiesDialog(): void {
-    if (this.featurePropertiesDialog) {
-      this.featurePropertiesDialog.node.remove();
-      this.featurePropertiesDialog.dispose();
-      this.featurePropertiesDialog = undefined;
-    }
-  }
-
-  /**
-   * Shows the coordinate info dialog with both image and world coordinates
-   */
-  private async showLocationInfoDialog(x: number, y: number): Promise<void> {
-    if (!this.imageName) {
-      logger.error('Cannot show location info: No image loaded');
-      return;
-    }
-
-    // Hide any existing dialogs first
-    this.hideCoordinateInfoDialog();
-    this.hideFeaturePropertiesDialog();
-
-    // Create CoordinateInfoDialog with initial image coordinates
-    this.locationInfoDialog = new LocationInfoDialog(
-      { x, y },
-      undefined,
-      undefined,
-      () => this.hideCoordinateInfoDialog()
-    );
-
-    this.locationInfoDialog.id = 'location-info-dialog';
-    this.locationInfoDialog.title.label = 'Location Information';
-
-    // Add to document body for proper modal behavior
-    document.body.appendChild(this.locationInfoDialog.node);
-
-    // Force the widget to render with loading state
-    this.locationInfoDialog.update();
-
-    // Try to convert image coordinates to world coordinates
-    try {
-      const worldCoords = await this.geocoderService.convertImageToWorld(
-        this.imageName,
-        x,
-        y
-      );
-
-      // Update the dialog with the world coordinates
-      if (this.locationInfoDialog) {
-        this.locationInfoDialog.updateWorldCoordinates(worldCoords);
-      }
-
-      logger.debug(
-        `Coordinate conversion successful: (${x}, ${y}) -> (${worldCoords.latitude}, ${worldCoords.longitude}, ${worldCoords.elevation})`
-      );
-    } catch (error: any) {
-      logger.error(`Failed to convert coordinates: ${error.message}`);
-
-      // Update the dialog with the error
-      if (this.locationInfoDialog) {
-        this.locationInfoDialog.updateWorldCoordinates(
-          undefined,
-          error.message
-        );
-      }
-    }
-  }
-
-  /**
-   * Hides the coordinate info dialog
-   */
-  private hideCoordinateInfoDialog(): void {
-    if (this.locationInfoDialog) {
-      this.locationInfoDialog.node.remove();
-      this.locationInfoDialog.dispose();
-      this.locationInfoDialog = undefined;
-    }
-  }
-
-  /**
-   * Handles click events on the map to show feature properties dialog or coordinate info
+   * Handles click events on the map to update property inspector with selection info
    */
   private handleMapClick(info: any, event: any): boolean {
-    // Deck.gl picking associated an object with the click. Show the
-    // properties dialog for that object.
+    // Deck.gl picking associated an object with the click. Update property inspector
+    // with feature selection for that object.
     if (info.object && info.x !== undefined && info.y !== undefined) {
-      this.showFeaturePropertiesDialog(info.object);
+      // Update property inspector with feature selection
+      this.updatePropertyInspectorSelection('feature', info.object);
       return true; // Mark as handled
     }
 
-    // If click was not associated with an object, show coordinate info
+    // If click was not associated with an object, update property inspector with location info
     // Use coordinate from Deck.gl which gives us the world coordinates in the OrthographicView
     if (!info.object && info.coordinate) {
       const [x, y] = info.coordinate;
-      // Show coordinate info dialog with image coordinates
-      this.showLocationInfoDialog(x, y);
+      // Update property inspector with location selection
+      this.updatePropertyInspectorSelection('location', null, { x, y });
       return true; // Mark as handled
     }
 
-    // Click not handled - hide any existing dialogs
-    this.hideFeaturePropertiesDialog();
-    this.hideCoordinateInfoDialog();
+    // Click not handled - clear property inspector selection
+    this.clearPropertyInspectorSelection();
     return false;
   }
 
@@ -310,6 +212,9 @@ export class ImageViewerWidget extends MainAreaWidget {
       imageMetadata.width,
       imageMetadata.height
     );
+
+    // Load metadata for property inspector
+    this.loadImageMetadataForPropertyInspector(imageMetadata.name);
 
     // Get the initial viewport state from ImageManager
     const initialViewState = this.imageManager.getInitialViewState();
@@ -767,6 +672,139 @@ export class ImageViewerWidget extends MainAreaWidget {
   }
 
   /**
+   * Register this widget with the property inspector provider
+   */
+  public registerWithPropertyInspector(
+    provider: IPropertyInspectorProvider
+  ): void {
+    if (this.propertyInspector) {
+      // Already registered
+      return;
+    }
+
+    try {
+      this.propertyInspector = provider.register(this);
+      this.updatePropertyInspectorContent();
+      logger.info('Successfully registered with property inspector');
+    } catch (error: any) {
+      logger.error(
+        `Failed to register with property inspector: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Update property inspector selection
+   */
+  private updatePropertyInspectorSelection(
+    type: 'location' | 'feature',
+    data?: any,
+    imageCoordinates?: { x: number; y: number }
+  ): void {
+    this.currentSelection = {
+      type,
+      data,
+      imageCoordinates,
+      isLoadingCoordinates: type === 'location'
+    };
+
+    this.updatePropertyInspectorContent();
+
+    // Handle coordinate conversion for location selections
+    if (type === 'location' && imageCoordinates && this.imageName) {
+      this.convertCoordinatesForPropertyInspector(
+        imageCoordinates.x,
+        imageCoordinates.y
+      );
+    }
+  }
+
+  /**
+   * Clear property inspector selection
+   */
+  private clearPropertyInspectorSelection(): void {
+    this.currentSelection = { type: null };
+    this.updatePropertyInspectorContent();
+  }
+
+  /**
+   * Convert coordinates for property inspector
+   */
+  private async convertCoordinatesForPropertyInspector(
+    x: number,
+    y: number
+  ): Promise<void> {
+    if (!this.imageName) {
+      return;
+    }
+
+    try {
+      const worldCoords = await this.geocoderService.convertImageToWorld(
+        this.imageName,
+        x,
+        y
+      );
+      if (this.currentSelection.type === 'location') {
+        this.currentSelection.worldCoordinates = worldCoords;
+        this.currentSelection.isLoadingCoordinates = false;
+        this.updatePropertyInspectorContent();
+      }
+    } catch (error: any) {
+      if (this.currentSelection.type === 'location') {
+        this.currentSelection.coordinateError = error.message;
+        this.currentSelection.isLoadingCoordinates = false;
+        this.updatePropertyInspectorContent();
+      }
+    }
+  }
+
+  /**
+   * Load image metadata for property inspector
+   */
+  private async loadImageMetadataForPropertyInspector(
+    imageName: string
+  ): Promise<void> {
+    this.imageInfo.name = imageName;
+    this.imageInfo.isLoadingMetadata = true;
+    this.updatePropertyInspectorContent();
+
+    try {
+      const response = await this.commService.sendMessage({
+        type: 'IMAGE_METADATA_REQUEST',
+        dataset: imageName
+      });
+
+      if (response.status === 'SUCCESS' && response.metadata) {
+        this.imageInfo.metadata = response.metadata;
+      } else {
+        this.imageInfo.metadataError =
+          response.error || 'Failed to fetch metadata';
+      }
+    } catch (error: any) {
+      this.imageInfo.metadataError = error.message;
+    } finally {
+      this.imageInfo.isLoadingMetadata = false;
+      this.updatePropertyInspectorContent();
+    }
+  }
+
+  /**
+   * Update the property inspector content
+   */
+  private updatePropertyInspectorContent(): void {
+    if (!this.propertyInspector) {
+      return;
+    }
+
+    const content = React.createElement(ImageViewerPropertyInspector, {
+      currentSelection: this.currentSelection,
+      imageInfo: this.imageInfo
+    });
+
+    this.propertyInspector.render(content);
+  }
+
+  /**
    * Implementation expand the super's dispose function to ensure class specific resources are cleaned up.
    */
   dispose(): void {
@@ -794,12 +832,6 @@ export class ImageViewerWidget extends MainAreaWidget {
       console.warn('Exception caught cleaning up service resources');
       console.debug(e);
     }
-
-    // Clean up feature properties dialog
-    this.hideFeaturePropertiesDialog();
-
-    // Clean up coordinate info dialog
-    this.hideCoordinateInfoDialog();
 
     // Clean up DOM
     if (this.mapDiv) {
