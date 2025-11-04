@@ -8,14 +8,6 @@ The extension is currently in **Release Candidate/MVP** phase, with core functio
 
 ## Core Navigation & Interaction
 
-### GeoJump
-
-Navigate directly to specific world coordinates by entering latitude/longitude values. This control will allow users to quickly jump to areas of interest without manual panning and zooming.
-
-### GeoLocate
-
-Click anywhere on satellite imagery to get precise world coordinates using the image's sensor model. This feature will provide accurate geographic positioning that accounts for sensor geometry and terrain effects.
-
 ### Elevation Models
 
 Configure digital elevation models to improve geometric calculations and coordinate transformations. This will enhance the accuracy of coordinate conversions and overlay positioning, particularly important for imagery with significant terrain variation.

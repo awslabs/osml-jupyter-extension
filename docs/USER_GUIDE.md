@@ -61,38 +61,60 @@ The image viewer is built using Deck.gl which provides common navigation control
 
 The viewer is optimized for large satellite imagery files and will load additional detail as you zoom in.
 
-### 4. Viewing Feature Properties
+#### Geographic Navigation with GeoJump
 
-To inspect the properties of overlaid features:
+The toolbar includes a coordinate input tool that enables direct navigation to specific locations:
 
-1. **Right-click** on any feature (point, line, or polygon) in an overlay layer
-2. A **properties dialog** will appear showing all metadata associated with that feature
+![GeoJump coordinate input](images/geojump-toolbar.png)
 
-![Feature properties dialog](images/feature-properties-dialog.png)
+1. **Enter coordinates** in the input field using either:
+   - **Image coordinates**: `x,y` format (e.g., `1024,768`)
+   - **World coordinates**: `latitude,longitude` format (e.g., `40.7128,-74.0060`)
+2. **Press Enter** or click the navigation button to fly to the specified location
+3. The viewer will automatically pan and zoom to center on the requested coordinates
 
-This is particularly useful for examining detection types, confidence scores, or other analytical data embedded in your GeoJSON features. A search bar is available to filter the properties down to items matching a selected key.
+### 4. Using the Property Inspector
 
-### 5. Viewing Image Metadata
+The property inspector in the right sidebar provides comprehensive information about your current selection, layers, and image metadata. This panel is used in the same way the notebook property inspector is used within JupyterLab. It contains three main sections:
 
-To access metadata about the loaded satellite image:  
-![Image metadata dialog](images/image-metadata-tool.png)
+![Property inspector overview](images/property-inspector-overview.png)
 
-1. **Click the metadata tool** in the image viewer toolbar
-2. The **Image Metadata Dialog** will open, displaying metadata unique to each image.
+#### Current Selection Properties
 
-### 6. Managing Layers
+The property inspector displays different information based on what you've selected:
 
-To view and control your overlay layers:  
-![Image metadata dialog](images/layer-control-tool.png)
+**Feature Selection**: When you click on any feature (point, line, or polygon) from an overlay layer, the property inspector shows all metadata associated with that feature, including detection types, confidence scores, or other analytical data embedded in your GeoJSON features.
 
-1. **Click the layers tool** in the image viewer toolbar
-2. The **Layer Control Dialog** will open, allowing you to:
-   - View all active layers
-   - Toggle layer visibility on/off
-   - Remove layers from the display
-   - Add layers published from a notebook to the display (see: Advanced Usage)
+**Location Selection**: When you click on a location on the image (not on a feature), the property inspector displays both image coordinates (pixel position) and world coordinates (latitude/longitude) for that location.
 
-![Layer control dialog](images/layer-control-dialog.png)
+![Current selection properties](images/current-selection-properties.png)
+
+> **⚠️ Coordinate Accuracy Note**: World coordinates are calculated using the image's sensor model without external elevation data. For improved accuracy, future releases will integrate digital elevation models. See [LIMITATIONS.md](LIMITATIONS.md) for details.
+
+#### Image Metadata
+
+The property inspector displays comprehensive metadata about the currently loaded satellite image, including sensor information, acquisition details, and geospatial properties.
+
+![Image metadata panel](images/image-metadata-panel.png)
+
+#### Layer Management
+
+The layer management section allows you to:
+
+- View all active layers
+- Toggle layer visibility on/off
+- Remove layers from the display
+- Add layers published from a notebook to the display (see: Advanced Usage)
+
+![Layer management panel](images/layer-management-panel.png)
+
+### 5. Viewing Logging Information
+
+Extension logging information is available through JupyterLab's log console for troubleshooting and system monitoring.
+
+**To view logs**: Open `View` → `Show Log Console` from the main menu
+
+The logs contain image loading status, layer management events, coordinate transformations, and error messages.
 
 ## Advanced Usage
 

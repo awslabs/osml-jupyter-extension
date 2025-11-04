@@ -40,6 +40,12 @@ This document outlines current limitations, known issues, and important consider
 
 ## Functional Limitations
 
+### World Coordinate Accuracy
+
+- **Current Implementation**: World coordinates are calculated using the image's sensor model without external elevation data
+- **Impact**: Coordinate accuracy may be reduced, particularly in areas with significant terrain variation
+- **Future Enhancement**: Integration with digital elevation models is planned to improve coordinate transformation accuracy
+
 ### Format Support
 
 - **Current Support**: NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
