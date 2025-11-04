@@ -3,6 +3,7 @@
 # Image processors: Handle image loading, tiles, metadata, statistics, and unloading
 
 import base64
+import xml.etree.ElementTree as ET
 
 class ImageLoadProcessor(BaseMessageProcessor):
     """Process IMAGE_LOAD_REQUEST messages"""
@@ -96,6 +97,74 @@ class ImageTileProcessor(BaseMessageProcessor):
 class ImageMetadataProcessor(BaseMessageProcessor):
     """Process IMAGE_METADATA_REQUEST messages"""
     
+    def _parse_xml_tre(self, xml_string):
+        """Parse XML TRE data into structured JSON format"""
+        tres = {}
+        
+        try:
+            if not xml_string:
+                return tres
+            
+            # Handle case where xml_string might be a list (from the example)
+            if isinstance(xml_string, list) and len(xml_string) > 0:
+                xml_content = xml_string[0]
+            else:
+                xml_content = xml_string
+            
+            if not xml_content or not str(xml_content).strip():
+                return tres
+            
+            root = ET.fromstring(str(xml_content))
+            
+            # Process each TRE
+            for tre_elem in root.findall('tre'):
+                tre_name = tre_elem.get('name')
+                tre_location = tre_elem.get('location')
+                
+                if not tre_name:
+                    continue
+                
+                tre_data = {}
+                if tre_location:
+                    tre_data['location'] = tre_location
+                
+                # Process regular fields
+                for field_elem in tre_elem.findall('field'):
+                    field_name = field_elem.get('name')
+                    field_value = field_elem.get('value')
+                    if field_name and field_value is not None:
+                        tre_data[field_name] = field_value
+                
+                # Process repeated fields
+                for repeated_elem in tre_elem.findall('repeated'):
+                    repeated_name = repeated_elem.get('name')
+                    if not repeated_name:
+                        continue
+                    
+                    # Process each group within the repeated section
+                    for group_elem in repeated_elem.findall('group'):
+                        group_index = group_elem.get('index')
+                        if group_index is None:
+                            continue
+                        
+                        # Process fields within this group
+                        for field_elem in group_elem.findall('field'):
+                            field_name = field_elem.get('name')
+                            field_value = field_elem.get('value')
+                            if field_name and field_value is not None:
+                                # Create unique field name with index
+                                indexed_field_name = f"{field_name}_{group_index}"
+                                tre_data[indexed_field_name] = field_value
+                
+                tres[tre_name] = tre_data
+        
+        except ET.ParseError as e:
+            self.logger.warning(f"Failed to parse XML TRE data: {e}")
+        except Exception as e:
+            self.logger.warning(f"Unexpected error parsing TRE data: {e}")
+        
+        return tres
+    
     @handle_errors_enhanced('IMAGE_METADATA_RESPONSE', 'image_metadata')
     def process(self, data, comm):
         # Validate request
@@ -129,53 +198,42 @@ class ImageMetadataProcessor(BaseMessageProcessor):
         comm.send(response)
     
     def _extract_metadata(self, image_factory):
-        """Extract metadata from image factory"""
+        """Extract enhanced metadata from image factory"""
         ds = image_factory.raster_dataset
+        metadata = {}
         
-        # Get basic raster information
-        metadata = {
-            'width': ds.RasterXSize,
-            'height': ds.RasterYSize,
-            'bands': ds.RasterCount,
-            'data_type': ds.GetRasterBand(1).DataType if ds.RasterCount > 0 else None,
-            'projection': ds.GetProjection(),
-            'geotransform': ds.GetGeoTransform(),
-        }
+        # Extract standard GDAL metadata directly into root
+        try:
+            gdal_metadata = ds.GetMetadata()
+            if gdal_metadata:
+                metadata.update(gdal_metadata)
+                self.logger.debug(f"Extracted {len(gdal_metadata)} GDAL metadata fields")
+        except Exception as e:
+            self.logger.warning(f"Failed to extract GDAL metadata: {e}")
         
-        # Get overview information
-        if ds.RasterCount > 0:
-            band = ds.GetRasterBand(1)
-            metadata['overview_count'] = band.GetOverviewCount()
-            
-            # Get overview dimensions
-            overviews = []
-            for i in range(band.GetOverviewCount()):
-                overview = band.GetOverview(i)
-                overviews.append({
-                    'width': overview.XSize,
-                    'height': overview.YSize
-                })
-            metadata['overviews'] = overviews
+        # Extract and parse TRE metadata
+        try:
+            tre_xml = ds.GetMetadata("xml:TRE")
+            if tre_xml:
+                tres = self._parse_xml_tre(tre_xml)
+                if tres:
+                    # Remove duplicate TRE fields from GDAL metadata to avoid duplication
+                    duplicates_removed = 0
+                    for tre_name, tre_data in tres.items():
+                        for field_name, field_value in tre_data.items():
+                            if field_name == 'location':  # Skip location attribute
+                                continue
+                            # Construct flat name: "NITF_" + <tre name> + "_" + <field name>
+                            flat_key = f"NITF_{tre_name}_{field_name}"
+                            if flat_key in metadata:
+                                del metadata[flat_key]
+                                duplicates_removed += 1
+                    
+                    metadata["TRES"] = tres
+                    self.logger.debug(f"Extracted {len(tres)} TRE sections, removed {duplicates_removed} duplicate fields")
+        except Exception as e:
+            self.logger.warning(f"Failed to extract TRE metadata: {e}")
         
-        # Get driver information
-        driver = ds.GetDriver()
-        if driver:
-            metadata['driver'] = driver.GetDescription()
-            metadata['format'] = driver.ShortName
-        
-        # Get file size if available
-        file_list = ds.GetFileList()
-        if file_list:
-            metadata['file_list'] = file_list
-        
-        # Get coordinate system info
-        spatial_ref = ds.GetSpatialRef()
-        if spatial_ref:
-            metadata['coordinate_system'] = {
-                'authority_name': spatial_ref.GetAuthorityName(None),
-                'authority_code': spatial_ref.GetAuthorityCode(None),
-                'proj4': spatial_ref.ExportToProj4()
-            }
         
         return metadata
 
