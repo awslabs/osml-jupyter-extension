@@ -6,6 +6,7 @@ import { IStatusBar } from '@jupyterlab/statusbar';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILoggerRegistry } from '@jupyterlab/logconsole';
 import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
+import { Contents } from '@jupyterlab/services';
 import { logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
 import { LayerControlToolbarButton, GeocoderToolbarWidget } from './components';
@@ -171,9 +172,33 @@ export abstract class AbstractCommand {
   }
 
   /**
+   * Helper method to get selected files from the file browser
+   */
+  protected getSelectedFiles(): Contents.IModel[] {
+    const widget = this.browser?.tracker.currentWidget;
+    if (!widget) {
+      return [];
+    }
+    return Array.from(widget.selectedItems());
+  }
+
+  /**
+   * Public method to check if this command should be visible based on selected files
+   */
+  public isVisible(): boolean {
+    const selectedFiles = this.getSelectedFiles();
+    return this.checkVisibility(selectedFiles);
+  }
+
+  /**
    * Abstract method that subclasses must implement for their specific logic
    */
   protected abstract executeCommandLogic(
     selectedFileName: string | null
   ): Promise<void>;
+
+  /**
+   * Abstract method that subclasses must implement to define visibility rules
+   */
+  protected abstract checkVisibility(selectedFiles: Contents.IModel[]): boolean;
 }

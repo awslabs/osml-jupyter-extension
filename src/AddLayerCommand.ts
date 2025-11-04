@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { AbstractCommand } from './AbstractCommand';
+import { Contents } from '@jupyterlab/services';
 import { logger } from './utils';
 
 /**
@@ -79,5 +80,20 @@ export class AddLayerCommand extends AbstractCommand {
       );
       return;
     }
+  }
+
+  /**
+   * Check if this command should be visible based on selected files
+   * Only show for GeoJSON files with extension: .geojson
+   */
+  protected checkVisibility(selectedFiles: Contents.IModel[]): boolean {
+    if (selectedFiles.length === 0) {
+      return false;
+    }
+
+    return selectedFiles.some(file => {
+      const fileName = file.name.toLowerCase();
+      return fileName.endsWith('.geojson');
+    });
   }
 }

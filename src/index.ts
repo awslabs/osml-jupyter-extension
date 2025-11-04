@@ -21,6 +21,7 @@ namespace CommandIDs {
   export const openWithViewer = 'osml-jupyter-extension:openWithViewer';
   export const addLayer = 'osml-jupyter-extension:addLayer';
 }
+
 /**
  * Initialization data for the osml-jupyter-extension extension.
  */
@@ -87,13 +88,15 @@ async function activate(
   app.commands.addCommand(CommandIDs.openWithViewer, {
     label: 'OversightML: Open',
     icon: LOGO_ICON,
-    execute: () => openImageCommand.execute()
+    execute: () => openImageCommand.execute(),
+    isVisible: () => openImageCommand.isVisible()
   });
 
   app.commands.addCommand(CommandIDs.addLayer, {
     label: 'OversightML: Add Layer',
     icon: LOGO_ICON,
-    execute: () => addLayerCommand.execute()
+    execute: () => addLayerCommand.execute(),
+    isVisible: () => addLayerCommand.isVisible()
   });
 
   app.contextMenu.addItem({

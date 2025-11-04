@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates.
 
 import { AbstractCommand } from './AbstractCommand';
+import { Contents } from '@jupyterlab/services';
 import { logger } from './utils';
 
 /**
@@ -41,5 +42,22 @@ export class OpenImageCommand extends AbstractCommand {
         );
       }
     }
+  }
+
+  /**
+   * Check if this command should be visible based on selected files
+   * Only show for image files with extensions: .ntf, .nitf, .tiff, .tif
+   */
+  protected checkVisibility(selectedFiles: Contents.IModel[]): boolean {
+    if (selectedFiles.length === 0) {
+      return false;
+    }
+
+    const imageExtensions = ['.ntf', '.nitf', '.tiff', '.tif'];
+
+    return selectedFiles.some(file => {
+      const fileName = file.name.toLowerCase();
+      return imageExtensions.some(ext => fileName.endsWith(ext));
+    });
   }
 }
