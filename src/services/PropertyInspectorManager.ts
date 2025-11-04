@@ -6,7 +6,13 @@ import {
 } from '@jupyterlab/property-inspector';
 import * as React from 'react';
 import { ImageViewerPropertyInspector } from '../components';
-import { ISelectionChangedArgs, IImageInfo, ICurrentSelection } from '../types';
+import {
+  ISelectionChangedArgs,
+  IImageInfo,
+  ICurrentSelection,
+  ILayerControlActions
+} from '../types';
+import { LayerManager, FeatureTileService } from './index';
 import { logger } from '../utils';
 
 /**
@@ -16,6 +22,29 @@ export class PropertyInspectorManager {
   private propertyInspector?: IPropertyInspector;
   private currentSelection: ICurrentSelection = { type: null };
   private imageInfo: IImageInfo = {};
+  private layerManager?: LayerManager;
+  private featureTileService?: FeatureTileService;
+  private getCurrentImageName?: () => string | undefined;
+
+  /**
+   * Set layer dependencies needed for layer control functionality
+   */
+  public setLayerDependencies(
+    layerManager: LayerManager,
+    featureTileService: FeatureTileService,
+    getCurrentImageName: () => string | undefined
+  ): void {
+    this.layerManager = layerManager;
+    this.featureTileService = featureTileService;
+    this.getCurrentImageName = getCurrentImageName;
+
+    // Connect to layer changes to update property inspector
+    if (this.layerManager) {
+      this.layerManager.layersChanged.connect(() => {
+        this.updatePropertyInspectorContent();
+      });
+    }
+  }
 
   /**
    * Register with the property inspector provider
@@ -74,6 +103,61 @@ export class PropertyInspectorManager {
   }
 
   /**
+   * Create layer actions object
+   */
+  private createLayerActions(): ILayerControlActions {
+    return {
+      toggleVisibility: (layerId: string) => {
+        if (!this.layerManager) {
+          return;
+        }
+
+        const currentLayers = this.layerManager.getLayerInfo();
+        const layer = currentLayers.find(l => l.id === layerId);
+        const newVisibility = layer ? !layer.visible : true;
+        this.layerManager.setLayerVisibility(layerId, newVisibility);
+      },
+      updateColor: (
+        layerId: string,
+        color: [number, number, number, number]
+      ) => {
+        if (!this.layerManager) {
+          return;
+        }
+        this.layerManager.setLayerColor(layerId, color);
+      },
+      deleteLayer: (layerId: string) => {
+        if (!this.layerManager) {
+          return;
+        }
+        this.layerManager.deleteLayer(layerId);
+      },
+      addNamedDataset: (datasetName: string) => {
+        if (
+          !this.layerManager ||
+          !this.featureTileService ||
+          !this.getCurrentImageName
+        ) {
+          return;
+        }
+
+        const imageName = this.getCurrentImageName();
+        if (!datasetName || !imageName) {
+          console.warn('Cannot add named dataset: Missing required parameters');
+          return;
+        }
+
+        const getFeatureTileData =
+          this.featureTileService.createFeatureDataFunction(
+            imageName,
+            datasetName
+          );
+        this.layerManager.addFeatureLayer(datasetName, getFeatureTileData);
+      }
+    };
+  }
+
+  /**
    * Update the property inspector content
    */
   private updatePropertyInspectorContent(): void {
@@ -81,9 +165,15 @@ export class PropertyInspectorManager {
       return;
     }
 
+    // Get current layers or empty array if layerManager not available
+    const layers = this.layerManager ? this.layerManager.getLayerInfo() : [];
+    const layerActions = this.createLayerActions();
+
     const content = React.createElement(ImageViewerPropertyInspector, {
       currentSelection: this.currentSelection,
-      imageInfo: this.imageInfo
+      imageInfo: this.imageInfo,
+      layers: layers,
+      layerActions: layerActions
     });
 
     this.propertyInspector.render(content);

@@ -9,7 +9,7 @@ import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
 import { Contents } from '@jupyterlab/services';
 import { logger } from './utils';
 import { ImageViewerWidget } from './ImageViewerWidget';
-import { LayerControlToolbarButton, GeocoderToolbarWidget } from './components';
+import { GeocoderToolbarWidget } from './components';
 import { ServiceContainer } from './services';
 import { Widget } from '@lumino/widgets';
 
@@ -100,25 +100,8 @@ export abstract class AbstractCommand {
     if (
       this.toolbarRegistry &&
       this.sharedState.widget &&
-      this.sharedState.widget.toolbar &&
-      this.sharedState.serviceContainer
+      this.sharedState.widget.toolbar
     ) {
-      const services = this.sharedState.serviceContainer.getServices();
-
-      // Create and add the layer control button with proper service injection
-      const layerControlButton = new LayerControlToolbarButton(
-        services.layerManager,
-        services.featureTileService,
-        () => {
-          const currentImage = services.imageManager.getCurrentImage();
-          return currentImage ? currentImage.name : undefined;
-        }
-      );
-      this.sharedState.widget.toolbar.addItem(
-        'layerControl',
-        layerControlButton
-      );
-
       // Create and add the geocoder toolbar widget
       const geocoderWidget = new GeocoderToolbarWidget(this.sharedState.widget);
       this.sharedState.widget.toolbar.addItem('geocoder', geocoderWidget);

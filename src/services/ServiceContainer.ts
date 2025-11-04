@@ -110,6 +110,16 @@ export class ServiceContainer {
       'propertyInspectorManager'
     );
     const imageManager = this.getService<ImageManager>('imageManager');
+    const layerManager = this.getService<LayerManager>('layerManager');
+    const featureTileService =
+      this.getService<FeatureTileService>('featureTileService');
+
+    // Set layer dependencies for property inspector manager
+    propertyInspectorManager.setLayerDependencies(
+      layerManager,
+      featureTileService,
+      () => imageManager.getCurrentImageName() || undefined
+    );
 
     // Register with property inspector
     propertyInspectorManager.register(propertyInspectorProvider, widget);
