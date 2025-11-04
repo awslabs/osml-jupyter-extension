@@ -29,8 +29,8 @@ This extension is designed for **data scientists and engineers building tools fo
 To view satellite imagery in the extension:
 
 1. **Navigate to your image file** in the JupyterLab file browser
-2. **Right-click** on a supported image file (GeoTIFF, NITF, SICD, SIDD)
-3. **Select "OversightML: Open"** from the context menu
+2. **Right-click** on a supported image file with extensions: `.ntf`, `.nitf`, `.tiff`, or `.tif`
+3. **Select "OversightML: Open"** from the context menu (this option only appears for supported image files)
 4. **Choose the kernel** that has osml-imagery-toolkit installed (typically `osml-kernel`)
 
 ![Opening an image with context menu](images/open-image-context-menu.png)
@@ -44,8 +44,8 @@ The image viewer will open in a new tab, and the image will begin loading. You'l
 To add GeoJSON feature overlays to your image:
 
 1. **Ensure an image is already open** in the viewer (this is required before adding layers)
-2. **Right-click** on a GeoJSON file in the file browser
-3. **Select "OversightML: Add Layer"** from the context menu
+2. **Right-click** on a GeoJSON file (`.geojson` extension) in the file browser
+3. **Select "OversightML: Add Layer"** from the context menu (this option only appears for `.geojson` files)
 
 ![Adding a layer with context menu](images/add-layer-context-menu.png)
 
