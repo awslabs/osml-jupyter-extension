@@ -5,10 +5,14 @@ import ImageProperties, { IImageInfo } from './ImageProperties';
 import CurrentSelectionProperties, {
   ICurrentSelection
 } from './CurrentSelectionProperties';
+import LayerControlPanel from './LayerControlPanel';
+import { ILayerInfo, ILayerControlActions } from '../types';
 
 interface IImageViewerPropertyInspectorProps {
   currentSelection: ICurrentSelection;
   imageInfo: IImageInfo;
+  layers: ILayerInfo[];
+  layerActions: ILayerControlActions;
 }
 
 /**
@@ -80,7 +84,9 @@ const ExpandableSection: FC<{
  */
 const ImageViewerPropertyInspector: FC<IImageViewerPropertyInspectorProps> = ({
   currentSelection,
-  imageInfo
+  imageInfo,
+  layers,
+  layerActions
 }) => {
   return (
     <div
@@ -112,6 +118,11 @@ const ImageViewerPropertyInspector: FC<IImageViewerPropertyInspectorProps> = ({
       {/* Current Selection Section */}
       <ExpandableSection title="Current Selection" defaultExpanded={true}>
         <CurrentSelectionProperties selection={currentSelection} />
+      </ExpandableSection>
+
+      {/* Layers Section */}
+      <ExpandableSection title="Layers" defaultExpanded={true}>
+        <LayerControlPanel layers={layers} actions={layerActions} />
       </ExpandableSection>
 
       {/* Image Properties Section */}
