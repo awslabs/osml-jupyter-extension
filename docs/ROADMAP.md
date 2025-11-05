@@ -12,6 +12,11 @@ The extension is currently in **Release Candidate/MVP** phase, with core functio
 
 Configure digital elevation models to improve geometric calculations and coordinate transformations. This will enhance the accuracy of coordinate conversions and overlay positioning, particularly important for imagery with significant terrain variation.
 
+### Image Rotation
+
+Provide the ability to rotate the base image and all overlaid layers. Includes adding support for common rotations
+applied to georeferenced satellite imagery such as up-is-up, north-is-up, and shadows-down.
+
 ## Image Analysis & Processing
 
 ### Chipping
@@ -48,7 +53,7 @@ Display and interact with machine learning model outputs, including bounding box
 
 ### Editing Overlays
 
-Draw and edit geometric features directly on imagery, including points, lines, and polygons. This capability will support annotation workflows and ground truth creation for machine learning applications.
+Draw and edit geometric features directly on imagery, including points, lines, boxes, and polygons. This capability will support annotation workflows and training data updates for machine learning applications.
 
 ### Enhanced Layer Management
 

@@ -58,8 +58,7 @@
         "test:python:integration": "python -m pytest tests/python/ -v -m integration",
         "test:all": "jlpm test:typescript && jlpm test:python",
         "watch": "run-p watch:src watch:labextension",
-        "watch:src": "run-p \"tsc -w --sourceMap\" \"jlpm watch:kernel\"",
-        "watch:kernel": "chokidar \"src/kernel/[0-9][0-9]_*.py\" -c \"jlpm concat:kernel\"",
+        "watch:src": "tsc -w --sourceMap",
         "watch:labextension": "jupyter labextension watch ."
     },
     "dependencies": {
@@ -106,7 +105,7 @@
         "stylelint-config-standard": "^34.0.0",
         "stylelint-csstree-validator": "^3.0.0",
         "stylelint-prettier": "^4.0.0",
-        "typescript": "~5.0.2",
+        "typescript": "^5.9.3",
         "yjs": "^13.5.0"
     },
     "sideEffects": [
