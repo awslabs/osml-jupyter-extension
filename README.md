@@ -4,7 +4,8 @@
 
 A JupyterLab extension that provides interactive satellite imagery visualization and analysis capabilities using the OversightML (OSML) toolkit. This extension enables data scientists, researchers, and engineers to work with satellite imagery directly within the Jupyter Notebook ecosystem without switching to external GIS tools.
 
-> 🚧 **Early Release** - This extension is actively evolving. See [ROADMAP](docs/ROADMAP.md) for planned features and [LIMITATIONS](docs/LIMITATIONS.md) for current constraints.
+> 🚧 **Early Release** 🚧  
+> This extension is actively evolving. See [ROADMAP](docs/ROADMAP.md) for planned features and [LIMITATIONS](docs/LIMITATIONS.md) for current constraints.
 
 ## Key Features
 
@@ -16,8 +17,8 @@ robust sensor models to correctly overlay features. It provides:
 - **Multi-format Support**: Native support for NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
 - **Feature Overlays**: Overlay of geospatial features using either world or image coordinates
 - **Metadata Access**: View and explore image metadata and feature properties
-- **Seamless Integration**: Right-click context menu integration with JupyterLab file browser
-- **OSML Ecosystem**: Built on the OversightML Imagery Toolkit for additional satellite image processing
+- **Seamless JupyterLab Integration**: Reuse many of the common JupyterLab extension points to maintain a consistent look and feel
+- **OversightML Ecosystem**: Built on the OversightML Imagery Toolkit for additional satellite image processing
 
 ![Image With Overlays](docs/images/image-viewer-and-open-menu.png)
 
@@ -77,11 +78,13 @@ See the [USER_GUIDE](./docs/USER_GUIDE.md) for more information.
 
 ## Development
 
-A summary of the extension's architecture can be found in [ARCHITECTURE_OVERVIEW](./docs/ARCHITECTURE_OVERVIEW.md).
+A summary of the extension's architecture and key design decisions can be found in [ARCHITECTURE_OVERVIEW](./docs/ARCHITECTURE_OVERVIEW.md).
 
 ### Development Install
 
-For development work, clone the repository and set up the development environment:
+For development work, clone the repository and set up the development environment. The `jlpm` command invokes the JupyterLab-provided,
+locked version of the yarn package manager. This project was setup following the conventions described in the
+[JupyterLab Develop Extensions](https://jupyterlab.readthedocs.io/en/stable/extension/extension_dev.html) documentation.
 
 ```bash
 # Create development conda environment
@@ -99,28 +102,59 @@ jupyter labextension develop . --overwrite
 
 ### Development Workflow
 
+Iterative development of the frontend using a local jupyter server can be setup by running two terminals. In
+one the `jlpm watch` command can be run to monitor the source code for changes and rebuild as needed. In the
+second a local copy of JupyterLab will be started to host the extension. You will need to refresh your browser
+window to see changes after they are built.
+
+> ⚠️ **IMPORTANT** ⚠️  
+> This automatic recomplilation does not monitor changes to the kernel code (src/kernel).
+> If the backend is changed run a regular `jlpm build` to ensure those changes are packaged and ready for the
+> next refresh.
+
 ```bash
-# Watch for changes and auto-rebuild
+# Terminal 1: Watch for changes and auto-rebuild
 jlpm watch
 
-# Run JupyterLab in another terminal
+# Terminal 2: Run JupyterLab
 jupyter lab
 ```
 
 ### Testing
 
+Automated tests for the frontend and backend code can be executed with the commands shown below.
+
 ```bash
-# Run TypeScript tests
+# Run TypeScript tests for the frontend application
 jlpm test:typescript
 
-# Run Python tests
+# Run Python tests for the backend kernel code
 jlpm test:python
+```
+
+### Style Checks
+
+Automated style checks / envforcement are provided by prettier and eslint.
+
+```bash
+# Check for style errors but do not make any updates
+jlpm run lint:check
+
+# Run style checks and fix simple issues
+jlpm run lint
 ```
 
 ### Building a Distributable Package
 
+JupyterLab prebuilt extensions are distributed as a pip bundle that can be loaded into JupyterLab without rebuilding JupyterLab. The build and
+hatchling configuration follows the JupyterLab extension template used to initialize this project. When executed the following commands will
+produce distributions in the `dist/` directory.
+
 ```bash
+# Rebuild the source and ensure that all the kernel code is ready for packaging
 jlpm build
+
+# Build the distribution package
 python3 -m build
 ```
 

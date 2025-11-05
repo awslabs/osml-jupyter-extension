@@ -53,13 +53,16 @@ The overlay will be added to your current image viewer. You can add multiple lay
 
 ### 3. Navigating the Image
 
-The image viewer is built using Deck.gl which provides common navigation controls:
+The image viewer is built using Deck.gl which provides basic navigation controls:
 
 - **Pan**: Click and drag anywhere on the image to move around
 - **Zoom**: Use your mouse wheel to zoom in and out
-- **Reset View**: Use the zoom controls in the toolbar to reset to full extent
 
-The viewer is optimized for large satellite imagery files and will load additional detail as you zoom in.
+The viewer is optimized for large satellite imagery files and will load tiles of different resolution as
+you change zoom levels.
+
+Note that there currently is not any way to rotate the view. This feature is being considered for a
+future release.
 
 #### Geographic Navigation with GeoJump
 

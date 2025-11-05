@@ -1,3 +1,8 @@
+> ⚠️ **IMPORTANT** ⚠️  
+> The intent is to automate releases of this project through the `.github/workflows/release.yml` GitHub action.
+> This documentation is boilerplate generated as part of the templated initialization of this repository. It is
+> being preserved for information only until we finalize the automated release process.
+
 # Making a new release of osml_jupyter_extension
 
 The extension can be published to `PyPI` and `npm` manually or using the [Jupyter Releaser](https://github.com/jupyter-server/jupyter_releaser).
