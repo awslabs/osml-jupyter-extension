@@ -122,3 +122,8 @@ class BaseMessageProcessor:
         missing = [field for field in required_fields if field not in data]
         if missing:
             raise ValueError(f"Missing required fields: {missing}")
+        
+        for key in ("dataset", "imageName", "overlayName"):
+            if isinstance(data.get(key), str):
+                data[key] = data[key].removeprefix("RTC:")
+
