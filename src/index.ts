@@ -99,6 +99,12 @@ async function activate(
     isVisible: () => addLayerCommand.isVisible()
   });
 
+  console.log('Context Menu Children');
+  for (const child in app.contextMenu.menu.children) {
+    console.log(child);
+  }
+  console.log('FINISHED: ContextMenu Children');
+
   app.contextMenu.addItem({
     command: CommandIDs.openWithViewer,
     selector: '.jp-DirListing-item[data-isdir="false"]',
