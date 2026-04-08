@@ -29,14 +29,7 @@ that has GDAL, Proj, and the osml-imagery-toolkit installed.
 
 ### JupyterLab Extension Installation from PyPI
 
-The extension can either be installed from a package distributed on PyPi or from a distribution built from source.
-
-```bash
-pip install osml-jupyter-extension
-```
-
-If building from source follow the instructions in the development install section to setup and build the distribution.
-Once the distribution is available it can be installed in a jupyter lab environment of your choosing.
+The extension can be installed from source. Follow the instructions in the development install section to setup and build the distribution. Once the distribution is available it can be installed in a jupyter lab environment of your choosing.
 
 ```bash
 pip install dist/osml_jupyter_extension-0.1.0-py3-none-any.whl
