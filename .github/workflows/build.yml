@@ -9,6 +9,52 @@ permissions:
   contents: read
 
 jobs:
+  fix-lockfile:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      lockfile-updated: ${{ steps.commit.outputs.lockfile-updated }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: "0"
+          lfs: "true"
+
+      - name: JupyterLab Base Setup
+        uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+
+      - name: Install Dependencies
+        run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+
+      - name: Regenerate lockfile
+        run: jlpm install --mode update-lockfile
+
+      - name: Commit updated lockfile
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add yarn.lock
+          if git diff --cached --quiet; then
+            echo "lockfile-updated=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: update yarn.lock for dependabot"
+            git push
+            echo "lockfile-updated=true" >> "$GITHUB_OUTPUT"
+          fi
+
   jlpm:
+    needs: [fix-lockfile]
+    # Run if fix-lockfile was skipped (non-dependabot PR) or if it ran
+    # but didn't push a new commit. Skip when a lockfile commit was pushed
+    # since that push will re-trigger this workflow with the correct lockfile.
+    if: >-
+      always()
+      && !failure()
+      && !cancelled()
+      && needs.fix-lockfile.outputs.lockfile-updated != 'true'
     uses: ./.github/workflows/jlpm.yml
     secrets: inherit
