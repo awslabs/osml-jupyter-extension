@@ -130,3 +130,6 @@ dmypy.json
 
 # Yarn cache
 .yarn/
+
+# npm lockfile (this project uses Yarn Berry)
+package-lock.json
