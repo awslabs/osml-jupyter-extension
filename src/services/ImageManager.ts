@@ -41,6 +41,7 @@ export class ImageManager {
   private currentImage: IImageMetadata | null = null;
   private imageLayer: TileLayer | null = null;
   private currentGetTileData: TileDataFunction | null = null;
+  private currentNumLevels: number = 1;
   private tileSize: number = 512;
 
   // Signal emitted when a new image is loaded or cleared, now with rich metadata
@@ -82,9 +83,11 @@ export class ImageManager {
 
       const imageWidth = imageLoadResponse.width;
       const imageHeight = imageLoadResponse.height;
+      const numLevels = imageLoadResponse.numLevels ?? 1;
+      this.currentNumLevels = numLevels;
 
       logger.debug(
-        `ImageManager loaded image metadata: ${imageName} (${imageWidth}x${imageHeight})`
+        `ImageManager loaded image metadata: ${imageName} (${imageWidth}x${imageHeight}, ${numLevels} pyramid levels)`
       );
 
       // Create image metadata
@@ -108,8 +111,9 @@ export class ImageManager {
       this.currentImage = imageMetadata;
       this.currentGetTileData = getTileData;
 
-      // Create the image layer with the tile data function
-      this.createImageLayer(imageName, getTileData);
+      // Create the image layer with zoom constrained by pyramid levels
+      const minZoom = numLevels > 1 ? -(numLevels - 1) : 0;
+      this.createImageLayer(imageName, getTileData, minZoom);
 
       logger.info(`ImageManager successfully loaded image: ${imageName}`);
 
@@ -128,14 +132,15 @@ export class ImageManager {
    */
   private createImageLayer(
     imageName: string,
-    getTileData: TileDataFunction
+    getTileData: TileDataFunction,
+    minZoom: number = -10
   ): void {
     this.imageLayer = new TileLayer({
       id: `image-${imageName}`,
       data: [], // Required by TileLayer but not used since we provide getTileData
       tileSize: this.tileSize,
-      minZoom: -10,
-      maxZoom: 10,
+      minZoom,
+      maxZoom: 2,
       maxCacheSize: 100,
       maxCacheByteSize: 50 * 1024 * 1024, // 50MB cache
       refinementStrategy: 'best-available',
@@ -299,9 +304,9 @@ export class ImageManager {
 
     return {
       target: [centerX, centerY, 0],
-      zoom: 0, // Start at full resolution (zoom level 0)
-      minZoom: -10,
-      maxZoom: 10
+      zoom: 0,
+      minZoom: this.currentNumLevels > 1 ? -(this.currentNumLevels - 1) : 0,
+      maxZoom: 2
     };
   }
 
@@ -314,7 +319,13 @@ export class ImageManager {
 
       // Recreate image layer if image is loaded
       if (this.currentImage && this.currentGetTileData) {
-        this.createImageLayer(this.currentImage.name, this.currentGetTileData);
+        const minZoom =
+          this.currentNumLevels > 1 ? -(this.currentNumLevels - 1) : 0;
+        this.createImageLayer(
+          this.currentImage.name,
+          this.currentGetTileData,
+          minZoom
+        );
       }
     }
   }

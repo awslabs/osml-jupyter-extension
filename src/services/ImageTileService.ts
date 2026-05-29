@@ -17,6 +17,7 @@ export interface IImageLoadResponse {
   status: string;
   width?: number;
   height?: number;
+  numLevels?: number;
   error?: string;
 }
 
@@ -78,7 +79,8 @@ export class ImageTileService {
         success: true,
         status: response.status,
         width: response.width,
-        height: response.height
+        height: response.height,
+        numLevels: response.numLevels
       };
     } catch (error: any) {
       logger.error(
@@ -185,8 +187,7 @@ export class ImageTileService {
       const base64Data = response.img;
       if (!base64Data) {
         const errorMessage = `No image data received for tile ${tileKey}`;
-        logger.error(`ImageTileService tile load failed: ${errorMessage}`);
-        console.error(errorMessage);
+        logger.debug(`ImageTileService tile load failed: ${errorMessage}`);
         return null;
       }
 

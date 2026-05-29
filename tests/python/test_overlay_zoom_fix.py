@@ -1,231 +1,112 @@
 import pytest
-import sys
-import os
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
-import shapely.geometry
+from unittest.mock import Mock
 
-# Add the lib directory to Python path for testing
-lib_path = Path(__file__).parent.parent.parent / "lib"
-sys.path.insert(0, str(lib_path))
+import shapely
 
-# Import the classes from the concatenated kernel setup
-def test_overlay_processor_zoom_scaling():
-    """Test that OverlayTileProcessor correctly scales coordinates by zoom level"""
-    
-    # Execute the kernel setup code to get the classes
-    kernel_file = lib_path / "kernel" / "kernel-setup.py"
-    namespace = {}
-    
-    # Mock get_ipython() function to avoid errors in test environment
-    mock_ipython = Mock()
-    mock_ipython.kernel.comm_manager.register_target = Mock()
-    namespace['get_ipython'] = lambda: mock_ipython
-    
-    with open(kernel_file, 'r') as f:
-        kernel_code = f.read()
-    exec(kernel_code, namespace)
-    
-    # Get the classes we need
-    OverlayTileProcessor = namespace['OverlayTileProcessor']
-    AdvancedCacheManager = namespace['AdvancedCacheManager']
-    OSMLKernelLogger = namespace['OSMLKernelLogger']
-    
-    # Create processor with mock dependencies
+from aws.osml.jupyter.processors.overlay import OverlayTileProcessor
+from aws.osml.jupyter.cache import AdvancedCacheManager
+from aws.osml.jupyter.core import OSMLKernelLogger
+
+
+def _make_processor():
     cache_manager = Mock(spec=AdvancedCacheManager)
     logger = Mock(spec=OSMLKernelLogger)
-    processor = OverlayTileProcessor(cache_manager, logger)
-    
-    # Mock the overlay factory
+    return OverlayTileProcessor(cache_manager, logger), cache_manager
+
+
+def test_overlay_processor_zoom_scaling():
+    """Test that OverlayTileProcessor correctly scales coordinates by zoom level"""
+    processor, cache_manager = _make_processor()
+
     mock_factory = Mock()
     mock_factory.find_intersects.return_value = []
-    cache_manager.get_overlay_factory.return_value = mock_factory
-    
-    # Mock comm
+    cache_manager.get_overlay_index.return_value = mock_factory
+
     mock_comm = Mock()
-    
-    # Test data for different zoom levels
+
     test_cases = [
-        # zoom, expected_scale, expected_scaled_tile_size
-        (-2, 4.0, 2048),    # 2^(-1 * -2) = 2^2 = 4
-        (-1, 2.0, 1024),    # 2^(-1 * -1) = 2^1 = 2  
-        (0, 1.0, 512),      # 2^(-1 * 0) = 2^0 = 1
-        (1, 0.5, 256),      # 2^(-1 * 1) = 2^-1 = 0.5
-        (2, 0.25, 128),     # 2^(-1 * 2) = 2^-2 = 0.25
+        (-2, 4.0, 2048),
+        (-1, 2.0, 1024),
+        (0, 1.0, 512),
+        (1, 0.5, 256),
+        (2, 0.25, 128),
     ]
-    
+
     for zoom, expected_scale, expected_scaled_tile_size in test_cases:
-        # Reset mock
         mock_factory.find_intersects.reset_mock()
-        
-        # Test data
+
         data = {
             'imageName': 'test_image.tiff',
-            'overlayName': 'test_overlay.geojson', 
+            'overlayName': 'test_overlay.geojson',
             'zoom': zoom,
             'row': 1,
-            'col': 2
+            'col': 2,
         }
-        
-        # Process the request
+
         processor.process(data, mock_comm)
-        
-        # Verify find_intersects was called with correctly scaled bounding box
+
         assert mock_factory.find_intersects.called
         call_args = mock_factory.find_intersects.call_args[0]
         bbox = call_args[0]
-        
-        # Expected coordinates based on row=1, col=2
+
         expected_min_x = 2 * expected_scaled_tile_size
-        expected_min_y = 1 * expected_scaled_tile_size  
+        expected_min_y = 1 * expected_scaled_tile_size
         expected_max_x = 3 * expected_scaled_tile_size
         expected_max_y = 2 * expected_scaled_tile_size
-        
-        # Verify bounding box coordinates
-        assert bbox.bounds[0] == expected_min_x, f"Zoom {zoom}: Wrong min_x. Expected {expected_min_x}, got {bbox.bounds[0]}"
-        assert bbox.bounds[1] == expected_min_y, f"Zoom {zoom}: Wrong min_y. Expected {expected_min_y}, got {bbox.bounds[1]}" 
-        assert bbox.bounds[2] == expected_max_x, f"Zoom {zoom}: Wrong max_x. Expected {expected_max_x}, got {bbox.bounds[2]}"
-        assert bbox.bounds[3] == expected_max_y, f"Zoom {zoom}: Wrong max_y. Expected {expected_max_y}, got {bbox.bounds[3]}"
+
+        assert bbox.bounds[0] == expected_min_x, f"Zoom {zoom}: Wrong min_x"
+        assert bbox.bounds[1] == expected_min_y, f"Zoom {zoom}: Wrong min_y"
+        assert bbox.bounds[2] == expected_max_x, f"Zoom {zoom}: Wrong max_x"
+        assert bbox.bounds[3] == expected_max_y, f"Zoom {zoom}: Wrong max_y"
 
 
 def test_feature_filtering_by_zoom():
-    """Test that the _filter_features_by_zoom method works correctly when called directly"""
-    
-    # Execute the kernel setup code to get the classes
-    kernel_file = lib_path / "kernel" / "kernel-setup.py"
-    namespace = {}
-    
-    # Mock get_ipython() function to avoid errors in test environment
-    mock_ipython = Mock()
-    mock_ipython.kernel.comm_manager.register_target = Mock()
-    namespace['get_ipython'] = lambda: mock_ipython
-    
-    with open(kernel_file, 'r') as f:
-        kernel_code = f.read()
-    exec(kernel_code, namespace)
-    
-    # Get the classes we need
-    OverlayTileProcessor = namespace['OverlayTileProcessor']
-    AdvancedCacheManager = namespace['AdvancedCacheManager']
-    OSMLKernelLogger = namespace['OSMLKernelLogger']
-    
-    # Create processor
-    cache_manager = Mock(spec=AdvancedCacheManager)
-    logger = Mock(spec=OSMLKernelLogger)
-    processor = OverlayTileProcessor(cache_manager, logger)
-    
-    # Create test features (more than the limits)
-    test_features = []
-    for i in range(1000):  # Create 1000 features
-        feature = {
-            'type': 'Feature',
-            'geometry': {
-                'type': 'Point',
-                'coordinates': [i, i]
-            },
-            'properties': {'id': i}
-        }
-        test_features.append(feature)
-    
-    # Test the filtering method directly (since it's not currently used in the main flow)
-    # This tests the filtering logic itself, not the integration
-    test_cases = [
-        (-3, 5000),   # Based on ZOOM_FEATURE_LIMITS in the code
-        (-1, 20000),  # Based on ZOOM_FEATURE_LIMITS in the code
-        (0, 50000),   # Based on ZOOM_FEATURE_LIMITS in the code
-        (2, 200000),  # Based on ZOOM_FEATURE_LIMITS in the code
+    """Test that _filter_features_by_zoom returns all features when under every limit"""
+    processor, _ = _make_processor()
+
+    test_features = [
+        {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [i, i]}, 'properties': {'id': i}}
+        for i in range(1000)
     ]
-    
-    for zoom, expected_limit in test_cases:
+
+    for zoom in [-3, -1, 0, 2]:
         filtered = processor._filter_features_by_zoom(test_features, zoom)
-        
-        # Since we have 1000 features and all limits are above 1000,
-        # we should get back all 1000 features
-        assert len(filtered) == 1000, f"Zoom {zoom}: Expected 1000 features (under limit {expected_limit}), got {len(filtered)}"
-    
-    # Test with a smaller limit to verify filtering actually works
-    # Create a test with features that exceed a smaller made-up limit
-    small_test_features = test_features[:10]  # Only 10 features
-    
-    # The filtering should work, but since our test features (10) are under all limits, 
-    # we should get all 10 back
-    filtered_small = processor._filter_features_by_zoom(small_test_features, -3)
-    assert len(filtered_small) == 10, f"Expected 10 features for small test, got {len(filtered_small)}"
+        assert len(filtered) == 1000, f"Zoom {zoom}: expected 1000 features, got {len(filtered)}"
+
+    filtered_small = processor._filter_features_by_zoom(test_features[:10], -3)
+    assert len(filtered_small) == 10
 
 
 def test_feature_importance_filtering():
-    """Test that features are filtered by importance (area) at negative zoom levels"""
-    
-    # Execute the kernel setup code to get the classes  
-    kernel_file = lib_path / "kernel" / "kernel-setup.py"
-    namespace = {}
-    
-    # Mock get_ipython() function to avoid errors in test environment
-    mock_ipython = Mock()
-    mock_ipython.kernel.comm_manager.register_target = Mock()
-    namespace['get_ipython'] = lambda: mock_ipython
-    
-    with open(kernel_file, 'r') as f:
-        kernel_code = f.read()
-    exec(kernel_code, namespace)
-    
-    # Get the classes we need
-    OverlayTileProcessor = namespace['OverlayTileProcessor']
-    AdvancedCacheManager = namespace['AdvancedCacheManager'] 
-    OSMLKernelLogger = namespace['OSMLKernelLogger']
-    
-    # Create processor
-    cache_manager = Mock(spec=AdvancedCacheManager)
-    logger = Mock(spec=OSMLKernelLogger)
-    processor = OverlayTileProcessor(cache_manager, logger)
-    
-    # Create test features with different sizes (polygons with different areas)
+    """Test that _filter_by_importance returns the N largest features"""
+    processor, _ = _make_processor()
+
     test_features = [
-        # Large polygon (area = 400)
         {
             'type': 'Feature',
-            'geometry': {
-                'type': 'Polygon', 
-                'coordinates': [[[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]]
-            },
-            'properties': {'id': 'large', 'area': 400}
+            'geometry': {'type': 'Polygon', 'coordinates': [[[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]]},
+            'properties': {'id': 'large', 'area': 400},
         },
-        # Medium polygon (area = 100)
         {
             'type': 'Feature',
-            'geometry': {
-                'type': 'Polygon',
-                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]
-            },
-            'properties': {'id': 'medium', 'area': 100}
+            'geometry': {'type': 'Polygon', 'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]},
+            'properties': {'id': 'medium', 'area': 100},
         },
-        # Small polygon (area = 25)  
         {
             'type': 'Feature',
-            'geometry': {
-                'type': 'Polygon',
-                'coordinates': [[[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]]]
-            },
-            'properties': {'id': 'small', 'area': 25}
+            'geometry': {'type': 'Polygon', 'coordinates': [[[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]]]},
+            'properties': {'id': 'small', 'area': 25},
         },
-        # Point (area = 0)
         {
-            'type': 'Feature', 
-            'geometry': {
-                'type': 'Point',
-                'coordinates': [0, 0]
-            },
-            'properties': {'id': 'point', 'area': 0}
-        }
+            'type': 'Feature',
+            'geometry': {'type': 'Point', 'coordinates': [0, 0]},
+            'properties': {'id': 'point', 'area': 0},
+        },
     ]
-    
-    # Filter by importance (should return larger features first)
+
     filtered = processor._filter_by_importance(test_features, 2)
-    
-    # Should return 2 features: the largest and medium ones
+
     assert len(filtered) == 2
-    
-    # Should be sorted by area (largest first)
     assert filtered[0]['properties']['id'] == 'large'
     assert filtered[1]['properties']['id'] == 'medium'
 

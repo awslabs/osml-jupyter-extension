@@ -3,8 +3,10 @@
 import { ServiceManager } from '@jupyterlab/services';
 import { IPropertyInspectorProvider } from '@jupyterlab/property-inspector';
 
+import { IViewerNavigator } from '../types';
 import {
   CommService,
+  PushDispatcher,
   ImageTileService,
   FeatureTileService,
   KernelService,
@@ -100,6 +102,27 @@ export class ServiceContainer {
   }
 
   /**
+   * Create the `PushDispatcher` and register it with `CommService` so
+   * kernel-initiated push messages are routed to frontend services. Called
+   * once the viewer widget (the navigation surface) exists.
+   */
+  public registerPushDispatcher(navigator: IViewerNavigator): void {
+    const commService = this.getService<CommService>('commService');
+    const layerManager = this.getService<LayerManager>('layerManager');
+    const featureTileService =
+      this.getService<FeatureTileService>('featureTileService');
+    const imageManager = this.getService<ImageManager>('imageManager');
+    const dispatcher = new PushDispatcher(
+      navigator,
+      layerManager,
+      featureTileService,
+      () => imageManager.getCurrentImageName() || undefined
+    );
+    this.services.set('pushDispatcher', dispatcher);
+    commService.setPushDispatcher(dispatcher);
+  }
+
+  /**
    * Register property inspector provider and wire up signals
    */
   public registerPropertyInspector(
@@ -111,15 +134,9 @@ export class ServiceContainer {
     );
     const imageManager = this.getService<ImageManager>('imageManager');
     const layerManager = this.getService<LayerManager>('layerManager');
-    const featureTileService =
-      this.getService<FeatureTileService>('featureTileService');
 
     // Set layer dependencies for property inspector manager
-    propertyInspectorManager.setLayerDependencies(
-      layerManager,
-      featureTileService,
-      () => imageManager.getCurrentImageName() || undefined
-    );
+    propertyInspectorManager.setLayerDependencies(layerManager);
 
     // Register with property inspector
     propertyInspectorManager.register(propertyInspectorProvider, widget);

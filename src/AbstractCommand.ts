@@ -77,6 +77,12 @@ export abstract class AbstractCommand {
         this.sharedState.serviceContainer
       );
 
+      // Wire the push channel: the dispatcher routes kernel-initiated pushes
+      // (e.g. SET_VIEW) to the viewer widget's navigation surface.
+      this.sharedState.serviceContainer.registerPushDispatcher(
+        this.sharedState.widget
+      );
+
       // Register with property inspector if available
       if (this.propertyInspectorProvider) {
         this.sharedState.serviceContainer.registerPropertyInspector(

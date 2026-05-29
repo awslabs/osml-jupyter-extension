@@ -31,13 +31,15 @@ To view satellite imagery in the extension:
 1. **Navigate to your image file** in the JupyterLab file browser
 2. **Right-click** on a supported image file with extensions: `.ntf`, `.nitf`, `.tiff`, or `.tif`
 3. **Select "OversightML: Open"** from the context menu (this option only appears for supported image files)
-4. **Choose the kernel** that has osml-imagery-toolkit installed (typically `osml-kernel`)
+4. **Choose any Python kernel** from the kernel selection dialog — no special setup is required
 
 ![Opening an image with context menu](images/open-image-context-menu.png)
 
 ![Kernel selection dialog](images/kernel-selection-dialog.png)
 
-The image viewer will open in a new tab, and the image will begin loading. You'll see status updates in the JupyterLab status bar during the loading process.
+The image viewer will open in a new tab. On first use, the extension will automatically install its Python dependencies into the selected kernel environment using `pip`. A progress notification will appear in the lower-right corner during installation, which typically takes 10–30 seconds depending on network speed. Subsequent uses of the same kernel are instant — the already-installed package is detected and no network access is needed.
+
+> **Air-gapped / pre-provisioned environments**: If your kernel cannot reach PyPI, pre-install `osml-imagery-toolkit` and `osml-imagery-io` into the kernel environment before using the extension. The bootstrap will detect the pre-installed dependencies and complete installation without any outbound network access. See `conda/osml-kernel-environment.yml` for an example environment specification.
 
 ### 2. Adding Overlay Layers
 
@@ -129,47 +131,100 @@ One of the powerful features of the OSML Jupyter Extension is its ability to wor
 
 1. **Open an image** using the extension (this establishes the kernel session)
 2. **Create or open a Jupyter notebook** in the same JupyterLab instance
-3. **Select the same kernel** that's being used by the image viewer. There should be a kernel named OversightML Image Viewer in the section for existing python kernels.
+3. **Select the same kernel** that's being used by the image viewer. There will be a running kernel named OversightML Image Viewer in the list of existing Python kernels — connecting to it shares the already-bootstrapped session with no additional setup.
 
 ![Notebook kernel selection](images/notebook-kernel-selection.png)
 
-#### Publishing Layers from Notebook Code
+#### The `viewer` Object
 
-Once your notebook is connected to the same kernel, you can programmatically create and display layers. The extension supports creating features using **pixel coordinates** which are automatically converted to geographic coordinates.
+Once your notebook is connected to the same kernel, import the `viewer` object to drive the extension from notebook code:
+
+```python
+from aws.osml.jupyter import viewer, ViewerError
+
+# The dataset path the viewer currently has open (or None).
+print(viewer.current_image)
+```
+
+`viewer` is a singleton bound to the kernel's live state. It lets you **read** the current view (bounds, clicks), **reach** the underlying toolkit objects for the open image, **query** imagery, and **push** results back as rendered layers or viewport moves. Reading or acting on `viewer` before an image is open raises `ViewerError`.
+
+> **📌 Viewer-first topology**: The supported flow is to _open an image first_, then attach a notebook to the viewer's kernel — exactly as described under "Setting Up Notebook Integration" above. Starting a notebook first and attaching a viewer to it is not supported.
 
 ##### Complete Example Notebook
 
-For a comprehensive example of publishing layers from notebook code, see our complete example notebook:
+For a comprehensive, runnable walkthrough of every function below, see our complete example notebook:
 
-📓 **[Publishing Layers Example Notebook](examples/publishing_layers_example.ipynb)**
+📓 **[Notebook Viewer Example Notebook](examples/notebook_viewer_example.ipynb)**
 
 This notebook includes examples of:
 
+- Reading live view state and click events
+- Reaching the toolkit `reader` / `sensor_model` / `chip_factory`
 - Object detection results with bounding boxes
 - Road networks using LineString geometries
 - Example regions with Polygon boundaries
 
-##### Quick Start Example
+##### Reading the Live View State
 
-Here's a simple example to get you started:
+As you navigate in the viewer, the frontend streams the settled view bounds and the last click back to the kernel. These reads are **point-in-time**, not reactive — re-run a cell to see the latest values. They return `None` until the view has settled / a click has landed.
+
+```python
+# Re-run after the view settles (~300 ms) or after you click in the viewer.
+bounds = viewer.view_bounds
+if bounds is not None:
+    print("image-space rect:", bounds.image)  # shapely box
+    print("zoom:", bounds.zoom)
+
+click = viewer.last_click
+if click is not None:
+    print("image coords:", click.image)   # ImageCoordinate
+    print("feature:", click.feature)       # GeoJSON feature, if one was hit
+    print("layer:", click.layer)           # layer id, if a feature was hit
+```
+
+The image → world transform is computed **lazily** and memoized when you read `.world`. `view_bounds.world` returns four corner `GeodeticWorldCoordinate`s (in image-corner order TL, TR, BR, BL); `view_bounds.world_polygon` wraps them as a GeoJSON `Polygon` in degrees. `click.world` returns the clicked point as a `GeodeticWorldCoordinate`.
+
+> **⚠️ Radians caveat**: `GeodeticWorldCoordinate` stores longitude/latitude in **radians**. The `.world` properties return correctly-constructed coordinates and `.world_polygon` already emits degrees — but if you call the sensor model directly, convert its result with `math.degrees()`. For order-independent extent, prefer `view_bounds.image.bounds` → `(minx, miny, maxx, maxy)` over the shapely ring, whose vertex order differs from `.world`.
+
+##### Reaching the Toolkit Objects
+
+`viewer.reader`, `viewer.sensor_model`, and `viewer.chip_factory` hand you the live toolkit objects for the current image — the same `DatasetReader` / `SensorModel` / `ChipFactory` the viewer itself uses. They raise a clear `ViewerError` (rather than returning `None`) when no image is loaded, so your code fails loudly.
+
+```python
+import math
+from aws.osml.photogrammetry import ImageCoordinate
+
+sensor_model = viewer.sensor_model
+
+# Direct sensor-model transform — result is in radians, so convert to degrees.
+world = sensor_model.image_to_world(ImageCoordinate([100.0, 100.0]))
+print(f"pixel (100, 100) -> lon={math.degrees(world.longitude):.6f}, "
+      f"lat={math.degrees(world.latitude):.6f}")
+```
+
+##### Querying the Current Image
+
+```python
+print("metadata keys:", list(viewer.metadata().keys()))
+print("statistics:", viewer.statistics())
+
+# Features intersecting a bbox (defaults to the current view bounds, all layers).
+if viewer.view_bounds is not None:
+    print("features in view:", len(viewer.features_in()))
+```
+
+`viewer.features_in(bbox=None, layer=None)` returns the features intersecting a bbox (an image-space shapely geometry or `(minx, miny, maxx, maxy)` tuple). It defaults to the current view bounds and searches every overlay loaded for the current image unless you restrict it to a single `layer`.
+
+#### Publishing Layers with `viewer.add_layer`
+
+`viewer.add_layer(features, name)` projects and indexes features on the kernel, then pushes them to the viewer so they render immediately over the existing tile path. It accepts a GeoJSON `FeatureCollection` dict, a `list` of features, or any object exposing `__geo_interface__` (a GeoDataFrame is duck-typed — no hard geopandas dependency).
+
+`name` is **required**; re-adding under the same name **replaces** the existing layer, so re-running a cell is idempotent. Features are specified in **pixel coordinates**, which the extension automatically converts to geographic coordinates.
 
 ```python
 import geojson
 
-# Prepare a feature collection for serving tiles.
-# NOTE: This function will likely be moved into a reusable library for use by the
-# extension.
-def publish_overlay(image_name, collection_name, fc):
-    accessor = ImagedFeaturePropertyAccessor()
-    for f in fc['features']:
-        geom = accessor.find_image_geometry(f)
-        accessor.set_image_geometry(f, geom)
-
-    tile_index = STRFeature2DSpatialIndex(fc, use_image_geometries=True)
-    key = f"{image_name}:{collection_name}"
-    global_cache_manager.set_overlay_factory(key, tile_index)
-
-# Create a simple detection result using pixel coordinates
+# Create a simple detection result using pixel coordinates.
 detection = geojson.Feature(
     geometry=None,  # No geographic coordinates needed
     properties={
@@ -179,10 +234,8 @@ detection = geojson.Feature(
     }
 )
 
-detection_collection = geojson.FeatureCollection(features=[detection])
-
-# Publish to the image viewer (replace with your image filename)
-publish_overlay("your_image.tif", "Detections", detection_collection)
+# Render the feature collection as a named layer in the viewer.
+viewer.add_layer(geojson.FeatureCollection(features=[detection]), name="Detections")
 ```
 
 #### Feature Coordinate Systems
@@ -238,11 +291,13 @@ For detailed geometries like roads, boundaries, or precise object outlines:
 }
 ```
 
+A single `add_layer` call can mix geometry types in one collection, so one named layer can carry bounding boxes, lines, and polygons together.
+
 > **📍 Coordinate System**: Pixel coordinates use the **top-left corner as (0,0)** with x increasing rightward and y increasing downward. The extension automatically converts these pixel coordinates to geographic coordinates based on the image's geospatial metadata.
 
 #### Working with Multiple Data Sources
 
-You can combine data from various sources and publish them as layers:
+You can combine data from various sources and publish each as its own named layer:
 
 ```python
 # Create detection results
@@ -251,9 +306,29 @@ detections = create_detection_results()  # Your analysis function
 # Create analysis regions
 regions = create_analysis_regions()      # Your region definition
 
-# Publish both layers
-publish_overlay("satellite_image.tif", "Object_Detections", detections)
-publish_overlay("satellite_image.tif", "Analysis_Regions", regions)
+# Publish both as separate layers.
+viewer.add_layer(detections, name="Object_Detections")
+viewer.add_layer(regions, name="Analysis_Regions")
+```
+
+#### Moving the Viewport
+
+`viewer.goto(...)` moves the viewport to a point. Pass either image-space `x`/`y` or geographic `lon`/`lat` (degrees) — geographic coordinates are converted to image space kernel-side via the current sensor model. `zoom` is optional; when omitted the viewer preserves the current zoom. `viewer.set_view(bounds, zoom=None)` centers the viewport on an image-space rectangle.
+
+```python
+# Move to an image pixel with an explicit zoom.
+viewer.goto(x=1024, y=768, zoom=2)
+
+# Or move to a geographic coordinate (degrees; converted kernel-side).
+viewer.goto(lon=-77.0369, lat=38.9072, zoom=4)
+```
+
+#### Removing Layers
+
+`viewer.remove_layer(name)` unloads the layer's index and clears it from the viewer.
+
+```python
+viewer.remove_layer("Detections")
 ```
 
 ---

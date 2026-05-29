@@ -6,23 +6,28 @@ Mock Jupyter comm channel for testing message processors
 class MockComm:
     """Mock Jupyter comm channel for testing"""
     
-    def __init__(self):
+    def __init__(self, comm_id="test_comm_id"):
         self.sent_messages = []
         self.message_handlers = []
+        self.close_handlers = []
         self.is_open = True
-        self.comm_id = "test_comm_id"
+        self.comm_id = comm_id
         self.target_name = "osml-jupyter-extension"
-    
+
     def send(self, data):
         """Mock sending a message"""
         if self.is_open:
             self.sent_messages.append(data)
         else:
             raise RuntimeError("Comm is closed")
-    
+
     def on_msg(self, handler):
         """Mock registering a message handler"""
         self.message_handlers.append(handler)
+
+    def on_close(self, handler):
+        """Mock registering a close handler"""
+        self.close_handlers.append(handler)
     
     def simulate_message(self, msg_data):
         """Simulate receiving a message from frontend"""
@@ -35,8 +40,10 @@ class MockComm:
             handler(mock_msg)
     
     def close(self):
-        """Mock closing the comm channel"""
+        """Mock closing the comm channel, firing registered close handlers"""
         self.is_open = False
+        for handler in self.close_handlers:
+            handler({})
     
     def get_last_message(self):
         """Get the last sent message"""
@@ -79,14 +86,16 @@ class MockCommManager:
     def __init__(self):
         self.comms = {}
         self.targets = {}
-    
+        self._comm_counter = 0
+
     def register_target(self, target_name, handler):
         """Mock registering a comm target"""
         self.targets[target_name] = handler
-    
+
     def new_comm(self, target_name, data=None):
         """Mock creating a new comm"""
-        comm = MockComm()
+        self._comm_counter += 1
+        comm = MockComm(comm_id=f"test_comm_id_{self._comm_counter}")
         comm.target_name = target_name
         self.comms[comm.comm_id] = comm
         

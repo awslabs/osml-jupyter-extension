@@ -58,7 +58,6 @@ const LayerControlPanel: FC<ILayerControlPanelProps> = ({
   layers,
   actions
 }) => {
-  const [datasetName, setDatasetName] = useState('');
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(
     null
   );
@@ -86,90 +85,8 @@ const LayerControlPanel: FC<ILayerControlPanelProps> = ({
     actions.deleteLayer(layerId);
   };
 
-  // Handle adding named dataset
-  const handleAddDataset = () => {
-    if (datasetName.trim()) {
-      actions.addNamedDataset(datasetName.trim());
-      setDatasetName(''); // Clear input after adding
-    }
-  };
-
-  // Handle Enter key press in text input
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleAddDataset();
-    }
-  };
-
   return (
     <div>
-      {/* Add Named Dataset Section */}
-      <div
-        style={{
-          marginBottom: '16px',
-          padding: '12px',
-          border: '1px solid var(--jp-border-color1)',
-          borderRadius: '4px',
-          backgroundColor: 'var(--jp-layout-color1)'
-        }}
-      >
-        <div
-          style={{
-            fontWeight: '600',
-            marginBottom: '8px',
-            fontSize: 'var(--jp-ui-font-size1)',
-            color: 'var(--jp-ui-font-color1)'
-          }}
-        >
-          Add Dataset Layer
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center'
-          }}
-        >
-          <input
-            type="text"
-            value={datasetName}
-            onChange={e => setDatasetName(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Enter dataset name..."
-            style={{
-              flex: 1,
-              padding: '6px 8px',
-              border: '1px solid var(--jp-border-color1)',
-              borderRadius: '3px',
-              fontSize: 'var(--jp-ui-font-size1)',
-              fontFamily: 'var(--jp-ui-font-family)',
-              outline: 'none',
-              backgroundColor: 'var(--jp-layout-color0)',
-              color: 'var(--jp-ui-font-color1)',
-              boxSizing: 'border-box'
-            }}
-          />
-          <button
-            onClick={handleAddDataset}
-            disabled={!datasetName.trim()}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: datasetName.trim()
-                ? 'var(--jp-brand-color1)'
-                : 'var(--jp-layout-color3)',
-              color: datasetName.trim() ? 'white' : 'var(--jp-ui-font-color2)',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: 'var(--jp-ui-font-size1)',
-              cursor: datasetName.trim() ? 'pointer' : 'not-allowed',
-              fontWeight: '500'
-            }}
-          >
-            Add
-          </button>
-        </div>
-      </div>
-
       {/* Active Layers Section */}
       <div>
         <div
@@ -197,8 +114,9 @@ const LayerControlPanel: FC<ILayerControlPanelProps> = ({
           >
             <div style={{ marginBottom: '4px' }}>No overlay layers</div>
             <div style={{ fontSize: 'var(--jp-ui-font-size0)' }}>
-              Add dataset layers using the input above or "OversightML: Add
-              Layer" from the file browser context menu.
+              Add layers with "OversightML: Add Layer" from the file browser
+              context menu, or from a notebook with{' '}
+              <code>viewer.add_layer(...)</code>.
             </div>
           </div>
         ) : (

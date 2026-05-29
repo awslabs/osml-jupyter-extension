@@ -16,10 +16,12 @@ import { LOGO_ICON } from './utils';
 import { ISharedWidgetState } from './AbstractCommand';
 import { OpenImageCommand } from './OpenImageCommand';
 import { AddLayerCommand } from './AddLayerCommand';
+import { BuildPyramidCommand } from './BuildPyramidCommand';
 
 namespace CommandIDs {
   export const openWithViewer = 'osml-jupyter-extension:openWithViewer';
   export const addLayer = 'osml-jupyter-extension:addLayer';
+  export const buildPyramid = 'osml-jupyter-extension:buildPyramid';
 }
 
 /**
@@ -99,6 +101,15 @@ async function activate(
     isVisible: () => addLayerCommand.isVisible()
   });
 
+  const buildPyramidCommand = new BuildPyramidCommand(app, manager, browser);
+
+  app.commands.addCommand(CommandIDs.buildPyramid, {
+    label: 'OversightML: Build Pyramid',
+    icon: LOGO_ICON,
+    execute: () => buildPyramidCommand.execute(),
+    isVisible: () => buildPyramidCommand.isVisible()
+  });
+
   console.log('Context Menu Children');
   for (const child in app.contextMenu.menu.children) {
     console.log(child);
@@ -114,6 +125,11 @@ async function activate(
     command: CommandIDs.addLayer,
     selector: '.jp-DirListing-item[data-isdir="false"]',
     rank: 2
+  });
+  app.contextMenu.addItem({
+    command: CommandIDs.buildPyramid,
+    selector: '.jp-DirListing-item[data-isdir="false"]',
+    rank: 3
   });
 
   if (settingRegistry) {
