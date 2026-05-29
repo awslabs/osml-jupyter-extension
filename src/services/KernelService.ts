@@ -3,6 +3,7 @@
 import { ServiceManager, KernelMessage } from '@jupyterlab/services';
 import {
   ISessionContext,
+  Notification,
   SessionContext,
   SessionContextDialogs
 } from '@jupyterlab/apputils';
@@ -10,6 +11,17 @@ import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
 import { KERNEL_SETUP_CODE } from '../utils';
 import { logger } from '../utils';
+
+/**
+ * Structured progress message emitted by the kernel bootstrap script over iopub.
+ */
+export interface IOsmlProgressMessage {
+  source: 'osml';
+  stage: string;
+  status: 'progress' | 'complete' | 'error';
+  message: string;
+  percent: number | null;
+}
 
 /**
  * Service for managing Jupyter kernel setup and lifecycle
@@ -137,53 +149,174 @@ export class KernelService {
   }
 
   /**
-   * Execute kernel setup code with proper promise handling
+   * Parse structured OSML progress messages from an iopub stream line.
+   * Returns null if the line is not a valid OSML progress message.
    */
-  private async executeKernelSetupCode(): Promise<void> {
+  private parseProgressMessage(line: string): IOsmlProgressMessage | null {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && parsed.source === 'osml') {
+        return parsed as IOsmlProgressMessage;
+      }
+    } catch {
+      // Not JSON or not an OSML message — ignore
+    }
+    return null;
+  }
+
+  /**
+   * Execute kernel setup code with progress notifications.
+   *
+   * @param notificationId - Optional existing notification ID to update (used for retry).
+   */
+  public async executeKernelSetupCode(notificationId?: string): Promise<void> {
     try {
       logger.debug('Executing kernel setup code');
 
-      // Install the code on the Jupyter session needed to create tiles and setup the server side of the comm channel.
-      const kernelSetupFuture =
-        this.sessionContext?.session?.kernel?.requestExecute({
-          code: KERNEL_SETUP_CODE
-        });
+      const kernel = this.sessionContext?.session?.kernel;
+      const kernelSetupFuture = kernel?.requestExecute({
+        code: KERNEL_SETUP_CODE
+      });
 
-      if (kernelSetupFuture) {
-        await new Promise<void>((resolve, reject) => {
-          kernelSetupFuture.onIOPub = function (
-            msg: KernelMessage.IIOPubMessage
-          ): void {
-            const msgType = msg.header.msg_type;
-            switch (msgType) {
-              case 'execute_result':
-                resolve();
-                break;
-              case 'error': {
-                const errorMessage = 'Kernel setup code execution failed';
-                logger.error(`KernelService setup failed: ${errorMessage}`);
-                console.error('Unable to setup kernel for JupyterImageLayer');
-                console.error(msg);
-                reject(new Error('Kernel setup failed'));
-                break;
-              }
-            }
-          };
-
-          kernelSetupFuture.done.catch(error => {
-            logger.error(
-              `KernelService setup code execution failed: ${error.message}`
-            );
-            reject(error);
-          });
-        });
-
-        logger.debug('Kernel setup code executed successfully');
-      } else {
+      if (!kernelSetupFuture) {
         const errorMessage = 'Failed to create kernel setup future';
         logger.error(`KernelService setup failed: ${errorMessage}`);
         throw new Error(errorMessage);
       }
+
+      let nId = notificationId ?? '';
+      let terminalStateReached = false;
+
+      const cancelAction: Notification.IAction = {
+        label: 'Cancel',
+        callback: () => {
+          kernel?.interrupt();
+        }
+      };
+
+      const retryAction: Notification.IAction = {
+        label: 'Retry',
+        callback: (event: MouseEvent) => {
+          event.preventDefault();
+          Notification.update({
+            id: nId,
+            message: 'Retrying kernel setup...',
+            type: 'in-progress',
+            actions: [cancelAction]
+          });
+          this.executeKernelSetupCode(nId);
+        }
+      };
+
+      if (!nId) {
+        nId = Notification.emit('Initializing kernel...', 'in-progress', {
+          autoClose: false,
+          actions: [cancelAction]
+        });
+      } else {
+        Notification.update({
+          id: nId,
+          message: 'Initializing kernel...',
+          type: 'in-progress',
+          actions: [cancelAction]
+        });
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        kernelSetupFuture.onIOPub = (
+          msg: KernelMessage.IIOPubMessage
+        ): void => {
+          const msgType = msg.header.msg_type;
+          switch (msgType) {
+            case 'stream': {
+              const content = msg.content as { text: string };
+              const lines = content.text.split('\n');
+              for (const line of lines) {
+                const progress = this.parseProgressMessage(line);
+                if (!progress) {
+                  continue;
+                }
+                if (progress.status === 'progress') {
+                  const msg =
+                    progress.percent !== null
+                      ? `${progress.message} (${progress.percent}%)`
+                      : progress.message;
+                  Notification.update({
+                    id: nId,
+                    message: msg,
+                    type: 'in-progress',
+                    actions: [cancelAction]
+                  });
+                } else if (progress.status === 'complete') {
+                  terminalStateReached = true;
+                  Notification.update({
+                    id: nId,
+                    message: progress.message,
+                    type: 'success',
+                    autoClose: 5000,
+                    actions: []
+                  });
+                  setTimeout(() => Notification.dismiss(nId), 5000);
+                } else if (progress.status === 'error') {
+                  terminalStateReached = true;
+                  Notification.update({
+                    id: nId,
+                    message: progress.message,
+                    type: 'error',
+                    autoClose: false,
+                    actions: [retryAction]
+                  });
+                }
+              }
+              break;
+            }
+            case 'execute_result':
+              resolve();
+              break;
+            case 'status': {
+              const content = msg.content as any;
+              if (content.execution_state === 'idle') {
+                resolve();
+              }
+              break;
+            }
+            case 'error': {
+              const errorMessage = 'Kernel setup code execution failed';
+              logger.error(`KernelService setup failed: ${errorMessage}`);
+              terminalStateReached = true;
+              Notification.update({
+                id: nId,
+                message: 'Kernel setup failed',
+                type: 'error',
+                autoClose: false,
+                actions: [retryAction]
+              });
+              reject(new Error('Kernel setup failed'));
+              break;
+            }
+          }
+        };
+
+        kernelSetupFuture.done.catch(error => {
+          logger.error(
+            `KernelService setup code execution failed: ${error.message}`
+          );
+          reject(error);
+        });
+      });
+
+      if (!terminalStateReached) {
+        Notification.update({
+          id: nId,
+          message: 'Kernel ready',
+          type: 'success',
+          autoClose: 5000,
+          actions: []
+        });
+        setTimeout(() => Notification.dismiss(nId), 5000);
+      }
+
+      logger.debug('Kernel setup code executed successfully');
     } catch (error: any) {
       logger.error(`KernelService setup code failed: ${error.message}`);
       throw error;
@@ -224,10 +357,10 @@ export class KernelService {
   /**
    * Dispose of the kernel service and clean up resources
    */
-  public dispose(): void {
+  public async dispose(): Promise<void> {
     try {
       if (this.sessionContext?.session) {
-        this.sessionContext.session.shutdown();
+        await this.sessionContext.session.shutdown();
       }
       this.sessionContext?.dispose();
       this.sessionContext = undefined;

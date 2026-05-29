@@ -15,7 +15,7 @@
 - Run `jlpm test:typescript` for frontend tests
 - Run `jlpm test:python` for backend kernel tests
 - Run `jlpm run lint` to enforce style checks. Some errors can be fixed automatically. Others will require intervention.
-- The kernel code concatenation happens automatically during build but can be run manually with `python scripts/concat-kernel.py`
+- The kernel wheel bundling happens automatically during build but can be run manually with `python scripts/bundle-kernel.py`
 
 ## Technology Stack
 

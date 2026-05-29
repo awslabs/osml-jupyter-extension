@@ -6,6 +6,8 @@ export * from './features';
 export * from './models';
 export * from './signals';
 
+import { FeatureTileDataFunction } from './tiles';
+
 /**
  * Common application types
  */
@@ -42,7 +44,112 @@ export type CommMessageType =
   | 'WORLD_TO_IMAGE_RESPONSE'
   | 'IMAGE_TO_WORLD_REQUEST'
   | 'IMAGE_TO_WORLD_RESPONSE'
-  | 'KERNEL_COMM_SETUP_COMPLETE';
+  | 'PYRAMID_BUILD_REQUEST'
+  | 'PYRAMID_BUILD_RESPONSE'
+  | 'KERNEL_COMM_SETUP_COMPLETE'
+  | PushMessageType;
+
+/**
+ * Kernel -> frontend push (render command) message types. These form the
+ * inbound "push channel"; they are disjoint from the request/response
+ * `*_RESPONSE` types so the persistent demultiplexer can route them without
+ * touching the tile-fetch hot path.
+ */
+export type PushMessageType =
+  | 'ADD_LAYER'
+  | 'REMOVE_LAYER'
+  | 'SET_VIEW'
+  | 'GOTO';
+
+/**
+ * The set of push types, for runtime membership checks in the demultiplexer.
+ */
+export const PUSH_MESSAGE_TYPES: ReadonlySet<PushMessageType> =
+  new Set<PushMessageType>(['ADD_LAYER', 'REMOVE_LAYER', 'SET_VIEW', 'GOTO']);
+
+/**
+ * Frontend -> kernel fire-and-forget "state stream" message types. These form a
+ * third category alongside request/response and the push channel: they feed the
+ * kernel-side `ViewStateStore` and expect no `*_RESPONSE`. Sent via
+ * `CommService.sendOneWay`.
+ */
+export type StateStreamMessageType = 'VIEW_STATE_UPDATE' | 'CLICK_EVENT';
+
+/**
+ * Fires after the viewport settles (~300 ms of stillness). Carries the current
+ * view rectangle in full-image pixel space plus zoom and the current image.
+ */
+export interface IViewStateUpdateMessage {
+  type: 'VIEW_STATE_UPDATE';
+  imageName: string;
+  minx: number;
+  miny: number;
+  maxx: number;
+  maxy: number;
+  zoom: number;
+}
+
+/**
+ * Emitted once per click. Carries the click location in full-image pixel space;
+ * `feature` (the picked object) and `layerId` are present only when a feature
+ * was hit. The frontend does not compute world coordinates here.
+ */
+export interface IClickEventMessage {
+  type: 'CLICK_EVENT';
+  imageName: string;
+  x: number;
+  y: number;
+  feature?: unknown;
+  layerId?: string;
+}
+
+/**
+ * Kernel -> frontend push message. Carries a render command routed by
+ * `PushDispatcher`. Fields are optional and interpreted per `type`.
+ */
+export interface IPushMessage {
+  type: PushMessageType;
+  /** Layer name for ADD_LAYER / REMOVE_LAYER. */
+  name?: string;
+  /** Optional style hints for ADD_LAYER. */
+  style?: IMetadataObject;
+  /** Target image-space coordinates for SET_VIEW / GOTO. */
+  x?: number;
+  y?: number;
+  /** Target zoom for SET_VIEW / GOTO. */
+  zoom?: number;
+  /** Owning image name for ADD_LAYER (defaults to current image). */
+  imageName?: string;
+}
+
+/**
+ * Minimal navigation surface the `PushDispatcher` needs from the viewer widget.
+ * Declared as an interface (rather than importing `ImageViewerWidget`) to avoid
+ * a service -> widget circular import.
+ */
+export interface IViewerNavigator {
+  navigateToCoordinates(x: number, y: number, zoom?: number): void;
+}
+
+/**
+ * Minimal layer-rendering surface the `PushDispatcher` needs to apply
+ * `ADD_LAYER` / `REMOVE_LAYER` pushes. Structurally satisfied by `LayerManager`.
+ */
+export interface ILayerRenderer {
+  addFeatureLayer(layerId: string, getTileData: FeatureTileDataFunction): void;
+  deleteLayer(layerId: string): void;
+}
+
+/**
+ * Minimal factory surface for feature-tile data functions the `PushDispatcher`
+ * needs for `ADD_LAYER` pushes. Structurally satisfied by `FeatureTileService`.
+ */
+export interface IFeatureDataFunctionFactory {
+  createFeatureDataFunction(
+    imageName: string,
+    overlayName: string
+  ): FeatureTileDataFunction;
+}
 
 /**
  * Communication message interface
@@ -151,7 +258,6 @@ export interface ILayerControlActions {
     color: [number, number, number, number]
   ) => void;
   deleteLayer: (layerId: string) => void;
-  addNamedDataset: (datasetName: string) => void;
 }
 
 /**
@@ -164,7 +270,6 @@ export interface ILayerManagerActions {
     color: [number, number, number, number]
   ) => void;
   deleteLayer: (layerId: string) => void;
-  addNamedDataset: (datasetName: string) => void;
   getLayerInfo: () => ILayerInfo[];
 }
 

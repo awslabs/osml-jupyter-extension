@@ -10,8 +10,13 @@
  * - Message handlers for image and overlay tile requests
  */
 
-// Import the Python code as a string
-import kernelSetupPython from '../kernel/kernel-setup.py';
+// The bootstrap is split into two Python files, both imported as raw strings:
+//   - kernel-payload.generated.py — generated DATA (base64 wheel, sha256, version)
+//   - kernel-bootstrap.py         — hand-maintained LOGIC (install + progress)
+// The payload MUST come first so the bootstrap logic can read the _WHEEL_B64 /
+// _WHEEL_SHA256 / _VERSION names it defines. See scripts/bundle-kernel.py.
+import kernelPayloadPython from '../kernel/kernel-payload.generated.py';
+import kernelBootstrapPython from '../kernel/kernel-bootstrap.py';
 
 /**
  * The Python code that the extension installs in a newly launched kernel to provide access to raster and vector
@@ -19,4 +24,4 @@ import kernelSetupPython from '../kernel/kernel-setup.py';
  * of the comm messaging handlers. It is only a MVP prototype for now and we will need to look for best practices
  * about how to manage this code going forward.
  */
-export const KERNEL_SETUP_CODE: string = kernelSetupPython;
+export const KERNEL_SETUP_CODE: string = `${kernelPayloadPython}\n\n${kernelBootstrapPython}`;

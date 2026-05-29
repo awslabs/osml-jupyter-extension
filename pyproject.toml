@@ -33,7 +33,12 @@ test = [
     "pytest-mock>=3.10",
     "numpy>=1.20.0",
     "pillow>=8.0.0",
-    "shapely>=2.0.2"
+    "shapely>=2.0.2",
+    # bundle-kernel.py builds the kernel wheel by calling the hatchling PEP 517
+    # backend directly. During `pip install .` it runs in pip's build overlay
+    # where hatchling is already present, but `jlpm run test` reruns build:lib in
+    # the bare runner interpreter — which only has what this extra installs.
+    "hatchling>=1.5.0"
 ]
 
 [tool.hatch.version]

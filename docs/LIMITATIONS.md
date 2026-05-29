@@ -18,19 +18,11 @@ This document outlines current limitations, known issues, and important consider
 
 ## Technical Limitations
 
-### Complex Build Process
+### Kernel Dependency Installation
 
-- **Issue**: Backend kernel code requires non-standard concatenation process
-- **Details**: Python kernel modules are concatenated using `scripts/concat-kernel.py` due to proof-of-concept architecture
-- **Impact**: Development workflow is more complex than typical JupyterLab extensions
-- **Workaround**: Follow development setup instructions carefully; build system handles concatenation automatically
-
-### Environment Dependencies
-
-- **Issue**: Requires specific conda environment setup with exact version matching
-- **Dependencies**: GDAL, Proj, and OSML Imagery Toolkit versions must align between development and kernel environments
-- **Impact**: Setup is more involved than typical Python packages
-- **Recommendation**: Use provided conda environment files (`conda/osml-kernel-environment.yml` and `conda/osml-jupyterlab-ext-dev-environment.yml`)
+- **Requirement**: On first use in a kernel, the extension installs its Python dependencies (`osml-imagery-toolkit`, `osml-imagery-io`, and the embedded kernel wheel) into that kernel's environment
+- **Impact**: The kernel needs either outbound access to PyPI (via `pip`) or those dependencies pre-provisioned. In fully air-gapped kernels without pre-provisioned dependencies, the first-use bootstrap cannot complete.
+- **Recommendation**: In connected environments no manual setup is required — the bootstrap runs automatically. For air-gapped or centrally managed deployments, pre-provision the kernel dependencies (see `conda/osml-kernel-environment.yml`) so the bootstrap completes without outbound network access.
 
 ### Primary Target Environment
 
@@ -50,7 +42,7 @@ This document outlines current limitations, known issues, and important consider
 
 - **Current Support**: NITF, GeoTIFF, SICD, SIDD, and GeoJSON datasets
 - **Limitation**: Some specialized satellite imagery formats may not be fully supported
-- **Dependency**: Format support depends on underlying GDAL and OSML Toolkit capabilities
+- **Dependency**: Format support depends on the underlying `osml-imagery-toolkit` / `osml-imagery-io` capabilities
 
 ### Performance Considerations
 
@@ -60,9 +52,9 @@ This document outlines current limitations, known issues, and important consider
 
 ### Kernel Session Management
 
-- **Requirement**: Extension requires kernel with specific dependencies installed
-- **Impact**: Cannot work with arbitrary Python kernels
-- **Setup**: Must use kernels with GDAL, Proj, and OSML Imagery Toolkit available
+- **Requirement**: Extension requires a kernel with its Python dependencies installed
+- **Impact**: Works with any Python kernel that has `pip` and PyPI access — the extension self-bootstraps its dependencies on first use
+- **Setup**: No manual dependency installation is needed in connected environments. In air-gapped kernels, pre-provision `osml-imagery-toolkit` and `osml-imagery-io` (see `conda/osml-kernel-environment.yml`)
 
 ## Usage Scope
 
@@ -82,8 +74,7 @@ This document outlines current limitations, known issues, and important consider
 
 ### Known Issue Categories
 
-- **Build System**: Complex concatenation process may occasionally fail
-- **Environment Setup**: Version mismatches between development and kernel environments
+- **Kernel Bootstrap**: First-use dependency installation may fail in kernels without PyPI access (see air-gapped guidance above)
 - **Memory Usage**: Large datasets may cause memory pressure
 - **Compatibility**: Issues with specific Jupyter or JupyterLab versions
 

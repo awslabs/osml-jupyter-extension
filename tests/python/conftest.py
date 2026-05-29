@@ -44,11 +44,6 @@ def sample_geojson_path(test_data_dir):
     return test_data_dir / "sample_overlay.geojson"
 
 
-@pytest.fixture
-def kernel_setup_file():
-    """Fixture providing path to concatenated kernel setup file"""
-    return Path("lib/kernel/kernel-setup.py")
-
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
@@ -149,9 +144,4 @@ def pytest_collection_modifyitems(config, items):
 
 
 def pytest_runtest_setup(item):
-    """Setup hook for individual tests"""
-    # Skip integration tests if build artifacts don't exist
-    if item.get_closest_marker("integration"):
-        kernel_file = Path("lib/kernel/kernel-setup.py")
-        if not kernel_file.exists():
-            pytest.skip("Integration tests require build artifacts - run 'jlpm build' first")
+    pass

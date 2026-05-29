@@ -1,13 +1,25 @@
 # Copyright Amazon.com, Inc. or its affiliates.
 
-# To build the environment run:
-# conda env create -f osml-kernel-environment.yml
+# OPTIONAL: Pre-provisioned kernel environment for air-gapped or managed deployments.
 #
-# To install in jupyter run:
-# conda activate osml-kernel
-# python3 -m ipykernel install --user --name=osml-kernel
+# This environment is NOT required for standard usage. The OSML JupyterLab extension
+# self-bootstraps into any Python kernel that has pip and PyPI access. On first use,
+# it automatically installs osml-imagery-toolkit, osml-imagery-io, and the embedded
+# osml-kernel wheel — no manual environment setup needed.
 #
-# After that refresh the jupyter tab in the browser to see the new environment
+# Use this file when:
+#   - Your kernel environment cannot reach PyPI (air-gapped networks)
+#   - You want to pre-provision kernel dependencies for faster first-use startup
+#   - Your organization manages conda environments centrally
+#
+# To build the environment:
+#   conda env create -f osml-kernel-environment.yml
+#
+# To register with Jupyter:
+#   conda activate osml-kernel
+#   python3 -m ipykernel install --user --name=osml-kernel
+#
+# After registering, refresh the JupyterLab tab to see the new kernel option.
 
 name: osml-kernel
 channels:
@@ -15,17 +27,13 @@ channels:
   - nodefaults
 dependencies:
   - python=3.12.9
-  - conda-forge::numpy=2.2.4
-  - conda-forge::gdal=3.8.5
-  - conda-forge::proj=9.4.1
   - ipykernel
   - python-graphviz
-  - conda-forge::py-opencv
   - geopandas
   - pip
   - pip:
       - boto3
       - tqdm
       - ipyleaflet
-      - osml-imagery-toolkit>=1.4.2
+      - osml-imagery-toolkit>=2.0.0a1
       - h3

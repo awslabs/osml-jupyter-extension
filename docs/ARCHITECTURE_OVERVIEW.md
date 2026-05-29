@@ -13,7 +13,97 @@ As a prebuilt extension, the OSML Jupyter Extension distributes JavaScript code 
 
 The extension is divided into two logical parts. The user interface is implemented as a frontend widget that runs within the JupyterLab web application. That UI communicates with the backend code running within a python kernel managed by the JupyterLab server.
 
-![Architecture Overview](images/architecture-overview.png)
+The diagram below traces the primary request path (solid arrows): rendering **layers** pull tiles from the **services**, which route requests through the **Comm** service and the Jupyter Comm Protocol to the kernel's **CommTarget**. The `MessageHandlerRegistry` dispatches each request to a **Message Processor**, which asks the **Cache** for an image session or overlay index. The cache is the factory that opens imagery via `osml-imagery-io` and builds the toolkit objects (chip factory, sensor model, spatial index); the processor then invokes those objects to generate the tile or query features. Dotted lines show orchestration and ownership rather than live request flow — the `ImageViewerWidget` creating the frontend subsystems, and the processor invoking the toolkit objects held by the cached session.
+
+```mermaid
+flowchart TB
+    subgraph Frontend["JupyterLab Frontend"]
+        direction TB
+        IVW["<b>ImageViewerWidget</b>"]:::widget
+
+        subgraph Layers["/layers"]
+            direction TB
+            L1["TileLayer"]:::component
+            L2["OverlayLayer"]:::component
+            L3(["Deck.gl"]):::library
+        end
+
+        subgraph Services["/services"]
+            direction TB
+            S1["ImageTile"]:::component
+            S2["VectorTile"]:::component
+            S3["Kernel"]:::component
+            S4["Comm"]:::component
+        end
+
+        subgraph Components["/components"]
+            direction TB
+            C1["Toolbar Items"]:::component
+            C2["Property Dialogs"]:::component
+        end
+
+        %% orchestration (ownership)
+        IVW -.-> Layers
+        IVW -.-> Services
+        IVW -.-> Components
+
+        %% data flow
+        L1 -->|"request raster tiles"| S1
+        L2 -->|"request vector tiles"| S2
+        S1 --> S4
+        S2 --> S4
+        S3 -.->|"session + setup"| S4
+    end
+
+    JupyterServer(["Jupyter Server"]):::infra
+
+    subgraph Kernel["Python Kernel"]
+        direction TB
+        subgraph MH["MessageHandler"]
+            direction TB
+            MH1["CommTarget"]:::component
+            MH2["Message Processors"]:::component
+        end
+
+        subgraph Cache["Cache"]
+            direction TB
+            CA1["ImageTiles"]:::component
+            CA2["FeatureTiles"]:::component
+        end
+
+        subgraph Toolkit["OSML Toolkit"]
+            direction TB
+            T1["Tile Factory"]:::component
+            T2["Sensor Models"]:::component
+            T3["Spatial Index"]:::component
+            T4(["osml-imagery-io"]):::library
+        end
+
+        %% kernel-side data flow
+        MH1 -->|"dispatch"| MH2
+        MH2 -->|"get / load session"| Cache
+        Cache -->|"open image, build chip factory & index"| Toolkit
+        MH2 -.->|"generate tile / query features"| Toolkit
+    end
+
+    %% cross-boundary data flow
+    S4 <==>|"Jupyter Comm Protocol"| JupyterServer
+    JupyterServer <==>|"Kernel Messages"| MH1
+
+    classDef widget fill:#F5A623,stroke:#B8791A,stroke-width:2px,color:#1A1A1A
+    classDef component fill:#FFD27F,stroke:#B8791A,stroke-width:1px,color:#1A1A1A
+    classDef library fill:#FFFFFF,stroke:#4A90D9,stroke-width:1.5px,stroke-dasharray:4 3,color:#1A1A1A
+    classDef infra fill:#4A90D9,stroke:#2C5A8C,stroke-width:2px,color:#FFFFFF
+
+    style Frontend fill:#EAF3FB,stroke:#4A90D9,stroke-width:2px,color:#1A1A1A
+    style Kernel fill:#EAF3FB,stroke:#4A90D9,stroke-width:2px,color:#1A1A1A
+    style Services fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+    style Layers fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+    style Components fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+    style MH fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+    style Cache fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+    style Toolkit fill:#FFF6E8,stroke:#B8791A,color:#1A1A1A
+```
 
 #### JupyterLab Frontend Components
 
@@ -38,24 +128,40 @@ The MessageHandler serves as the central communication hub within the Python ker
 The cache system is a performance optimization that stores frequently accessed data to reduce processing overhead and improve response times. This system implements LRU-based caching for processed image tiles to prevent redundant tile generation, while also maintaining cached vector tile data and spatial indexes for overlay features to accelerate subsequent requests. The caching infrastructure is designed to balance memory usage with performance gains, automatically managing cache eviction and ensuring optimal resource utilization.
 
 **OSML Toolkit Integration**
-The OSML Toolkit integration forms the core processing engine that handles all geospatial data operations. This integration includes a tile factory that converts complex satellite imagery into web-compatible tiles, advanced sensor models that handle geometric correction and coordinate transformations for accurate satellite imagery positioning, efficient spatial indexing capabilities for rapid querying of large vector datasets and overlay features. GDAL integration provides the low-level geospatial data processing and broad format support across various satellite imagery and vector data types.
+The OSML Toolkit integration forms the core processing engine that handles all geospatial data operations. This integration includes a tile factory that converts complex satellite imagery into web-compatible tiles, advanced sensor models that handle geometric correction and coordinate transformations for accurate satellite imagery positioning, efficient spatial indexing capabilities for rapid querying of large vector datasets and overlay features. The `osml-imagery-io` library provides the low-level geospatial data reading and broad format support across various satellite imagery and vector data types.
 
 ### Kernel Code Build and Injection System
 
-A critical aspect of the extension's architecture is its kernel code management system, which handles the deployment of Python backend code into running Jupyter kernels. The backend Python code follows a modular, numbered file architecture that ensures proper dependency resolution when concatenated.
+A critical aspect of the extension's architecture is its kernel code management system, which packages the Python backend as an embedded pip-installable wheel and self-bootstraps into any running IPython kernel on first use.
 
-**Concatenation Process:**
+The kernel code is split into two files by concern: hand-maintained bootstrap **logic** and generated **data**.
 
-1. `scripts/concat-kernel.py` scans `src/kernel/` for files matching pattern `[0-9][0-9]*_*.py`
-2. Files are sorted numerically to maintain dependency order
-3. Encoding/shebang conflicts are filtered during concatenation
-4. Output generates `src/kernel/kernel-setup.py` with section markers
-5. Completion indicator added for injection validation
+- `src/kernel/kernel-bootstrap.py` — the checked-in, hand-edited bootstrap logic. Contains no wheel data.
+- `src/kernel/kernel-payload.generated.py` — a data-only file (git-ignored) written by the build. Contains three assignments and no logic: `_WHEEL_B64` (the base64-encoded wheel), `_WHEEL_SHA256` (its content hash), and `_VERSION`.
+
+**Build-time wheel bundling (`scripts/bundle-kernel.py`):**
+
+1. Read the version from `package.json` and set `OSML_KERNEL_VERSION` (hatchling reads it for the dynamic package version)
+2. `python -m build src/kernel/ --wheel` builds the `osml-jupyter` package (the `aws.osml.jupyter` namespace package) into a wheel
+3. Compute the wheel's sha256 and base64-encode it
+4. Write `src/kernel/kernel-payload.generated.py` with `_WHEEL_B64`, `_WHEEL_SHA256`, and `_VERSION`
+5. Clean up build artifacts (`dist/`, `*.egg-info`)
+
+At runtime `src/utils/kernelSetupCode.ts` imports both `.py` files as raw strings (webpack `raw-loader`) and concatenates them **payload-first** (`${payload}\n\n${bootstrap}`) so the bootstrap logic can read the payload's names.
+
+**Runtime bootstrap sequence (executed in the kernel via `requestExecute`):**
+
+The self-heal keys on the **wheel content hash, not the version**. This is deliberate: during development the code changes without the version bumping, so a version check cannot detect changed-but-same-version code. The bootstrap compares `_WHEEL_SHA256` against a marker file (`.osml_wheel_sha256`) recorded next to the installed package and takes one of three paths:
+
+1. **Importable and hash matches** — the installed wheel is current; skip pip entirely
+2. **Importable but hash differs** (a dev rebuild at the same version) — decode the embedded wheel to a temp file and `pip install --force-reinstall --no-deps` to overwrite the stale code quickly
+3. **Not importable** (a fresh environment) — full `pip install` that resolves and installs the declared dependencies (`osml-imagery-toolkit~=2.0.0a1`, `osml-imagery-io~=0.1`) from PyPI, or from the already-installed environment in pre-provisioned/air-gapped deployments
+
+After install it records the hash to the marker, then `from aws.osml.jupyter import initialize; initialize(get_ipython())` wires up the comm target and message processors. JSON-formatted progress messages are emitted to `stdout` during installation and surfaced as JupyterLab notifications.
 
 #### Kernel Injection and Initialization
 
-The concatenated kernel code is injected into Jupyter kernels from the frontend when the ImageViewerWidget connects to a new backend kernel.
-Once injected, the kernel code establishes communication channels allowing the frontend and backend to exchange messages.
+The combined payload-plus-bootstrap script is injected into the kernel from the frontend when the ImageViewerWidget connects to a new backend kernel. Because the `osml-jupyter` wheel is installed into the kernel's `site-packages` and the hash marker is recorded alongside it, subsequent kernel reconnections find a matching hash, skip the pip step, and start instantly.
 
 ## Communication Architecture
 
@@ -78,36 +184,36 @@ The following sequence diagram illustrates how the frontend initializes the comm
 sequenceDiagram
     participant User
     participant JupyterLab
-    participant ImageViewerWidget
+    participant ServiceContainer
     participant KernelService
     participant CommService
     participant JupyterServer
     participant PythonKernel
     participant MessageHandler
+    participant ImageViewerWidget
 
-    User->>JupyterLab: Right-click file → "Open with OversightML"
-    JupyterLab->>ImageViewerWidget: Create widget instance
+    User->>JupyterLab: Right-click file → "OversightML: Open"
+    JupyterLab->>ServiceContainer: Command creates container, calls initialize()
 
-    ImageViewerWidget->>KernelService: initialize()
-    KernelService->>JupyterServer: Request kernel session
+    ServiceContainer->>KernelService: initialize()
+    KernelService->>JupyterServer: Create session (kernelPreference: ipython)
     JupyterServer->>PythonKernel: Start/connect to kernel
     PythonKernel-->>KernelService: Kernel ready
 
-    KernelService->>PythonKernel: Execute setup code
-    Note over PythonKernel: Import osml_jupyter_extension<br/>Initialize message handlers<br/>Register comm target
+    KernelService->>User: Prompt kernel selection dialog
+    User-->>KernelService: Choose kernel
 
-    PythonKernel->>MessageHandler: Register message processors
-    MessageHandler->>PythonKernel: Processors registered
-    PythonKernel-->>KernelService: Setup complete
+    KernelService->>PythonKernel: requestExecute(bootstrap script)
+    Note over PythonKernel: pip install osml-jupyter (first use)<br/>initialize(get_ipython()):<br/>register 'osml_comm_target'<br/>+ message processors
+    PythonKernel-->>KernelService: Execution idle (setup complete)
 
-    ImageViewerWidget->>CommService: initialize(targetName)
-    CommService->>PythonKernel: Open comm channel
-    PythonKernel->>MessageHandler: Route to comm target
-    MessageHandler-->>CommService: Comm channel established
+    ServiceContainer->>CommService: initialize(kernel, 'osml_comm_target')
+    CommService->>PythonKernel: createComm + open('osml_comm_target')
+    PythonKernel->>MessageHandler: Invoke comm target handler
+    MessageHandler-->>CommService: Send KERNEL_COMM_SETUP_COMPLETE
+    Note over CommService: Resolves once<br/>KERNEL_COMM_SETUP_COMPLETE received
 
-    MessageHandler->>CommService: Send KERNEL_COMM_SETUP_COMPLETE
-    CommService->>ImageViewerWidget: Initialization complete
-
+    ServiceContainer->>ImageViewerWidget: Create widget (services ready)
     Note over ImageViewerWidget: Widget ready for<br/>user interaction
     ImageViewerWidget-->>User: Display viewer interface
 ```
@@ -127,7 +233,7 @@ sequenceDiagram
     participant MessageRegistry
     participant TileProcessor as ImageTileProcessor
     participant Cache as CacheManager
-    participant GDAL as GDAL/OSML Toolkit
+    participant Toolkit as OSML Toolkit<br/>(osml-imagery-io)
 
     User->>ImageViewerWidget: Pan/zoom map
     ImageViewerWidget->>ImageTileService: Request tile at {zoom, row, col}
@@ -144,8 +250,8 @@ sequenceDiagram
     alt Tile in cache
         Cache-->>TileProcessor: Return cached tile
     else Tile not cached
-        TileProcessor->>GDAL: Process tile from image
-        GDAL-->>TileProcessor: Return processed tile
+        TileProcessor->>Toolkit: Process tile from image
+        Toolkit-->>TileProcessor: Return processed tile
         TileProcessor->>Cache: Store in cache
     end
 
@@ -158,12 +264,46 @@ sequenceDiagram
     ImageTileService-->>ImageViewerWidget: Provide tile for rendering
     ImageViewerWidget-->>User: Display updated map
 
-    Note over User,GDAL: Error Handling (Alternative Flow)
+    Note over User,Toolkit: Error Handling (Alternative Flow)
     alt Request timeout or error
         ImageTileService->>ImageViewerWidget: Return error placeholder
         ImageViewerWidget-->>User: Show error tile or retry
     end
 ```
+
+### Notebook Interoperability (the `viewer` object)
+
+Beyond the frontend-driven request/response flow above, the extension exposes a
+programmatic `viewer` object at `aws.osml.jupyter` that lets analysts drive the
+image viewer from an attached notebook. This is built on a **bidirectional lane**
+over the same `osml_comm_target` comm:
+
+- **State stream (frontend → kernel):** as the analyst navigates, the frontend
+  emits fire-and-forget `VIEW_STATE_UPDATE` (after the view settles, ~300 ms) and
+  `CLICK_EVENT` (one per click) messages carrying **raw image-space** coordinates.
+  A kernel-side `ViewStateStore` is the single source of truth for live view
+  state; it does no sensor-model math on write.
+- **Push channel (kernel → frontend):** the kernel pushes render commands
+  (`ADD_LAYER`, `REMOVE_LAYER`, `SET_VIEW`) to a persistent frontend
+  `PushDispatcher` via a `CommRegistry.broadcast` to all live comms. A permanent
+  `CommService` demultiplexer routes push types to the dispatcher and
+  `*_RESPONSE` types to the existing correlation layer.
+
+The `viewer` singleton lazily binds to the `ViewStateStore`, `CommRegistry`, and
+cache populated by `initialize()`. It lets a notebook read live state
+(`current_image`, `view_bounds`, `last_click`), reach the toolkit objects for the
+current image (`reader` / `sensor_model` / `chip_factory`), query imagery
+(`metadata()` / `statistics()` / `features_in()`), and push results back
+(`add_layer()` / `remove_layer()` / `goto()` / `set_view()`). The image → world
+transform is computed lazily on `.world` reads and memoized per bounds / click.
+The supported topology is **viewer-first** (open an image, then attach a notebook
+to the viewer's kernel). See
+[`docs/examples/notebook_viewer_example.ipynb`](examples/notebook_viewer_example.ipynb)
+for a worked example.
+
+Notebook-created layers use the same tile-rendering path as the file-browser
+"OversightML: Add Layer" context-menu action; `viewer.add_layer` supersedes the
+old type-a-name "Add Dataset Layer" panel widget, which has been retired.
 
 ## Alternatives Considered
 

@@ -12,7 +12,7 @@ import {
   ICurrentSelection,
   ILayerControlActions
 } from '../types';
-import { LayerManager, FeatureTileService } from './index';
+import { LayerManager } from './index';
 import { logger } from '../utils';
 
 /**
@@ -23,20 +23,12 @@ export class PropertyInspectorManager {
   private currentSelection: ICurrentSelection = { type: null };
   private imageInfo: IImageInfo = {};
   private layerManager?: LayerManager;
-  private featureTileService?: FeatureTileService;
-  private getCurrentImageName?: () => string | undefined;
 
   /**
    * Set layer dependencies needed for layer control functionality
    */
-  public setLayerDependencies(
-    layerManager: LayerManager,
-    featureTileService: FeatureTileService,
-    getCurrentImageName: () => string | undefined
-  ): void {
+  public setLayerDependencies(layerManager: LayerManager): void {
     this.layerManager = layerManager;
-    this.featureTileService = featureTileService;
-    this.getCurrentImageName = getCurrentImageName;
 
     // Connect to layer changes to update property inspector
     if (this.layerManager) {
@@ -131,28 +123,6 @@ export class PropertyInspectorManager {
           return;
         }
         this.layerManager.deleteLayer(layerId);
-      },
-      addNamedDataset: (datasetName: string) => {
-        if (
-          !this.layerManager ||
-          !this.featureTileService ||
-          !this.getCurrentImageName
-        ) {
-          return;
-        }
-
-        const imageName = this.getCurrentImageName();
-        if (!datasetName || !imageName) {
-          console.warn('Cannot add named dataset: Missing required parameters');
-          return;
-        }
-
-        const getFeatureTileData =
-          this.featureTileService.createFeatureDataFunction(
-            imageName,
-            datasetName
-          );
-        this.layerManager.addFeatureLayer(datasetName, getFeatureTileData);
       }
     };
   }
