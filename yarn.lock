@@ -5412,9 +5412,9 @@ __metadata:
   linkType: hard
 
 "ansi-regex@npm:^6.2.2":
-  version: 6.4.0
-  resolution: "ansi-regex@npm:6.4.0"
-  checksum: 8/8d0305a47218c994a15348d556d358c9a0b3a7abbd51be1c502447813839fb2b0f12700fca9e842acdd79e5740bb2a2d291880b4d770c1634068732a2a3091e5
+  version: 6.6.0
+  resolution: "ansi-regex@npm:6.6.0"
+  checksum: 8/101ea2a09dd4ab8a2329764a727280c76f38211c95156abd902a15de0a06939d02ca03075c873ff823459ff083a46e4a3c5aba66c7a4394eddfdddfc933e6fdc
   languageName: node
   linkType: hard
 
@@ -5711,11 +5711,11 @@ __metadata:
   linkType: hard
 
 "brace-expansion@npm:^2.0.2":
-  version: 2.1.7
-  resolution: "brace-expansion@npm:2.1.7"
+  version: 2.1.8
+  resolution: "brace-expansion@npm:2.1.8"
   dependencies:
     balanced-match: ^1.0.0
-  checksum: 8/bc9b64f6b9726b102ade72e0efa77d2ee456fcde51400f8ad7295a18d686a6df0f6a34e3e742c336ab3a46b21b5154d69d81fc00ab25821b1193376549f71fef
+  checksum: 8/a197cc5ec3fc468e523c2a0710cea6959caa26a2cc9f94b692f7faf057ef1e9d1de58dfb99bff6c6bed18a24493a741f8d5da63210430384a26f0b73daf3c746
   languageName: node
   linkType: hard
 
@@ -11204,9 +11204,9 @@ __metadata:
   linkType: hard
 
 "source-map-js@npm:^1.0.1, source-map-js@npm:^1.2.1":
-  version: 1.2.1
-  resolution: "source-map-js@npm:1.2.1"
-  checksum: 7bda1fc4c197e3c6ff17de1b8b2c20e60af81b63a52cb32ec5a5d67a20a7d42651e2cb34ebe93833c5a2a084377e17455854fee3e21e7925c64a51b6a52b0faf
+  version: 1.2.4
+  resolution: "source-map-js@npm:1.2.4"
+  checksum: b0fb346b142e89a19fa3299a259d8c0dc66626321634c30df260b2e8a1d4c1e219a6a28e8d10617cc54e7816d94eff5c4edd96e208172e93efc2c6fd75b111c6
   languageName: node
   linkType: hard
 
